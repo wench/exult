@@ -479,7 +479,6 @@ echo.  &gt;&gt;..\..\gitinfo.h</Command>
     <ClCompile Include="..\..\usecode\useval.cc" />
     <ClCompile Include="..\..\verify.cc" />
     <ClCompile Include="..\..\version.cc" />
-    <ClCompile Include="..\..\windrag.cc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\actions.h" />
@@ -717,7 +716,6 @@ echo.  &gt;&gt;..\..\gitinfo.h</Command>
     <ClInclude Include="..\..\usecode\useval.h" />
     <ClInclude Include="..\..\verify.h" />
     <ClInclude Include="..\..\version.h" />
-    <ClInclude Include="..\..\windrag.h" />
     <ClInclude Include="msvc_include.h" />
   </ItemGroup>
   <ItemGroup>
