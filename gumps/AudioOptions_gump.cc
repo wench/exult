@@ -24,7 +24,7 @@
 #	pragma GCC diagnostic ignored "-Wold-style-cast"
 #	pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #endif    // __GNUC__
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #ifdef __GNUC__
 #	pragma GCC diagnostic pop
 #endif    // __GNUC__
@@ -658,8 +658,8 @@ void AudioOptions_gump::paint() {
 		}
 	}
 
-	std::shared_ptr<Font>          font = fontManager.get_font("SMALL_BLACK_FONT");
-	Image_window8* iwin = gwin->get_win();
+	std::shared_ptr<Font> font = fontManager.get_font("SMALL_BLACK_FONT");
+	Image_window8*        iwin = gwin->get_win();
 
 	font->paint_text(iwin->get_ib8(), "Audio:", x + colx[0], y + rowy[1] + 1);
 	if (audio_enabled) {
