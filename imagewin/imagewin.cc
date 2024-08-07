@@ -943,7 +943,7 @@ void Image_window::show(int x, int y, int w, int h) {
 	// Final Rectangles actually being scaled.
 	// 4 rectangles for whole screen, right edge fixup, bottom edge fixup,
 	// and bottom right corner fixup.
-	int                     numrects = 0;
+	size_t                     numrects = 0;
 	std::array<TileRect, 4> rects;
 
 	// width has been clamped so add in a strip on the edge
