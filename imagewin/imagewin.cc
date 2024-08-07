@@ -37,7 +37,9 @@ Boston, MA  02111-1307, USA.
 #include "istring.h"
 #include "manip.h"
 #include "mouse.h"
+#include "rect.h"
 
+#include <array>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -45,8 +47,8 @@ Boston, MA  02111-1307, USA.
 // Simulate HighDPI mode without OS or Display Support for it
 // uncomment the define and set to a value greater than 1.0 to multiply the
 // fullscreen render surface resolution This should only be used for testing and
-// development and will likely degrade performance and quality 
-//#define SIMULATE_HIDPI 2.0f
+// development and will likely degrade performance and quality
+// #define SIMULATE_HIDPI 2.0f
 
 #ifdef __GNUC__
 #	pragma GCC diagnostic push
@@ -895,10 +897,20 @@ void Image_window::show(int x, int y, int w, int h) {
 	x -= get_start_x();
 	y -= get_start_y();
 
+	// we can only include guard band in the buffersize if inter_surface is not
+	// display_surface otherwise scalers will write out of bounds. A separate
+	// inter_surface has a guardband but display_surface does not
+	int gb = (inter_surface != display_surface) ? guard_band : 0;
+	//  Include guardband when comparing to width and height so the whole buffer
+	//  can still be used if it is not a muliple of 4
+	int buffer_w = get_full_width() + gb;
+	int buffer_h = get_full_height() + gb;
 	// Increase the area by 4 pixels
-	increase_area(x, y, w, h, 4, 4, 4, 4, get_full_width(), get_full_height());
+	increase_area(x, y, w, h, 4, 4, 4, 4, buffer_w, buffer_h);
 
-	// Make it 4 pixel aligned too
+	// Make it 4 pixel aligned too, needed for more advanced scalers that work
+	// with groups of 4 pixels, othwerwise we can get discontinuities around the
+	// mouse cursor when it moves
 	const int dx = x & 3;
 	const int dy = y & 3;
 	x -= dx;
@@ -906,6 +918,9 @@ void Image_window::show(int x, int y, int w, int h) {
 	y -= dy;
 	h += dy;
 
+	int desired_w = w, desired_h = h;
+
+	// Round up to multiple of 4
 	if (w & 3) {
 		w += 4 - (w & 3);
 	}
@@ -913,81 +928,124 @@ void Image_window::show(int x, int y, int w, int h) {
 		h += 4 - (h & 3);
 	}
 
-	if (w + x > get_full_width()) {
-		w = get_full_width() - x;
+	// Clip rounded up sizes to the buffer size
+	if (w + x > buffer_w) {
+		w = buffer_w - x;
 	}
-	if (h + y > get_full_height()) {
-		h = get_full_height() - y;
+	if (h + y > buffer_h) {
+		h = buffer_h - y;
 	}
 
+	// Clamp to multiple of 4 by rounding down
 	w &= ~3;
 	h &= ~3;
 
+	// Final Rectangles actually being scaled.
+	// 4 rectangles for whole screen, right edge fixup, bottom edge fixup,
+	// and bottom right corner fixup.
+	int                     numrects = 0;
+	std::array<TileRect, 4> rects;
+
+	// width has been clamped so add in a strip on the edge
+	if (w < desired_w && desired_w <= buffer_w) {
+		// x coord is wont be 4 pixel aligned but it shouldn't be an issue here
+		// the discontinuity shouldn't really be noticed as it wont move
+		rects[numrects++] = TileRect(desired_w - 4, 0, 4, h);
+	}
+	// height has been clamped so add in a strip on the bottom
+	if (h < desired_h && desired_h <= buffer_h) {
+		// y coord wont be 4 pixel aligned here also shouldn't be noticed
+		rects[numrects++] = TileRect(0, desired_h - 4, w, 4);
+
+		// Both got clamped so add a square in the corner
+		if (w < desired_w && desired_w <= buffer_w) {
+			rects[numrects++] = TileRect(desired_w - 4, desired_h - 4, 4, 4);
+		}
+	}
+	// Add full sized rectangle last so any discontinuities from the fixups will
+	// be be closer to the edge of the screen. Discontinuities from fixups are 4
+	// scaled pixels from edge but the full sized rect being drawn last will
+	// usually overwrite the first 3 pixels of the fixups pushing the
+	// discontinuity to 1 scaled pixel from the edge In theory the discontinuity
+	// can be placed anywhere on screen. but unless someone even notices
+	// anything I will not change it
+	rects[numrects++] = TileRect(x, y, w, h);
+
+	// Zero out unused rects
+	while (numrects < std::size(rects)) {
+		rects[numrects++] = TileRect(0, 0, 0, 0);
+	}
+
 	// Phase 1 blit from draw_surface to inter_surface
-	if (draw_surface != inter_surface) {
-		const ScalerInfo& sel_scaler = Scalers[scaler];
-
-		// Need to apply an offset to compensate for the guard_band
-		if (inter_surface == display_surface) {
-			inter_surface->pixels = static_cast<uint8*>(inter_surface->pixels)
-									- inter_surface->pitch * guard_band * scale
-									- inter_surface->format->BytesPerPixel
-											  * guard_band * scale;
+	// Need to do for each rect
+	for (auto& r : rects) {
+		if (!r) {
+			continue;
 		}
 
-		if (sel_scaler.arb) {
-			if (!sel_scaler.arb->Scale(
-						draw_surface, x + guard_band, y + guard_band, w, h,
-						inter_surface, scale * (x + guard_band),
-						scale * (y + guard_band), scale * w, scale * h,
-						false)) {
-				Scalers[point].arb->Scale(
-						draw_surface, x + guard_band, y + guard_band, w, h,
-						inter_surface, scale * (x + guard_band),
-						scale * (y + guard_band), scale * w, scale * h, false);
-			}
-		} else {
-			scalefun show_scaled;
-			if (inter_surface->format->BitsPerPixel == 16
-				|| inter_surface->format->BitsPerPixel == 15) {
-				const int r = inter_surface->format->Rmask;
-				const int g = inter_surface->format->Gmask;
-				const int b = inter_surface->format->Bmask;
+		if (draw_surface != inter_surface) {
+			const ScalerInfo& sel_scaler = Scalers[scaler];
 
-				show_scaled = (r == 0xf800 && g == 0x7e0 && b == 0x1f)
-											  || (b == 0xf800 && g == 0x7e0
-												  && r == 0x1f)
-									  ? (sel_scaler.fun8to565 != nullptr
-												 ? sel_scaler.fun8to565
-												 : sel_scaler.fun8to16)
-							  : (r == 0x7c00 && g == 0x3e0 && b == 0x1f)
-											  || (b == 0x7c00 && g == 0x3e0
-												  && r == 0x1f)
-									  ? (sel_scaler.fun8to555 != nullptr
-												 ? sel_scaler.fun8to555
-												 : sel_scaler.fun8to16)
-									  : sel_scaler.fun8to16;
-			} else if (inter_surface->format->BitsPerPixel == 32) {
-				show_scaled = sel_scaler.fun8to32;
+			// Need to apply an offset to compensate for the guard_band
+			if (inter_surface == display_surface) {
+				inter_surface->pixels
+						= static_cast<uint8*>(inter_surface->pixels)
+						  - inter_surface->pitch * guard_band * scale
+						  - inter_surface->format->BytesPerPixel * guard_band
+									* scale;
+			}
+
+			if (sel_scaler.arb) {
+				if (!sel_scaler.arb->Scale(
+							draw_surface, r.x + guard_band, r.y + guard_band,
+							r.w, r.h, inter_surface, scale * (r.x + guard_band),
+							scale * (r.y + guard_band), scale * r.w,
+							scale * r.h, false)) {
+					Scalers[point].arb->Scale(
+							draw_surface, r.x + guard_band, r.y + guard_band,
+							r.w, r.h, inter_surface, scale * (r.x + guard_band),
+							scale * (r.y + guard_band), scale * r.w,
+							scale * r.h, false);
+				}
 			} else {
-				show_scaled = sel_scaler.fun8to8;
+				scalefun show_scaled;
+				if (inter_surface->format->BitsPerPixel == 16
+					|| inter_surface->format->BitsPerPixel == 15) {
+					const int r = inter_surface->format->Rmask;
+					const int g = inter_surface->format->Gmask;
+					const int b = inter_surface->format->Bmask;
+
+					show_scaled = (r == 0xf800 && g == 0x7e0 && b == 0x1f)
+												  || (b == 0xf800 && g == 0x7e0
+													  && r == 0x1f)
+										  ? (sel_scaler.fun8to565 != nullptr
+													 ? sel_scaler.fun8to565
+													 : sel_scaler.fun8to16)
+								  : (r == 0x7c00 && g == 0x3e0 && b == 0x1f)
+												  || (b == 0x7c00 && g == 0x3e0
+													  && r == 0x1f)
+										  ? (sel_scaler.fun8to555 != nullptr
+													 ? sel_scaler.fun8to555
+													 : sel_scaler.fun8to16)
+										  : sel_scaler.fun8to16;
+				} else if (inter_surface->format->BitsPerPixel == 32) {
+					show_scaled = sel_scaler.fun8to32;
+				} else {
+					show_scaled = sel_scaler.fun8to8;
+				}
+
+				(this->*show_scaled)(r.x, r.y, r.w, r.h);
 			}
 
-			(this->*show_scaled)(x, y, w, h);
+			// Undo guard_band offset
+			if (inter_surface == display_surface) {
+				inter_surface->pixels
+						= static_cast<uint8*>(inter_surface->pixels)
+						  + inter_surface->pitch * guard_band * scale
+						  + inter_surface->format->BytesPerPixel * guard_band
+									* scale;
+			}
 		}
-
-		// Undo guard_band offset
-		if (inter_surface == display_surface) {
-			inter_surface->pixels = static_cast<uint8*>(inter_surface->pixels)
-									+ inter_surface->pitch * guard_band * scale
-									+ inter_surface->format->BytesPerPixel
-											  * guard_band * scale;
-		}
-
-		x *= scale;
-		y *= scale;
-		w *= scale;
-		h *= scale;
 	}
 
 	// Phase 2 blit from inter_surface to display_surface
