@@ -943,19 +943,19 @@ void Image_window::show(int x, int y, int w, int h) {
 	// Final Rectangles actually being scaled.
 	// 4 rectangles for whole screen, right edge fixup, bottom edge fixup,
 	// and bottom right corner fixup.
-	size_t                     numrects = 0;
+	size_t                  numrects = 0;
 	std::array<TileRect, 4> rects;
 
 	// width has been clamped so add in a strip on the edge
 	if (w < desired_w && desired_w <= buffer_w) {
 		// x coord is wont be 4 pixel aligned but it shouldn't be an issue here
 		// the discontinuity shouldn't really be noticed as it wont move
-		rects[numrects++] = TileRect(desired_w - 4, 0, 4, h);
+		rects[numrects++] = TileRect(desired_w - 4, y, 4, h);
 	}
 	// height has been clamped so add in a strip on the bottom
 	if (h < desired_h && desired_h <= buffer_h) {
 		// y coord wont be 4 pixel aligned here also shouldn't be noticed
-		rects[numrects++] = TileRect(0, desired_h - 4, w, 4);
+		rects[numrects++] = TileRect(x, desired_h - 4, w, 4);
 
 		// Both got clamped so add a square in the corner
 		if (w < desired_w && desired_w <= buffer_w) {
@@ -1193,6 +1193,19 @@ bool Image_window::get_draw_dims(
 		if (gw == 0 || gh == 0) {
 			gw = sw / scale;
 			gh = (sh * 5) / (scale * 6);
+
+			// Width or height are not a multiple of 4
+			if (gh & 3 || gw & 3) {
+				// Actually size the height of the buffer to a multiple of 4 and
+				// 5
+				int error = gh % 20;
+				// Round up to nearest 20
+				gh = gh + 20 - error;
+				// Calculate new width based on the rounded height. Guaranteed
+				// to also be a multiple of 4 as gh is a multiple of 5
+				int newgw = (gh * 8) / 5;
+				gw        = newgw;
+			}
 		}
 
 		// Height determines the scaling factor
