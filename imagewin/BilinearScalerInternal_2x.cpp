@@ -25,18 +25,32 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 namespace Pentagram {
 
+	// 2x Blinear Scaler
+	// 2x scaler is a specialization of Arb. It works almost identically to Arb
+	// but uses hardcoded filtering coefficients for 2x scaling
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_2x(
-			SDL_Surface* tex, sint32 sx, sint32 sy, sint32 sw, sint32 sh,
-			uint8* pixel, sint32 dw, sint32 dh, sint32 pitch, bool clamp_src) {
-		ignore_unused_variable_warning(dh);
-		// Source buffer pointers
-		const int tpitch = tex->pitch / sizeof(uintS);
-		uintS*    texel = static_cast<uintS*>(tex->pixels) + (sy * tpitch + sx);
-		uintS*    tline_end = texel + (sw - 1);
-		uintS*    tex_end   = texel + (sh - 4) * tpitch;
-		int       tex_diff  = (tpitch * 4) - sw;
+			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
+			uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src) {
 
+
+		// Number of times yloop can run.
+		// this is the number of 4 line blocks we can safely scale without
+		// checking for buffer overflow
+		const int numyloops = ((sh - 1) / 4);
+
+		// Source buffer pointers
+		const int    tpitch = tex->pitch / sizeof(uintS);
+		const uintS* texel
+				= static_cast<uintS*>(tex->pixels) + (sy * tpitch + sx);
+		const uintS* xloop_end = texel + (sw - 1);
+		const uintS* yloop_end = texel + (numyloops * 4) * tpitch;
+
+		// Absolute limit of the source buffer. Must not read beyond this
+		const uintS* srclimit
+				= static_cast<uintS*>(tex->pixels) + (tex->h * tpitch);
+		int tex_diff = (tpitch * 4) - sw;
+		 
 		uint8     a[4];
 		uint8     b[4];
 		uint8     c[4];
@@ -48,22 +62,31 @@ namespace Pentagram {
 		uint8     i[4];
 		uint8     j[4];
 		const int p_diff = (pitch * 8) - (dw * sizeof(uintX));
+		
+		// Absolute limit of dest buffer. Must not write beyond this
+		const uint8* dst_limit = pixel + dh * pitch;
 
 		bool clip_x = true;
 		if (sw + sx < tpitch && !clamp_src) {
 			clip_x    = false;
-			tline_end = texel + (sw + 1);
+			xloop_end = texel + (sw + 1);
 			tex_diff--;
 		}
 
 		bool clip_y = true;
 		if (sh + sy < tex->h && !clamp_src) {
-			clip_y  = false;
-			tex_end = texel + (sh)*tpitch;
+			clip_y    = false;
+			yloop_end = texel + (sh)*tpitch;
 		}
 
+		// Check if enough lines for loop. if not then set clip_y and prevent
+		// loop Must have 5 lines to do loop
+		if (texel + 5 * tpitch > srclimit) {
+			yloop_end = texel;
+			clip_y    = true;
+		}
 		// Src Loop Y
-		do {
+		while (texel != yloop_end) {
 			Read5(a, b, c, d, e);
 			texel++;
 
@@ -91,7 +114,7 @@ namespace Pentagram {
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
 
-			} while (texel != tline_end);
+			} while (texel != xloop_end);
 
 			// Final X (clipping)
 			if (clip_x) {
@@ -118,21 +141,23 @@ namespace Pentagram {
 			pixel += p_diff;
 
 			texel += tex_diff;
-			tline_end += tpitch * 4;
-		} while (texel != tex_end);
+			xloop_end += tpitch * 4;
+		}
 
 		//
-		// Final Rows - Clipping
+		// Final Rows - Clipped to height
 		//
-
-		// Src Loop Y
-		if (clip_y) {
-			Read5_Clipped(a, b, c, d, e);
+		// We don't need to keep track of how many lines have been scaled as the
+		// number is always a multple of 4 so sh mod 4 is number unscaled. but
+		// if clip_y and 0 lines remaining there are actually still 4 remaining
+		if (clip_y && (sh & 3) == 0) {
+			// Read 5 lines but clipped to only 4
+			Read5_Clipped(a, b, c, d, e, 4);
 			texel++;
 
 			// Src Loop X
 			do {
-				Read5_Clipped(f, g, h, i, j);
+				Read5_Clipped(f, g, h, i, j, 4);
 				texel++;
 				ScalePixel2x(a, b, f, g);
 				ScalePixel2x(b, c, g, h);
@@ -141,7 +166,7 @@ namespace Pentagram {
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
 
-				Read5_Clipped(a, b, c, d, e);
+				Read5_Clipped(a, b, c, d, e, 4);
 				texel++;
 				ScalePixel2x(f, g, a, b);
 				ScalePixel2x(g, h, b, c);
@@ -149,11 +174,11 @@ namespace Pentagram {
 				ScalePixel2x(i, j, d, e);
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
-			} while (texel != tline_end);
+			} while (texel != xloop_end);
 
 			// Final X (clipping)
 			if (clip_x) {
-				Read5_Clipped(f, g, h, i, j);
+				Read5_Clipped(f, g, h, i, j, 4);
 				texel++;
 
 				ScalePixel2x(a, b, f, g);
@@ -176,9 +201,11 @@ namespace Pentagram {
 			pixel += p_diff;
 
 			texel += tex_diff;
-			tline_end += tpitch * 4;
+			xloop_end += tpitch * 4;
+		} else if (clip_y && (sh & 3)) {
+			// Height is Non multiple of 4
+			return false;
 		}
-
 		return true;
 	}
 

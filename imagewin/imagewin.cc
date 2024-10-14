@@ -104,7 +104,7 @@ int Image_window::windowed      = 0;
 // so we need to define the default
 float Image_window::nativescale = 1.0f;
 
-const int Image_window::guard_band = 4;
+const int Image_window::guard_band = 0;
 
 SDL_PixelFormat*
 		  ManipBase::fmt;    // Format of dest. pixels (and src for rgb src).
@@ -969,7 +969,7 @@ void Image_window::show(int x, int y, int w, int h) {
 	// discontinuity to 1 scaled pixel from the edge In theory the discontinuity
 	// can be placed anywhere on screen. but unless someone even notices
 	// anything I will not change it
-	rects[numrects++] = TileRect(x, y, w, h);
+	rects[numrects++] = TileRect(x, y, w, h+1);
 
 	// Zero out unused rects
 	while (numrects < std::size(rects)) {
@@ -1193,7 +1193,7 @@ bool Image_window::get_draw_dims(
 		if (gw == 0 || gh == 0) {
 			gw = sw / scale;
 			gh = (sh * 5) / (scale * 6);
-
+			/*
 			// Width or height are not a multiple of 4
 			if (gh & 3 || gw & 3) {
 				// Actually size the height of the buffer to a multiple of 4 and
@@ -1206,6 +1206,7 @@ bool Image_window::get_draw_dims(
 				int newgw = (gh * 8) / 5;
 				gw        = newgw;
 			}
+			*/
 		}
 
 		// Height determines the scaling factor

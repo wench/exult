@@ -26,16 +26,20 @@ namespace Pentagram {
 
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_X2Y24(
-			SDL_Surface* tex, sint32 sx, sint32 sy, sint32 sw, sint32 sh,
-			uint8* pixel, sint32 dw, sint32 dh, sint32 pitch, bool clamp_src) {
+			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
+			uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src) {
 		ignore_unused_variable_warning(dh);
-		// Source buffer pointers
+		// Height must be greater than 5 and a multiple of 5
+		if (sh < 5 || sh & 5) {
+			return false;
+		}    // Source buffer pointers
 		const int tpitch = tex->pitch / sizeof(uintS);
 		uintS*    texel = static_cast<uintS*>(tex->pixels) + (sy * tpitch + sx);
 		uintS*    tline_end = texel + (sw - 1);
 		uintS*    tex_end   = texel + (sh - 5) * tpitch;
 		int       tex_diff  = (tpitch * 5) - sw;
 
+		// 2x5 Block of RGBA Source Pixels
 		uint8 a[4];
 		uint8 b[4];
 		uint8 c[4];
@@ -48,6 +52,7 @@ namespace Pentagram {
 		uint8 j[4];
 		uint8 k[4];
 		uint8 l[4];
+		// Work Buffer for Block of 2x12 scaled pixels. 
 		uint8 cols[2][12][4];
 
 		bool clip_x = true;
@@ -64,25 +69,33 @@ namespace Pentagram {
 		}
 
 		// Src Loop Y
-		do {
+		while (texel < tex_end) {
+			// Read first column of pixels
 			Read6(a, b, c, d, e, l);
 			texel++;
 
+			// scale first column of pixels into work buffer
 			X2xY24xDoColsA();
 
 			// Src Loop X
 			do {
+				// Read second colum of pixels
 				Read6(f, g, h, i, j, k);
 				texel++;
 
+				// scale second column of pixels into work buffer
 				X2xY24xDoColsB();
+				// Interpolate workbuffer horizontally into destination buffer. Treating column 0 as left and column 1 as right
 				X2xY24xInnerLoop(0, 1);
 				pixel -= pitch * 12 - sizeof(uintX) * 2;
 
+				// Read a new column of pixels over first column
 				Read6(a, b, c, d, e, l);
 				texel++;
 
+			// scale first column of pixels into work buffer
 				X2xY24xDoColsA();
+				// Interpolate workbuffer horizontally into destination buffer. Treating column 1 as left and column 0 as right
 				X2xY24xInnerLoop(1, 0);
 				pixel -= pitch * 12 - sizeof(uintX) * 2;
 			} while (texel != tline_end);
@@ -103,7 +116,7 @@ namespace Pentagram {
 			pixel += pitch * 12 - sizeof(uintX) * (dw);
 			texel += tex_diff;
 			tline_end += tpitch * 5;
-		} while (texel != tex_end);
+		} 
 
 		//
 		// Final Rows - Clipping
@@ -111,21 +124,21 @@ namespace Pentagram {
 
 		// Src Loop Y
 		if (clip_y) {
-			Read6_Clipped(a, b, c, d, e, l);
+			Read6_Clipped(a, b, c, d, e, l, 5);
 			texel++;
 
 			X2xY24xDoColsA();
 
 			// Src Loop X
 			do {
-				Read6_Clipped(f, g, h, i, j, k);
+				Read6_Clipped(f, g, h, i, j, k, 5);
 				texel++;
 
 				X2xY24xDoColsB();
 				X2xY24xInnerLoop(0, 1);
 				pixel -= pitch * 12 - sizeof(uintX) * 2;
 
-				Read6_Clipped(a, b, c, d, e, l);
+				Read6_Clipped(a, b, c, d, e, l, 5);
 				texel++;
 
 				X2xY24xDoColsA();
@@ -135,7 +148,7 @@ namespace Pentagram {
 
 			// Final X (clipping)
 			if (clip_x) {
-				Read6_Clipped(f, g, h, i, j, k);
+				Read6_Clipped(f, g, h, i, j, k, 5);
 				texel++;
 
 				X2xY24xDoColsB();
