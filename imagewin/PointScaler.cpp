@@ -37,8 +37,8 @@ namespace Pentagram {
 
 	public:
 		static bool Scale(
-				SDL_Surface* tex, sint32 sx, sint32 sy, sint32 sw, sint32 sh,
-				uint8* pixel, sint32 dw, sint32 dh, sint32 pitch,
+				SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
+				uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch,
 				bool clamp_src) {
 			ignore_unused_variable_warning(clamp_src);
 			// Source buffer pointers
@@ -140,9 +140,9 @@ namespace Pentagram {
 			// Specifically to handle 320x200 -> 640x480
 			//
 			else if ((sw * 2 == dw) && (dh >= sh)) {
-				uint32 pos_y;
-				uint32 end_y      = dh;
-				uint32 dst_y      = 0;
+				uint_fast32_t pos_y;
+				uint_fast32_t end_y      = dh;
+				uint_fast32_t dst_y      = 0;
 				uint8* next_block = nullptr;
 
 				// Src Loop Y
@@ -185,9 +185,9 @@ namespace Pentagram {
 			// Specifically to handle 640x400 -> 640x480
 			//
 			else if ((sw == dw) && (dh >= sh)) {
-				uint32 pos_y;
-				uint32 end_y      = dh;
-				uint32 dst_y      = 0;
+				uint_fast32_t pos_y;
+				uint_fast32_t end_y      = dh;
+				uint_fast32_t dst_y      = 0;
 				uint8* next_block = nullptr;
 
 				// Src Loop Y
@@ -228,17 +228,17 @@ namespace Pentagram {
 			// Arbitrary scaling X and Y (optimized for upscaling)
 			//
 			else {
-				uint32 pos_y           = 0;
-				uint32 pos_x           = 0;
-				uint32 end_y           = dh;
-				uint32 dst_y           = 0;
+				uint_fast32_t pos_y           = 0;
+				uint_fast32_t pos_x           = 0;
+				uint_fast32_t end_y           = dh;
+				uint_fast32_t dst_y           = 0;
 				uint8* blockline_start = nullptr;
 				uint8* next_block      = nullptr;
 
 				// Src Loop Y
 				do {
-					uint32 end_x = dw;
-					uint32 dst_x = 0;
+					uint_fast32_t end_x = dw;
+					uint_fast32_t dst_x = 0;
 
 					next_block = pixel;
 
@@ -295,8 +295,8 @@ namespace Pentagram {
 
 	PointScaler::PointScaler() {
 		Scale8To8   = PointScalerInternal<uint8, Manip8to8, uint8>::Scale;
-		Scale8To32  = PointScalerInternal<uint32, Manip8to32, uint8>::Scale;
-		Scale32To32 = PointScalerInternal<uint32, Manip32to32, uint32>::Scale;
+		Scale8To32  = PointScalerInternal<uint_fast32_t, Manip8to32, uint8>::Scale;
+		Scale32To32 = PointScalerInternal<uint_fast32_t, Manip32to32, uint_fast32_t>::Scale;
 
 		Scale8To16  = PointScalerInternal<uint16, Manip8to16, uint8>::Scale;
 		Scale8To555 = PointScalerInternal<uint16, Manip8to555, uint8>::Scale;
@@ -309,7 +309,7 @@ namespace Pentagram {
 				= PointScalerInternal<uint16, Manip565to565, uint16>::Scale;
 	}
 
-	uint32 PointScaler::ScaleBits() const {
+	uint_fast32_t PointScaler::ScaleBits() const {
 		return 0xFFFFFFFF;
 	}
 
@@ -327,6 +327,10 @@ namespace Pentagram {
 
 	const char* PointScaler::ScalerCopyright() const {
 		return "Copyright (C) 2005 The Pentagram Team, 2010 The Exult Team";
+	}
+
+	int PointScaler::granularity() const {
+		return 1;
 	}
 
 }    // namespace Pentagram

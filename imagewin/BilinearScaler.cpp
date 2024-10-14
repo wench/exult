@@ -30,9 +30,32 @@ namespace Pentagram {
 	class BilinearScalerInternal {
 	public:
 		static bool ScaleBilinear(
-				SDL_Surface* tex, sint32 sx, sint32 sy, sint32 sw, sint32 sh,
-				uint8* pixel, sint32 dw, sint32 dh, sint32 pitch,
+				SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
+				uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch,
 				bool clamp_src) {
+
+			//
+			// Clip the source rect to the size of tex and adjust dest rect as appropriate
+			//
+			uint_fast32_t tex_w = tex->w, tex_h = tex->h;
+
+			// clip y
+			if ((sh + sy) > tex_h) {
+				auto nsh = tex_h - sy;
+				dh       = (dh * nsh) / sh;
+				sh       = nsh;
+			}
+			// clip x
+			if ((sw + sx) > tex_w) {
+				auto nsw = tex_w - sx;
+				dw = (dh * nsw) / sw;
+				sw = nsw;
+			}
+
+			//
+			// Call the correct specialized function as appropriate
+			//
+
 			// 2x Scaling
 			if ((sw * 2 == dw) && (sh * 2 == dh) && !(sh % 4) && !(sw % 4)) {
 				return BilinearScalerInternal_2x<uintX, Manip, uintS>(
@@ -52,31 +75,20 @@ namespace Pentagram {
 				return BilinearScalerInternal_X1Y12<uintX, Manip, uintS>(
 						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
 			}
-			// Arbitrary
-			else if (!(sh % 4) && !(sw % 4)) {
+			// Arbitrary has no restrictions
+			else {
 				return BilinearScalerInternal_Arb<uintX, Manip, uintS>(
 						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
-			} else {
-				const int ow = sw & 3;
-				dw -= ow * dw / sw;
-				sw -= ow;
-
-				const int oh = sh & 3;
-				dh -= oh * dh / sh;
-				sh -= oh;
-
-				return ScaleBilinear(
-						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
-			}
+			} 
 		}
 	};
 
 	BilinearScaler::BilinearScaler() {
 		Scale8To8  = nullptr;
 		Scale8To32 = BilinearScalerInternal<
-				uint32, Manip8to32, uint8>::ScaleBilinear;
+				uint_fast32_t, Manip8to32, uint8>::ScaleBilinear;
 		Scale32To32 = BilinearScalerInternal<
-				uint32, Manip32to32, uint32>::ScaleBilinear;
+				uint_fast32_t, Manip32to32, uint_fast32_t>::ScaleBilinear;
 
 #ifdef COMPILE_ALL_BILINEAR_SCALERS
 		Scale8To565 = BilinearScalerInternal<
@@ -95,7 +107,7 @@ namespace Pentagram {
 #endif
 	}
 
-	uint32 BilinearScaler::ScaleBits() const {
+	uint_fast32_t BilinearScaler::ScaleBits() const {
 		return 0xFFFFFFFF;
 	}
 
@@ -113,6 +125,10 @@ namespace Pentagram {
 
 	const char* BilinearScaler::ScalerCopyright() const {
 		return "Copyright (C) 2005 The Pentagram Team, 2010 The Exult Team";
+	}
+
+	int BilinearScaler::granularity() const {
+		return 4;
 	}
 
 }    // namespace Pentagram
