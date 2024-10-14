@@ -26,8 +26,12 @@ namespace Pentagram {
 
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_X1Y12(
-			SDL_Surface* tex, sint32 sx, sint32 sy, sint32 sw, sint32 sh,
-			uint8* pixel, sint32 dw, sint32 dh, sint32 pitch, bool clamp_src) {
+			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
+			uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src) {
+		// Height must be greater than 5 and a multiple of 5
+		if (sh < 5 || sh&5) {
+			return false;
+		}
 		ignore_unused_variable_warning(dh);
 		// Source buffer pointers
 		const int tpitch = tex->pitch / sizeof(uintS);
@@ -36,12 +40,14 @@ namespace Pentagram {
 		uintS*    tex_end   = texel + (sh - 5) * tpitch;
 		const int tex_diff  = (tpitch * 5) - sw;
 
+		//1x5 block of RGBA Souurce Pixels
 		uint8 a[4];
 		uint8 b[4];
 		uint8 c[4];
 		uint8 d[4];
 		uint8 e[4];
 		uint8 l[4];
+		// Block of 1x6 scaled pixels
 		uint8 cols[6][4];
 
 		bool clip_y = true;
@@ -51,13 +57,15 @@ namespace Pentagram {
 		}
 
 		// Src Loop Y
-		do {
+		while (texel < tex_end) {
 			// Src Loop X
 			do {
 				Read6(a, b, c, d, e, l);
 				texel++;
 
+				// Fill cols with 1x6 scaled pixels
 				X1xY12xDoCols();
+				// Copy scaled pixels to destination buffer
 				X1xY12xInnerLoop();
 				pixel -= pitch * 6 - sizeof(uintX);
 
@@ -67,7 +75,7 @@ namespace Pentagram {
 			texel += tex_diff;
 			tline_end += tpitch * 5;
 
-		} while (texel != tex_end);
+		} 
 
 		//
 		// Final Rows - Clipping
@@ -77,7 +85,7 @@ namespace Pentagram {
 		if (clip_y) {
 			// Src Loop X
 			do {
-				Read6_Clipped(a, b, c, d, e, l);
+				Read6_Clipped(a, b, c, d, e, l,5);
 				texel++;
 
 				X1xY12xDoCols();

@@ -30,8 +30,8 @@ namespace Pentagram {
 	protected:
 		// Basic scaler function template
 		using ScalerFunc = bool (*)(
-				SDL_Surface* tex, sint32 sx, sint32 sy, sint32 sw, sint32 sh,
-				uint8* pixel, sint32 dw, sint32 dh, sint32 pitch,
+				SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
+				uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch,
 				bool clamp_src);
 
 		//
@@ -55,6 +55,8 @@ namespace Pentagram {
 				= 0;    //< Desciption of the Scaler
 		virtual const char* ScalerCopyright() const
 				= 0;    //< Scaler Copyright info
+
+		virtual int granularity() const = 0; // < Width and Height of source rect should be multiples of this
 
 		bool Support8bpp(int srcfmt) {
 			return srcfmt == 8 && Scale8To8;
