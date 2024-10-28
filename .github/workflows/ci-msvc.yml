@@ -105,6 +105,15 @@ jobs:
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: vcpkg integrate install
 
+    - name: Debug vcpkg 
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      if: ${{ runner.debug =='1' && 'detailed' || 'normal' }}
+      run: |   
+       c:
+       cd c:\vcpkg
+       git show
+       vcpkg install --triplet x64-windows --debug glib
+
     - name: Install VCPKG packages for Exult
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /v:${{ runner.debug =='1' && 'detailed' || 'normal' }} /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:Platform=${{env.BUILD_PLATFORM}} ${{env.SOLUTION_FILE_PATH}}\Exult.vcxproj /t:${{env.TARGET_VCPKG_MANIFEST_INSTALL}}
