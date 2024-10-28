@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "BilinearScaler.h"
 #include "manip.h"
 
+#include <cstddef>
 #include <cstring>
 #include <type_traits>
 #define COMPILE_ALL_BILINEAR_SCALERS
@@ -27,9 +28,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 namespace Pentagram {
 	typedef uint_fast32_t fixedu1616;
 
-	template <typename uintX, typename limit_t = nullptr_t>
+	template <typename uintX, typename limit_t = std::nullptr_t>
 	inline void WritePix(uint8* dest, uintX val, limit_t limit = nullptr) {
-		if (std::is_null_pointer<limit_t>::value || dest < limit) {
+		if (std::is_null_pointer<limit_t>::value
+			|| dest < static_cast<uint8*>(limit)) {
 			std::memcpy(dest, &val, sizeof(uintX));
 		}
 	}
@@ -314,58 +316,65 @@ namespace Pentagram {
 	// Bilinear scaler specialized for 2x scaling only
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_2x(
-			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
-			uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src);
+			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy,
+			uint_fast32_t sw, uint_fast32_t sh, uint8* pixel, uint_fast32_t dw,
+			uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src);
 
 	// Bilinear Scaler specialized for 2x horizontal 2.4x vertical scaling aka
 	// aspect correct 2x. sh must be a multiple of 5
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_X2Y24(
-			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
-			uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src);
+			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy,
+			uint_fast32_t sw, uint_fast32_t sh, uint8* pixel, uint_fast32_t dw,
+			uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src);
 
 	// Bilinear Scaler specialized for 1x horizontal 1.2x vertical scaling aka
 	// aspect correction with no scaling.
 	// sh must be a multiple of 5
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_X1Y12(
-			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
-			uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src);
+			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy,
+			uint_fast32_t sw, uint_fast32_t sh, uint8* pixel, uint_fast32_t dw,
+			uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src);
 
 	// Arbitrary Bilinrat scaler capble of scaling by any finteger or non
 	// integer factoe with no restrictions
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_Arb(
-			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
-			uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src);
+			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy,
+			uint_fast32_t sw, uint_fast32_t sh, uint8* pixel, uint_fast32_t dw,
+			uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src);
 
 #ifdef COMPILE_GAMMA_CORRECT_SCALERS
-#	define InstantiateFunc(func, a, b, c)                                    \
-		template bool func<a, b, c>(                                          \
-				SDL_Surface*, uint_fast32_t, uint_fast32_t, uint_fast32_t, uint_fast32_t, uint8*, uint_fast32_t, \
-				uint_fast32_t, uint_fast32_t, bool);                                        \
-		template bool func<a, b##_GC, c>(                                     \
-				SDL_Surface*, uint_fast32_t, uint_fast32_t, uint_fast32_t, uint_fast32_t, uint8*, uint_fast32_t, \
-				uint_fast32_t, uint_fast32_t, bool)
+#	define InstantiateFunc(func, a, b, c)                                 \
+		template bool func<a, b, c>(                                       \
+				SDL_Surface*, uint_fast32_t, uint_fast32_t, uint_fast32_t, \
+				uint_fast32_t, uint8*, uint_fast32_t, uint_fast32_t,       \
+				uint_fast32_t, bool);                                      \
+		template bool func<a, b##_GC, c>(                                  \
+				SDL_Surface*, uint_fast32_t, uint_fast32_t, uint_fast32_t, \
+				uint_fast32_t, uint8*, uint_fast32_t, uint_fast32_t,       \
+				uint_fast32_t, bool)
 #else
-#	define InstantiateFunc(func, a, b, c)                                    \
-		template bool func<a, b, c>(                                          \
-				SDL_Surface*, uint_fast32_t, uint_fast32_t, uint_fast32_t, uint_fast32_t, uint8*, uint_fast32_t, \
-				uint_fast32_t, uint_fast32_t, bool)
+#	define InstantiateFunc(func, a, b, c)                                 \
+		template bool func<a, b, c>(                                       \
+				SDL_Surface*, uint_fast32_t, uint_fast32_t, uint_fast32_t, \
+				uint_fast32_t, uint8*, uint_fast32_t, uint_fast32_t,       \
+				uint_fast32_t, bool)
 #endif
 
 #ifdef COMPILE_ALL_BILINEAR_SCALERS
-#	define InstantiateBilinearScalerFunc(func)               \
-		InstantiateFunc(func, uint_fast32_t, Manip8to32, uint8);     \
-		InstantiateFunc(func, uint_fast32_t, Manip32to32, uint_fast32_t);   \
-		InstantiateFunc(func, uint16, Manip8to565, uint8);    \
-		InstantiateFunc(func, uint16, Manip8to16, uint8);     \
-		InstantiateFunc(func, uint16, Manip8to555, uint8);    \
-		InstantiateFunc(func, uint16, Manip16to16, uint16);   \
-		InstantiateFunc(func, uint16, Manip555to555, uint16); \
+#	define InstantiateBilinearScalerFunc(func)                           \
+		InstantiateFunc(func, uint_fast32_t, Manip8to32, uint8);          \
+		InstantiateFunc(func, uint_fast32_t, Manip32to32, uint_fast32_t); \
+		InstantiateFunc(func, uint16, Manip8to565, uint8);                \
+		InstantiateFunc(func, uint16, Manip8to16, uint8);                 \
+		InstantiateFunc(func, uint16, Manip8to555, uint8);                \
+		InstantiateFunc(func, uint16, Manip16to16, uint16);               \
+		InstantiateFunc(func, uint16, Manip555to555, uint16);             \
 		InstantiateFunc(func, uint16, Manip565to565, uint16)
 #else
-#	define InstantiateBilinearScalerFunc(func)           \
+#	define InstantiateBilinearScalerFunc(func)                  \
 		InstantiateFunc(func, uint_fast32_t, Manip8to32, uint8); \
 		InstantiateFunc(func, uint_fast32_t, Manip32to32, uint_fast32_t)
 #endif

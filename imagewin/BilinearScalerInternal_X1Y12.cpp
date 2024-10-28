@@ -26,10 +26,11 @@ namespace Pentagram {
 
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_X1Y12(
-			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
-			uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src) {
+			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy,
+			uint_fast32_t sw, uint_fast32_t sh, uint8* pixel, uint_fast32_t dw,
+			uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src) {
 		// Height must be greater than 5 and a multiple of 5
-		if (sh < 5 || sh&5) {
+		if (sh < 5 || sh & 5) {
 			return false;
 		}
 		ignore_unused_variable_warning(dh);
@@ -40,7 +41,7 @@ namespace Pentagram {
 		uintS*    tex_end   = texel + (sh - 5) * tpitch;
 		const int tex_diff  = (tpitch * 5) - sw;
 
-		//1x5 block of RGBA Souurce Pixels
+		// 1x5 block of RGBA Souurce Pixels
 		uint8 a[4];
 		uint8 b[4];
 		uint8 c[4];
@@ -51,7 +52,7 @@ namespace Pentagram {
 		uint8 cols[6][4];
 
 		bool clip_y = true;
-		if (sh + sy < tex->h && !clamp_src) {
+		if (sh + sy < static_cast<unsigned int>(tex->h) && !clamp_src) {
 			clip_y  = false;
 			tex_end = texel + (sh)*tpitch;
 		}
@@ -74,8 +75,7 @@ namespace Pentagram {
 			pixel += pitch * 6 - sizeof(uintX) * (dw);
 			texel += tex_diff;
 			tline_end += tpitch * 5;
-
-		} 
+		}
 
 		//
 		// Final Rows - Clipping
@@ -85,7 +85,7 @@ namespace Pentagram {
 		if (clip_y) {
 			// Src Loop X
 			do {
-				Read6_Clipped(a, b, c, d, e, l,5);
+				Read6_Clipped(a, b, c, d, e, l, 5);
 				texel++;
 
 				X1xY12xDoCols();
