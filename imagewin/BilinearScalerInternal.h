@@ -203,13 +203,13 @@ namespace Pentagram {
 	do {                                                            \
 		while (pos_y < end_y                                        \
 			   && (std::is_null_pointer<decltype(limit)>::value     \
-				   || blockline_start < limit)) {                   \
+				   || blockline_start < static_cast<uint8*>(limit))) {                   \
 			pos_x = dst_x;                                          \
 			pixel = blockline_start;                                \
 			/* Dest Loop X */                                       \
 			while (pos_x < end_x                                    \
 				   && (std::is_null_pointer<decltype(limit)>::value \
-					   || pixel < limit)) {                         \
+					   || pixel < static_cast<uint8*>(limit))) {                         \
 				FilterPixel(                                        \
 						a, b, f, g, (end_x - pos_x) >> 8,           \
 						(end_y - pos_y) >> 8, limit);               \
