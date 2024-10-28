@@ -28,7 +28,7 @@ namespace Pentagram {
 	public:
 		BilinearScaler();
 
-		virtual uint32 ScaleBits()
+		virtual uint_fast32_t ScaleBits()
 				const;    //< bits for supported integer scaling
 		virtual bool ScaleArbitrary()
 				const;    //< supports arbitrary scaling of any degree
