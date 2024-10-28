@@ -30,18 +30,17 @@ namespace Pentagram {
 	// but uses hardcoded filtering coefficients for 2x scaling
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_2x(
-			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
-			uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src) {
-
-
+			SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy,
+			uint_fast32_t sw, uint_fast32_t sh, uint8* pixel, uint_fast32_t dw,
+			uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src) {
 		// Number of times yloop can run.
 		// this is the number of 4 line blocks we can safely scale without
 		// checking for buffer overflow
 		const int numyloops = ((sh - 1) / 4);
 
 		// Source buffer pointers
-		const int    tpitch = tex->pitch / sizeof(uintS);
-		const uintS* texel
+		const uint_fast32_t tpitch = tex->pitch / sizeof(uintS);
+		const uintS*        texel
 				= static_cast<uintS*>(tex->pixels) + (sy * tpitch + sx);
 		const uintS* xloop_end = texel + (sw - 1);
 		const uintS* yloop_end = texel + (numyloops * 4) * tpitch;
@@ -50,7 +49,7 @@ namespace Pentagram {
 		const uintS* srclimit
 				= static_cast<uintS*>(tex->pixels) + (tex->h * tpitch);
 		int tex_diff = (tpitch * 4) - sw;
-		 
+
 		uint8     a[4];
 		uint8     b[4];
 		uint8     c[4];
@@ -62,7 +61,7 @@ namespace Pentagram {
 		uint8     i[4];
 		uint8     j[4];
 		const int p_diff = (pitch * 8) - (dw * sizeof(uintX));
-		
+
 		// Absolute limit of dest buffer. Must not write beyond this
 		const uint8* dst_limit = pixel + dh * pitch;
 
@@ -74,7 +73,7 @@ namespace Pentagram {
 		}
 
 		bool clip_y = true;
-		if (sh + sy < tex->h && !clamp_src) {
+		if (sh + sy < static_cast<unsigned int>(tex->h) && !clamp_src) {
 			clip_y    = false;
 			yloop_end = texel + (sh)*tpitch;
 		}

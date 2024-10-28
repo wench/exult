@@ -73,7 +73,7 @@ namespace Pentagram {
 		uint8 j[4] = "J";
 
 		// Absolute limit of dest buffer. Must not write beyond this
-		const uint8* dst_limit = pixel + dh * pitch;
+		uint8* const dst_limit = pixel + dh * pitch;
 
 		// Current Fixed point position of dest pixel in source buffer
 		fixedu1616 pos_y = 0;
