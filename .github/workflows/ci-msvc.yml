@@ -112,7 +112,6 @@ jobs:
        c:
        cd c:\vcpkg
        git show
-       vcpkg install --triplet x64-windows --debug fluidsynth
 
     - name: Install VCPKG packages for Exult
       working-directory: ${{env.GITHUB_WORKSPACE}}
