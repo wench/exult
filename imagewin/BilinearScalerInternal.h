@@ -28,10 +28,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 namespace Pentagram {
 	typedef uint_fast32_t fixedu1616;
 
+	template <typename limit_t = std::nullptr_t>
+	inline bool IsUnclipped(uint8* dest, limit_t limit = nullptr)
+	{
+		return std::is_null_pointer<limit_t>::value || dest < static_cast<uint8*>(limit);
+	}
+
 	template <typename uintX, typename limit_t = std::nullptr_t>
 	inline void WritePix(uint8* dest, uintX val, limit_t limit = nullptr) {
-		if (std::is_null_pointer<limit_t>::value
-			|| dest < static_cast<uint8*>(limit)) {
+		if (IsUnclipped(dest,limit)) {
 			std::memcpy(dest, &val, sizeof(uintX));
 		}
 	}
@@ -202,14 +207,12 @@ namespace Pentagram {
 #define ArbInnerLoopClipped(a, b, f, g, limit)                      \
 	do {                                                            \
 		while (pos_y < end_y                                        \
-			   && (std::is_null_pointer<decltype(limit)>::value     \
-				   || blockline_start < static_cast<uint8*>(limit))) {                   \
+			   && IsUnclipped(blockline_start,limit)) {                   \
 			pos_x = dst_x;                                          \
 			pixel = blockline_start;                                \
 			/* Dest Loop X */                                       \
 			while (pos_x < end_x                                    \
-				   && (std::is_null_pointer<decltype(limit)>::value \
-					   || pixel < static_cast<uint8*>(limit))) {                         \
+				   && IsUnclipped(pixel,limit)) {                         \
 				FilterPixel(                                        \
 						a, b, f, g, (end_x - pos_x) >> 8,           \
 						(end_y - pos_y) >> 8, limit);               \
