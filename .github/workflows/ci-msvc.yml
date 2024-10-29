@@ -107,7 +107,7 @@ jobs:
 
     - name: Debug vcpkg 
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      if: ${{ runner.debug =='1' && 'detailed' || 'normal' }}
+      if: ${{ runner.debug =='1'}}
       run: |   
        c:
        cd c:\vcpkg
