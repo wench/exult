@@ -242,7 +242,7 @@ private:
 	std::chrono::duration<uint32, std::ratio<1, 6000>> xmidi_clock
 			= decltype(xmidi_clock)(0);
 	// Any current delay we must observe before starting a new track
-	decltype(xmidi_clock) start_track_delay_until;
+	decltype(xmidi_clock) start_track_delay_until = decltype(xmidi_clock)(0);
 	// The delay to use between stopping and starting tracks. 1500 ticks is
 	// 1/4sec
 	const decltype(xmidi_clock) after_stop_delay = decltype(xmidi_clock)(1500);
