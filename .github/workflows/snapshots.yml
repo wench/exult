@@ -2,7 +2,7 @@ name: snapshots
 
 on:
   schedule:
-    - cron: "0 00 * * *" # Daily at 00:00 UTC
+    - cron: "15 01 * * *" # Daily at 01:15 UTC - Changed from 0:00 as Windows build were failing when snapshots were scheduled to build at 0:00
   workflow_dispatch:
 
 permissions:
@@ -31,14 +31,12 @@ jobs:
       - name: Check if artifacts downloaded
         shell: bash
         run: |
-
           if [ -f Exult.exe ]; then
             echo HAVE_WINDOWS_SNAPSHOT=true >> $GITHUB_ENV
           else
             echo HAVE_WINDOWS_SNAPSHOT=false >> $GITHUB_ENV
             echo Couldn\'t find Exult.exe for Windows snapshot. No release will be made
           fi
-            
           if [ -f exult-snapshot-signed.apk ]; then
             echo HAVE_ANDROID_SNAPSHOT=true >> $GITHUB_ENV
           else
@@ -66,7 +64,7 @@ jobs:
             Exult.exe
             ExultStudio.exe
             ExultTools.exe
-            Gimp20Plugin.exe
+            Gimp30Plugin.exe
       - name: Generate VirusTotal Body
         if: ${{ (env.HAVE_WINDOWS_SNAPSHOT == 'true' && env.HAVE_ANDROID_SNAPSHOT == 'true')}}
         run: |
@@ -94,7 +92,7 @@ jobs:
             Exult.exe
             ExultStudio.exe
             ExultTools.exe
-            Gimp20Plugin.exe
+            Gimp30Plugin.exe
             Keyring.zip
             SFisland.zip
             Sifixes.zip
