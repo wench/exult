@@ -25,70 +25,76 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "manip.h"
 
 namespace Pentagram {
+	using namespace  nsBilinearScaler;
 
-	template <class uintX, class Manip, class uintS>
-	class BilinearScalerInternal {
-	public:
-		static bool ScaleBilinear(
-				SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy, uint_fast32_t sw, uint_fast32_t sh,
-				uint8* pixel, uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch,
-				bool clamp_src) {
+		template <class uintX, class Manip, class uintS>
+		class BilinearScalerInternal {
+		public:
+			static bool ScaleBilinear(
+					SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy,
+					uint_fast32_t sw, uint_fast32_t sh, uint8* pixel,
+					uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch,
+					bool clamp_src) {
+				//
+				// Clip the source rect to the size of tex and adjust dest rect
+				// as appropriate
+				//
+				uint_fast32_t tex_w = tex->w, tex_h = tex->h;
 
-			//
-			// Clip the source rect to the size of tex and adjust dest rect as appropriate
-			//
-			uint_fast32_t tex_w = tex->w, tex_h = tex->h;
+				// clip y
+				if ((sh + sy) > tex_h) {
+					auto nsh = tex_h - sy;
+					dh       = (dh * nsh) / sh;
+					sh       = nsh;
+				}
+				// clip x
+				if ((sw + sx) > tex_w) {
+					auto nsw = tex_w - sx;
+					dw       = (dh * nsw) / sw;
+					sw       = nsw;
+				}
 
-			// clip y
-			if ((sh + sy) > tex_h) {
-				auto nsh = tex_h - sy;
-				dh       = (dh * nsh) / sh;
-				sh       = nsh;
-			}
-			// clip x
-			if ((sw + sx) > tex_w) {
-				auto nsw = tex_w - sx;
-				dw = (dh * nsw) / sw;
-				sw = nsw;
-			}
+				//
+				// Call the correct specialized function as appropriate
+				//
 
-			//
-			// Call the correct specialized function as appropriate
-			//
-
-			// 2x Scaling
-			if ((sw * 2 == dw) && (sh * 2 == dh) && !(sh % 4) && !(sw % 4)) {
-				return BilinearScalerInternal_2x<uintX, Manip, uintS>(
-						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
-			}
-			// 2 X 2.4 Y
-			else if (
-					(sw * 2 == dw) && (dh * 5 == sh * 12) && !(sh % 5)
+				// 2x Scaling
+				if ((sw * 2 == dw) && (sh * 2 == dh) && !(sh % 4)
 					&& !(sw % 4)) {
-				return BilinearScalerInternal_X2Y24<uintX, Manip, uintS>(
-						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
+					return BilinearScalerInternal_2x<uintX, Manip, uintS>(
+							tex, sx, sy, sw, sh, pixel, dw, dh, pitch,
+							clamp_src);
+				}
+				// 2 X 2.4 Y
+				else if (
+						(sw * 2 == dw) && (dh * 5 == sh * 12) && !(sh % 5)
+						&& !(sw % 4)) {
+					return BilinearScalerInternal_X2Y24<uintX, Manip, uintS>(
+							tex, sx, sy, sw, sh, pixel, dw, dh, pitch,
+							clamp_src);
+				}
+				// 1 X 1.2 Y
+				else if (
+						(sw == dw) && (dh * 5 == sh * 6) && !(sh % 5)
+						&& !(sw % 4)) {
+					return BilinearScalerInternal_X1Y12<uintX, Manip, uintS>(
+							tex, sx, sy, sw, sh, pixel, dw, dh, pitch,
+							clamp_src);
+				}
+				// Arbitrary has no restrictions
+				else {
+					return BilinearScalerInternal_Arb<uintX, Manip, uintS>(
+							tex, sx, sy, sw, sh, pixel, dw, dh, pitch,
+							clamp_src);
+				}
 			}
-			// 1 X 1.2 Y
-			else if (
-					(sw == dw) && (dh * 5 == sh * 6) && !(sh % 5)
-					&& !(sw % 4)) {
-				return BilinearScalerInternal_X1Y12<uintX, Manip, uintS>(
-						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
-			}
-			// Arbitrary has no restrictions
-			else {
-				return BilinearScalerInternal_Arb<uintX, Manip, uintS>(
-						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
-			} 
-		}
-	};
-
+		};
 	BilinearScaler::BilinearScaler() {
 		Scale8To8  = nullptr;
 		Scale8To32 = BilinearScalerInternal<
-				uint_fast32_t, Manip8to32, uint8>::ScaleBilinear;
+				uint32_t, Manip8to32, uint8>::ScaleBilinear;
 		Scale32To32 = BilinearScalerInternal<
-				uint_fast32_t, Manip32to32, uint_fast32_t>::ScaleBilinear;
+				uint32_t, Manip32to32, uint32_t>::ScaleBilinear;
 
 #ifdef COMPILE_ALL_BILINEAR_SCALERS
 		Scale8To565 = BilinearScalerInternal<

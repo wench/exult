@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "ignore_unused_variable_warning.h"
 #include "manip.h"
 
-namespace Pentagram {
+namespace Pentagram { namespace nsBilinearScaler {
 
 	// 2x Blinear Scaler
 	// 2x scaler is a specialization of Arb. It works almost identically to Arb
@@ -86,12 +86,12 @@ namespace Pentagram {
 		}
 		// Src Loop Y
 		while (texel != yloop_end) {
-			Read5(a, b, c, d, e);
+			ReadTexelsV<Manip>(5, texel, tpitch, a, b, c, d, e);
 			texel++;
 
 			// Src Loop X
 			do {
-				Read5(f, g, h, i, j);
+				ReadTexelsV<Manip>(5, texel, tpitch, f, g, h, i, j);
 				texel++;
 
 				ScalePixel2x(a, b, f, g);
@@ -102,7 +102,7 @@ namespace Pentagram {
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
 
-				Read5(a, b, c, d, e);
+				ReadTexelsV<Manip>(5, texel, tpitch, a, b, c, d, e);
 				texel++;
 
 				ScalePixel2x(f, g, a, b);
@@ -117,7 +117,7 @@ namespace Pentagram {
 
 			// Final X (clipping)
 			if (clip_x) {
-				Read5(f, g, h, i, j);
+				ReadTexelsV<Manip>(5, texel, tpitch, f, g, h, i, j);
 				texel++;
 
 				ScalePixel2x(a, b, f, g);
@@ -151,12 +151,12 @@ namespace Pentagram {
 		// if clip_y and 0 lines remaining there are actually still 4 remaining
 		if (clip_y && (sh & 3) == 0) {
 			// Read 5 lines but clipped to only 4
-			Read5_Clipped(a, b, c, d, e, 4);
+			ReadTexelsV<Manip>(4, texel, tpitch, a, b, c, d, e);
 			texel++;
 
 			// Src Loop X
 			do {
-				Read5_Clipped(f, g, h, i, j, 4);
+				ReadTexelsV<Manip>(4, texel, tpitch, f, g, h, i, j);
 				texel++;
 				ScalePixel2x(a, b, f, g);
 				ScalePixel2x(b, c, g, h);
@@ -165,7 +165,7 @@ namespace Pentagram {
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
 
-				Read5_Clipped(a, b, c, d, e, 4);
+				ReadTexelsV<Manip>(4, texel, tpitch, a, b, c, d, e);
 				texel++;
 				ScalePixel2x(f, g, a, b);
 				ScalePixel2x(g, h, b, c);
@@ -177,7 +177,7 @@ namespace Pentagram {
 
 			// Final X (clipping)
 			if (clip_x) {
-				Read5_Clipped(f, g, h, i, j, 4);
+				ReadTexelsV<Manip>(4, texel, tpitch, f, g, h, i, j);
 				texel++;
 
 				ScalePixel2x(a, b, f, g);
@@ -210,4 +210,4 @@ namespace Pentagram {
 
 	InstantiateBilinearScalerFunc(BilinearScalerInternal_2x);
 
-}    // namespace Pentagram
+}}    // namespace Pentagram::nsBilinearScaler

@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "BilinearScalerInternal.h"
 #include "manip.h"
 
-namespace Pentagram {
+namespace Pentagram { namespace nsBilinearScaler {
 
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_X2Y24(
@@ -169,4 +169,4 @@ namespace Pentagram {
 
 	InstantiateBilinearScalerFunc(BilinearScalerInternal_X2Y24);
 
-}    // namespace Pentagram
+}}    // namespace Pentagram::nsBilinearScaler

@@ -22,7 +22,73 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "BilinearScalerInternal.h"
 #include "manip.h"
 
-namespace Pentagram {
+
+namespace Pentagram { namespace nsBilinearScaler {
+
+	template <
+			class uintX, class Manip, class uintS,
+			typename limit_t = std::nullptr_t>
+	BSI_FORCE_INLINE void FilterPixel(
+			const uint8* const tl, const uint8* const bl, const uint8* const tr,
+			const uint8* const br, const fixedu1616 fx, const fixedu1616 fy,
+			uint8* const pixel, limit_t limit = nullptr) {
+		WritePix<uintX>(
+				pixel,
+				Manip::rgb(
+						SimpleLerp(
+								SimpleLerp(tl[0], tr[0], fx),
+								SimpleLerp(bl[0], br[0], fx), fy)
+								>> 16,
+						SimpleLerp(
+								SimpleLerp(tl[1], tr[1], fx),
+								SimpleLerp(bl[1], br[1], fx), fy)
+								>> 16,
+						SimpleLerp(
+								SimpleLerp(tl[2], tr[2], fx),
+								SimpleLerp(bl[2], br[2], fx), fy)
+								>> 16),
+				limit);
+	}
+
+	// This takes 4 texels and generates the scaled pixels between them given
+	// the fixed point coordinates and limits specified
+	// 
+	template <
+			class uintX, class Manip, class uintS,
+			typename limit_t = std::nullptr_t>
+	BSI_FORCE_INLINE uint8* Scale2x2Block(
+			const uint8* const tl, const uint8* const bl, const uint8* const tr,
+			const uint8* const br, uint8*& blockline_start, uint8*& next_block,
+			fixedu1616& pos_y, fixedu1616& pos_x, fixedu1616& end_y,
+			const fixedu1616 end_x, const fixedu1616 add_y,
+			const fixedu1616 add_x, const fixedu1616 block_start_x,
+			const uint_fast32_t pitch, const limit_t limit = nullptr) {
+		uint8*     pixel = blockline_start;
+		fixedu1616 posy = pos_y, posx = pos_x;
+		while (posy < end_y && IsUnclipped(blockline_start, limit)) {
+			// reset posx to block_start_x for each row
+			posx  = block_start_x;
+			// Set pixel to blockline_start and increment blockline_start to the next line
+			pixel = blockline_start;
+			blockline_start += pitch;
+			while (posx < end_x && IsUnclipped(pixel, limit)) {
+				FilterPixel<uintX, Manip, uintS>(
+						tl, bl, tr, br, (end_x - posx) >> 8,
+						(end_y - posy) >> 8, pixel, limit);
+				pixel += sizeof(uintX);
+				posx += add_x;
+			};
+			if (!next_block) {
+				next_block = pixel;
+			}
+			posy += add_y;
+		}
+
+		pos_y = posy;
+		pos_x = posx;
+		end_y += 1 << 16;
+		return pixel;
+	}
 
 	// Arbitrary Bilinear Scaler
 	// It works on blocks of 2x5 source pixels at a time. Uses 16.16 Fixed point
@@ -33,7 +99,7 @@ namespace Pentagram {
 			uint_fast32_t sw, uint_fast32_t sh, uint8* pixel, uint_fast32_t dw,
 			uint_fast32_t dh, uint_fast32_t pitch, bool clamp_src) {
 		uint_fast32_t tex_w = tex->w, tex_h = tex->h;
-		sw &= ~3;
+		// sw &= ~3;
 		const uint_fast8_t blockwidth  = 2;
 		const uint_fast8_t blockheight = 4;
 		// Number of times yloop can run.
@@ -45,8 +111,7 @@ namespace Pentagram {
 		const int    tpitch = tex->pitch / sizeof(uintS);
 		const uintS* texel
 				= static_cast<uintS*>(tex->pixels) + (sy * tpitch + sx);
-		const int    numxloops = ((sw & ~1) - 1) / blockwidth;
-		const uintS* tline_end = texel + (sw - 1);
+		int          numxloops = (sw - 1) / blockwidth;
 		const uintS* xloop_end = texel + 1 + (numxloops * blockwidth);
 		const uintS* yloop_end = texel + (numyloops * blockheight) * tpitch;
 
@@ -55,12 +120,9 @@ namespace Pentagram {
 				= static_cast<uintS*>(tex->pixels) + (tex_h * tpitch);
 		int tex_diff = (tpitch * 4) - sw;
 
-		// 2*5 Source Pixel block being scaled RGBA but A is currently unused
-		// a f
-		// b g
-		// c h
-		// d i
-		// e j
+		// 2*5 Source RGBA Pixel block being scaled RGBA. Alpha values are
+		// currently ignored abcde are a column and fghij are the other column
+		// Column can be used in either order
 		uint8 a[4] = "A";
 		uint8 b[4] = "B";
 		uint8 c[4] = "C";
@@ -75,20 +137,19 @@ namespace Pentagram {
 		// Absolute limit of dest buffer. Must not write beyond this
 		uint8* const dst_limit = pixel + dh * pitch;
 
-		// Current Fixed point position of dest pixel in source buffer
-		fixedu1616 pos_y = 0;
-		fixedu1616 pos_x = 0;
-
-		// Fixedpoint position increments when advancing dest pixels
+		// Fixedpoint position increments when advancing dest pixels (this is 1/
+		// scalefactor) effectively means how many source pixels are advanced
+		// per dest pixel written
 		const fixedu1616 add_y = (sh << 16) / dh;
 		const fixedu1616 add_x = (sw << 16) / dw;
 
 		// Limits for block being worked on
-		// start_x and dst_y are calculated backward from the last pixel so the
-		// last pixel in each dest block has no fractional component when
-		// filtering
+		// start_x and block_start_y are calculated backward from the last pixel
+		// so the last pixel in each dest block has no fractional component when
+		// filtering and to limit rounding related problems from the calculation
+		// of the add values above
 		fixedu1616 start_x = (sw << 16) - (add_x * dw);
-		fixedu1616 dst_y   = (sh << 16) - (add_y * dh);
+		fixedu1616 start_y = (sh << 16) - (add_y * dh);
 		fixedu1616 end_y   = 1 << 16;
 
 		// Offset by half a source pixel when doing 0.5x scaling
@@ -97,20 +158,26 @@ namespace Pentagram {
 			start_x += 0x8000;
 		}
 		if (sh == dh * 2) {
-			dst_y += 0x8000;
+			start_y += 0x8000;
 		}
+
+		// Current Fixed point position in source buffer, Fractional part is
+		// used for the filtering coefficents
+		fixedu1616 pos_y = start_y;
+		fixedu1616 pos_x = start_x;
 
 		uint8* blockline_start = nullptr;
 		uint8* next_block      = nullptr;
 
-		// if no clamping is requested only disable clipping if the source rect
-		// is actually within the buffer and width is even
-
+		// if no clipping is requested only disable clipping x if the source
+		// actually has the neeeded width to safely read the line unclipped
+		// Odd widths always need clipping
 		bool clip_x = true;
-		if (sw + sx < tex_w && !clamp_src && (sw & 1) == 0) {
-			clip_x    = false;
-			xloop_end = texel + (sw + 1);
-			tline_end += 2;
+		if ((sx + 3 + numxloops * blockwidth) < tex_w && !clamp_src
+			&& !(sw & 1)) {
+			clip_x = false;
+			numxloops++;
+			xloop_end = texel + 1 + (numxloops * blockwidth);
 			tex_diff--;
 		}
 
@@ -131,124 +198,204 @@ namespace Pentagram {
 			clip_y    = true;
 		}
 		// Src Loop Y
-		int blocks = 0;
-		int lines  = 0;
+		uint_fast32_t block_start_x = start_x;
+		uint_fast32_t block_start_y = pos_y;
+
 		while (texel != yloop_end) {
-			auto texstart = texel;
-			// Read first 5 lines col 0
-			// Read5(a, b, c, d, e);
+			if (texel > yloop_end) {
+				return true;
+			}
+			// Read first column of 5 lines into abcde
 			ReadTexelsV<Manip>(5, texel, tpitch, a, b, c, d, e);
+			// advance texel pointer by 1 to the next column
 			texel++;
-			blocks++;
-			lines += 4;
 			uint_fast32_t end_x = 1 << 16;
-			uint_fast32_t dst_x = start_x;
+			block_start_x       = start_x;
+			block_start_y       = pos_y;
 
 			next_block = pixel;
-			// Src Loop X
-			int cols = 0;
-			/// xloop_end = texel + numxloops * 2;
-			do {
-				cols++;
-				pos_y = dst_y;
+			// Src Loop X, loops while there are 2 or more columns available
+			// auto xdiff = xloop_end - (texel + numxloops * blockwidth);
+			// xloop_end  = texel + (numxloops * blockwidth);
+			assert(xloop_end == (texel + numxloops * blockwidth));
+			while (texel != xloop_end) {
+				pos_y = block_start_y;
 
-				// Read col1
-				// Read5(f, g, h, i, j);
+				// Read next column of 5 lines into fghij
 				ReadTexelsV<Manip>(5, texel, tpitch, f, g, h, i, j);
+				// advance texel pointer by 1 to the next column
 				texel++;
 
 				blockline_start = next_block;
 				next_block      = nullptr;
 
-				// Interpolate col0 -> col1
+				// Interpolate with existing abcde as left and just read fghij
+				// as right
+				// Generate all dest pixels for The 4 inputsource pixels
+
 				// a f
 				// b g
-				ArbInnerLoop(a, b, f, g);
+				Scale2x2Block<uintX, Manip, uintS>(
+						a, b, f, g, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
 				// b g
 				// c h
-				ArbInnerLoop(b, c, g, h);
+				Scale2x2Block<uintX, Manip, uintS>(
+						b, c, g, h, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
 				// c h
 				// d i
-				ArbInnerLoop(c, d, h, i);
-				ArbInnerLoop(d, e, i, j);
+				Scale2x2Block<uintX, Manip, uintS>(
+						c, d, h, i, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
+				// d i
+				// e j
+				Scale2x2Block<uintX, Manip, uintS>(
+						d, e, i, j, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
 
 				end_y -= 4 << 16;
-				dst_x = pos_x;
+				block_start_x = pos_x;
 				end_x += 1 << 16;
-				pos_y = dst_y;
+				pos_y = block_start_y;
 
-				// Read col0
+				// Read next column of 5 lines into abcde
+				// Keeping existing fghij from above
 				ReadTexelsV<Manip>(5, texel, tpitch, a, b, c, d, e);
+				// advance texel pointer by 1 to the next column
 				texel++;
 
 				blockline_start = next_block;
 				next_block      = nullptr;
 
-				// Interpolate col1 -> col0
+				// Interpolate with existing fghij as left and just read abcde
+				// as right Generate all dest pixels for The 4 input source
+				// pixels
+
 				// f a
 				// g b
-				ArbInnerLoop(f, g, a, b);
-				// g b
-				// h c
-				ArbInnerLoop(g, h, b, c);
+				Scale2x2Block<uintX, Manip, uintS>(
+						f, g, a, b, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						nullptr);
+				//  g b
+				//  h c
+				Scale2x2Block<uintX, Manip, uintS>(
+						g, h, b, c, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						nullptr);
 				// h c
 				// i d
-				ArbInnerLoop(h, i, c, d);
+				Scale2x2Block<uintX, Manip, uintS>(
+						h, i, c, d, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						nullptr);
 				// i d
 				// j e
-				ArbInnerLoop(i, j, d, e);
-
+				pixel = Scale2x2Block<uintX, Manip, uintS>(
+						i, j, d, e, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						nullptr);
 				end_y -= 4 << 16;
-				dst_x = pos_x;
+				block_start_x = pos_x;
 				end_x += 1 << 16;
-			} while (texel != tline_end);
+			}
+			//	assert(cols == numxloops);
 
-			// Final X (clipping)
+			// Final X (clipping) if  have a source column available
+			// this happens when sw is even or 1
 			if (clip_x) {
-				pos_y = dst_y;
+				pos_y = block_start_y;
 
-				// Read col1
-				// Read5(f, g, h, i, j);
+				// Read last column of 5 lines into fghij
+				// if source width is odd we reread the previous column
+				if (sw & 1) {
+					texel--;
+				}
 				ReadTexelsV<Manip>(5, texel, tpitch, f, g, h, i, j);
 				texel++;
 
 				blockline_start = next_block;
 				next_block      = nullptr;
 
-				// Interpolate col0 -> col1
-				ArbInnerLoop(a, b, f, g);
-				ArbInnerLoop(b, c, g, h);
-				ArbInnerLoop(c, d, h, i);
-				ArbInnerLoop(d, e, i, j);
+				// Interpolate abcde as left and fghij as right
+				//
+				// a f
+				// b g
+				Scale2x2Block<uintX, Manip, uintS>(
+						a, b, f, g, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch);
+				// b g
+				// c h
+				Scale2x2Block<uintX, Manip, uintS>(
+						b, c, g, h, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch);
+				// c h
+				// d i
+				Scale2x2Block<uintX, Manip, uintS>(
+						c, d, h, i, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch);
+				// d i
+				// e j
+				pixel = Scale2x2Block<uintX, Manip, uintS>(
+						d, e, i, j, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch);
 
-				end_y -= 4 << 16;
-				dst_x = pos_x;
+				block_start_x = pos_x;
 				end_x += 1 << 16;
-				pos_y = dst_y;
 
+				assert(next_block);
+				// odd widths do not need the second column
 				blockline_start = next_block;
-				next_block      = nullptr;
-
-				// Interpolate col1 -> col1
-				ArbInnerLoop(f, g, f, g);
-				ArbInnerLoop(g, h, g, h);
-				ArbInnerLoop(h, i, h, i);
-				ArbInnerLoop(i, j, i, j);
-
 				end_y -= 4 << 16;
-				dst_x = pos_x;
-				end_x += 1 << 16;
+				if (!(sw & 1)) {
+					pos_y      = block_start_y;
+					next_block = nullptr;
+					// Interpolate with fghij as both columns, duplicates right
+					// most source column into right edge of destination but
+					// still interpolates vertically
+
+					// f f
+					// g g
+					Scale2x2Block<uintX, Manip, uintS>(
+							f, g, f, g, blockline_start, next_block, pos_y,
+							pos_x, end_y, end_x, add_y, add_x, block_start_x,
+							pitch);
+					// g g
+					// h h
+					Scale2x2Block<uintX, Manip, uintS>(
+							g, h, g, h, blockline_start, next_block, pos_y,
+							pos_x, end_y, end_x, add_y, add_x, block_start_x,
+							pitch);
+					// h h
+					// i i
+					Scale2x2Block<uintX, Manip, uintS>(
+							h, i, h, i, blockline_start, next_block, pos_y,
+							pos_x, end_y, end_x, add_y, add_x, block_start_x,
+							pitch);
+					// i i
+					// j j
+					pixel = Scale2x2Block<uintX, Manip, uintS>(
+							i, j, i, j, blockline_start, next_block, pos_y,
+							pos_x, end_y, end_x, add_y, add_x, block_start_x,
+							pitch);
+					end_y -= 4 << 16;
+					block_start_x = pos_x;
+					end_x += 1 << 16;
+				}
 			}
+			assert(next_block);
 
 			pixel += pitch - sizeof(uintX) * (dw);
 
-			dst_y = pos_y;
+			block_start_y = pos_y;
 			end_y += 4 << 16;
-			auto diff = texel - texstart;
 			texel += tex_diff;
-			auto alt = texel + 1 + (numxloops * blockwidth);
-			tline_end += tpitch * 4;
-			// xloop_end = alt;
+			xloop_end += tpitch * blockheight;
 		}
 
 		//
@@ -258,7 +405,6 @@ namespace Pentagram {
 			// Complex way to do (sh&3)==0 ? 4 : sh&3 without using a
 			// conditional just intrger arithmatic and bitwise operations
 			uint_fast8_t clipping = 4 - (((sh + 3) ^ 3) & 3);
-
 			// If no clamping was requested and we have pixels available, allow
 			// reading beyond the source rect
 			if (numyloops * blockheight + clipping + sy < tex_h && !clamp_src) {
@@ -269,85 +415,181 @@ namespace Pentagram {
 			}
 
 			// Read column 0 of block but clipped to clipping lines
+			a[0] = 0xff;
+			a[1] = 0;
+			a[2] = 0;
 			ReadTexelsV<Manip>(clipping, texel, tpitch, a, b, c, d, e);
 			texel++;
 
-			uint_fast32_t end_x = 1 << 16;
-			uint_fast32_t dst_x = start_x;
+			uint_fast32_t end_x         = 1 << 16;
+			uint_fast32_t block_start_x = start_x;
 
 			next_block = pixel;
 
 			// Src Loop X
-			do {
-				pos_y = dst_y;
+			while (texel != xloop_end) {
+				pos_y = block_start_y;
 
-				// Read5_Clipped(f, g, h, i, j, 4);
+				f[0] = 0;
+				f[1] = 0;
+				f[2] = 0xff;
 				ReadTexelsV<Manip>(clipping, texel, tpitch, f, g, h, i, j);
 				texel++;
 
 				blockline_start = next_block ? next_block : pixel;
 				next_block      = nullptr;
 
-				ArbInnerLoopClipped(a, b, f, g, dst_limit);
-				ArbInnerLoopClipped(b, c, g, h, dst_limit);
-				ArbInnerLoopClipped(c, d, h, i, dst_limit);
-				ArbInnerLoopClipped(d, e, i, j, dst_limit);
+				// a f
+				// b g
+				Scale2x2Block<uintX, Manip, uintS>(
+						a, b, f, g, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
+				// b g
+				// c h
+				Scale2x2Block<uintX, Manip, uintS>(
+						b, c, g, h, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
+				// c h
+				// d i
+				Scale2x2Block<uintX, Manip, uintS>(
+						c, d, h, i, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
+
+				// d i
+				// e j
+				Scale2x2Block<uintX, Manip, uintS>(
+						d, e, i, j, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
 
 				end_y -= 4 << 16;
-				dst_x = pos_x;
+				block_start_x = pos_x;
 				end_x += 1 << 16;
-				pos_y = dst_y;
+				pos_y = block_start_y;
 
 				// Read5_Clipped(a, b, c, d, e, 4);
+				a[0] = 0;
+				a[1] = 0xff;
+				a[2] = 0;
 				ReadTexelsV<Manip>(clipping, texel, tpitch, a, b, c, d, e);
 				texel++;
 
 				blockline_start = next_block ? next_block : pixel;
 				next_block      = nullptr;
+				// assert(IsUnclipped(blockline_start, dst_limit));
 
-				ArbInnerLoopClipped(f, g, a, b, dst_limit);
-				ArbInnerLoopClipped(g, h, b, c, dst_limit);
-				ArbInnerLoopClipped(h, i, c, d, dst_limit);
-				ArbInnerLoopClipped(i, j, d, e, dst_limit);
+				// j a
+				// g b
+				Scale2x2Block<uintX, Manip, uintS>(
+						f, g, a, b, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
+				//  g b
+				//  h c
+				Scale2x2Block<uintX, Manip, uintS>(
+						g, h, b, c, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
+				// h c
+				// i d
+				Scale2x2Block<uintX, Manip, uintS>(
+						h, i, c, d, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
+				// i d
+				// j e
+				pixel = Scale2x2Block<uintX, Manip, uintS>(
+						i, j, d, e, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
 
 				end_y -= 4 << 16;
-				dst_x = pos_x;
+				block_start_x = pos_x;
 				end_x += 1 << 16;
-			} while (texel != tline_end);
+			};
 
-			// Final X (clipping)
+			// Final X (clipping) if have a source column available
+			// this happens when sw is even or 1
+			//
 			if (clip_x) {
-				pos_y = dst_y;
+				pos_y = block_start_y;
 
-				// Read5_Clipped(f, g, h, i, j, 4);
+				// Read last column of 5 lines into fghij
+				if (sw & 1) {
+					// if source width is 1 go back a column so we re-read the
+					// column and do not exceed bounds
+					texel--;
+				}
 				ReadTexelsV<Manip>(clipping, texel, tpitch, f, g, h, i, j);
 				texel++;
 
 				blockline_start = next_block ? next_block : pixel;
 				next_block      = nullptr;
 
-				ArbInnerLoopClipped(a, b, f, g, dst_limit);
-				ArbInnerLoopClipped(b, c, g, h, dst_limit);
-				ArbInnerLoopClipped(c, d, h, i, dst_limit);
-				ArbInnerLoopClipped(d, e, i, j, dst_limit);
+				// a f
+				// b g
+				Scale2x2Block<uintX, Manip, uintS>(
+						a, b, f, g, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
+				// b g
+				// c h
+				Scale2x2Block<uintX, Manip, uintS>(
+						b, c, g, h, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
+				// c h
+				// d i
+				Scale2x2Block<uintX, Manip, uintS>(
+						c, d, h, i, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
+				// d i
+				// e j
+				Scale2x2Block<uintX, Manip, uintS>(
+						d, e, i, j, blockline_start, next_block, pos_y, pos_x,
+						end_y, end_x, add_y, add_x, block_start_x, pitch,
+						dst_limit);
 
 				end_y -= 4 << 16;
-				dst_x = pos_x;
+				block_start_x = pos_x;
 				end_x += 1 << 16;
-				pos_y = dst_y;
+				pos_y = block_start_y;
 
-				blockline_start = next_block ? next_block : pixel;
+				blockline_start = next_block;
 				next_block      = nullptr;
 
-				ArbInnerLoopClipped(f, g, f, g, dst_limit);
-				ArbInnerLoopClipped(g, h, g, h, dst_limit);
-				ArbInnerLoopClipped(h, i, h, i, dst_limit);
-				ArbInnerLoopClipped(i, j, i, j, dst_limit);
-
-				end_y -= 4 << 16;
-				dst_x = pos_x;
-				end_x += 1 << 16;
+				if (!(sw & 1)) {
+					// f f
+					// g g
+					Scale2x2Block<uintX, Manip, uintS>(
+							f, g, f, g, blockline_start, next_block, pos_y,
+							pos_x, end_y, end_x, add_y, add_x, block_start_x,
+							pitch, dst_limit);
+					// g g
+					// h h
+					Scale2x2Block<uintX, Manip, uintS>(
+							g, h, g, h, blockline_start, next_block, pos_y,
+							pos_x, end_y, end_x, add_y, add_x, block_start_x,
+							pitch, dst_limit);
+					// h h
+					// i i
+					Scale2x2Block<uintX, Manip, uintS>(
+							h, i, h, i, blockline_start, next_block, pos_y,
+							pos_x, end_y, end_x, add_y, add_x, block_start_x,
+							pitch, dst_limit);
+					// i i
+					// j j
+					Scale2x2Block<uintX, Manip, uintS>(
+							i, j, i, j, blockline_start, next_block, pos_y,
+							pos_x, end_y, end_x, add_y, add_x, block_start_x,
+							pitch, dst_limit);
+				}
 			}
+
 		} else if (clip_y && (sh & 3)) {
 			// Height is Non multiple of 4
 			// return false;
@@ -358,4 +600,4 @@ namespace Pentagram {
 
 	InstantiateBilinearScalerFunc(BilinearScalerInternal_Arb);
 
-}    // namespace Pentagram
+}}    // namespace Pentagram::nsBilinearScaler
