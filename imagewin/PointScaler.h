@@ -38,7 +38,6 @@ namespace Pentagram {
 		const char* ScalerDesc() const override;    //< Desciption of the Scaler
 		const char* ScalerCopyright()
 				const override;    //< Scaler Copyright info
-		int granularity() const override;
 	};
 
 }    // namespace Pentagram

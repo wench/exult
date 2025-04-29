@@ -329,8 +329,4 @@ namespace Pentagram {
 		return "Copyright (C) 2005 The Pentagram Team, 2010 The Exult Team";
 	}
 
-	int PointScaler::granularity() const {
-		return 1;
-	}
-
 }    // namespace Pentagram

@@ -24,72 +24,67 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "BilinearScalerInternal.h"
 #include "manip.h"
 
-namespace Pentagram {
-	using namespace  nsBilinearScaler;
+namespace Pentagram { namespace BilinearScaler {
 
-		template <class uintX, class Manip, class uintS>
-		class BilinearScalerInternal {
-		public:
-			static bool ScaleBilinear(
-					SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy,
-					uint_fast32_t sw, uint_fast32_t sh, uint8* pixel,
-					uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch,
-					bool clamp_src) {
-				//
-				// Clip the source rect to the size of tex and adjust dest rect
-				// as appropriate
-				//
-				uint_fast32_t tex_w = tex->w, tex_h = tex->h;
+	template <class uintX, class Manip, class uintS>
+	class BilinearScalerInternal {
+	public:
+		static bool ScaleBilinear(
+				SDL_Surface* tex, uint_fast32_t sx, uint_fast32_t sy,
+				uint_fast32_t sw, uint_fast32_t sh, uint8* pixel,
+				uint_fast32_t dw, uint_fast32_t dh, uint_fast32_t pitch,
+				bool clamp_src) {
+			//
+			// Clip the source rect to the size of tex and adjust dest rect
+			// as appropriate
+			//
+			uint_fast32_t tex_w = tex->w, tex_h = tex->h;
 
-				// clip y
-				if ((sh + sy) > tex_h) {
-					auto nsh = tex_h - sy;
-					dh       = (dh * nsh) / sh;
-					sh       = nsh;
-				}
-				// clip x
-				if ((sw + sx) > tex_w) {
-					auto nsw = tex_w - sx;
-					dw       = (dh * nsw) / sw;
-					sw       = nsw;
-				}
-
-				//
-				// Call the correct specialized function as appropriate
-				//
-
-				// 2x Scaling
-				if ((sw * 2 == dw) && (sh * 2 == dh) && !(sh % 4)
-					&& !(sw % 4)) {
-					return BilinearScalerInternal_2x<uintX, Manip, uintS>(
-							tex, sx, sy, sw, sh, pixel, dw, dh, pitch,
-							clamp_src);
-				}
-				// 2 X 2.4 Y
-				else if (
-						(sw * 2 == dw) && (dh * 5 == sh * 12) && !(sh % 5)
-						&& !(sw % 4)) {
-					return BilinearScalerInternal_X2Y24<uintX, Manip, uintS>(
-							tex, sx, sy, sw, sh, pixel, dw, dh, pitch,
-							clamp_src);
-				}
-				// 1 X 1.2 Y
-				else if (
-						(sw == dw) && (dh * 5 == sh * 6) && !(sh % 5)
-						&& !(sw % 4)) {
-					return BilinearScalerInternal_X1Y12<uintX, Manip, uintS>(
-							tex, sx, sy, sw, sh, pixel, dw, dh, pitch,
-							clamp_src);
-				}
-				// Arbitrary has no restrictions
-				else {
-					return BilinearScalerInternal_Arb<uintX, Manip, uintS>(
-							tex, sx, sy, sw, sh, pixel, dw, dh, pitch,
-							clamp_src);
-				}
+			// clip y
+			if ((sh + sy) > tex_h) {
+				auto nsh = tex_h - sy;
+				dh       = (dh * nsh) / sh;
+				sh       = nsh;
 			}
-		};
-	BilinearScaler::BilinearScaler() {
+			// clip x
+			if ((sw + sx) > tex_w) {
+				auto nsw = tex_w - sx;
+				dw       = (dh * nsw) / sw;
+				sw       = nsw;
+			}
+
+			//
+			// Call the correct specialized function as appropriate
+			//
+
+			// 2x Scaling
+			if ((sw * 2 == dw) && (sh * 2 == dh)) {
+				return BilinearScalerInternal_2x<uintX, Manip, uintS>(
+						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
+			}
+			// 2 X 2.4 Y
+			else if (
+					(sw * 2 == dw) && (dh * 5 == sh * 12) && !(sh % 5)
+					&& !(sw % 4)) {
+				return BilinearScalerInternal_X2Y24<uintX, Manip, uintS>(
+						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
+			}
+			// 1 X 1.2 Y
+			else if (
+					(sw == dw) && (dh * 5 == sh * 6) && !(sh % 5)
+					&& !(sw % 4)) {
+				return BilinearScalerInternal_X1Y12<uintX, Manip, uintS>(
+						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
+			}
+			// Arbitrary has no restrictions
+			else {
+				return BilinearScalerInternal_Arb<uintX, Manip, uintS>(
+						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
+			}
+		}
+	};
+
+	Scaler::Scaler() {
 		Scale8To8  = nullptr;
 		Scale8To32 = BilinearScalerInternal<
 				uint32_t, Manip8to32, uint8>::ScaleBilinear;
@@ -113,28 +108,24 @@ namespace Pentagram {
 #endif
 	}
 
-	uint_fast32_t BilinearScaler::ScaleBits() const {
+	uint_fast32_t Scaler::ScaleBits() const {
 		return 0xFFFFFFFF;
 	}
 
-	bool BilinearScaler::ScaleArbitrary() const {
+	bool Scaler::ScaleArbitrary() const {
 		return true;
 	}
 
-	const char* BilinearScaler::ScalerName() const {
+	const char* Scaler::ScalerName() const {
 		return "bilinear";
 	}
 
-	const char* BilinearScaler::ScalerDesc() const {
+	const char* Scaler::ScalerDesc() const {
 		return "Bilinear Filtering Scaler";
 	}
 
-	const char* BilinearScaler::ScalerCopyright() const {
-		return "Copyright (C) 2005 The Pentagram Team, 2010 The Exult Team";
+	const char* Scaler::ScalerCopyright() const {
+		return "Copyright (C) 2005 The Pentagram Team, 2025 The Exult Team";
 	}
 
-	int BilinearScaler::granularity() const {
-		return 4;
-	}
-
-}    // namespace Pentagram
+}}    // namespace Pentagram::BilinearScaler

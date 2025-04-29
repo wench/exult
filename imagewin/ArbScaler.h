@@ -56,8 +56,6 @@ namespace Pentagram {
 		virtual const char* ScalerCopyright() const
 				= 0;    //< Scaler Copyright info
 
-		virtual int granularity() const = 0; // < Width and Height of source rect should be multiples of this
-
 		bool Support8bpp(int srcfmt) {
 			return srcfmt == 8 && Scale8To8;
 		}

@@ -22,11 +22,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "ArbScaler.h"
 
-namespace Pentagram {
-
-	class BilinearScaler : public ArbScaler {
+namespace Pentagram { namespace BilinearScaler {
+	class Scaler : public ArbScaler {
 	public:
-		BilinearScaler();
+		Scaler();
 
 		virtual uint_fast32_t ScaleBits()
 				const;    //< bits for supported integer scaling
@@ -38,9 +37,8 @@ namespace Pentagram {
 		const char* ScalerDesc() const override;    //< Desciption of the Scaler
 		const char* ScalerCopyright()
 				const override;    //< Scaler Copyright info
-		int granularity() const override;
 	};
 
-}    // namespace Pentagram
+}}    // namespace Pentagram::BilinearScaler
 
 #endif

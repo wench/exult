@@ -33,7 +33,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #else
 #	define BSI_FORCE_INLINE inline
 #endif
-namespace Pentagram { namespace nsBilinearScaler {
+namespace Pentagram { namespace BilinearScaler {
 
 	typedef uint_fast32_t fixedu1616;
 /*
@@ -54,7 +54,7 @@ namespace Pentagram { namespace nsBilinearScaler {
 	template <typename limit_t = std::nullptr_t>
 	BSI_FORCE_INLINE bool IsUnclipped(uint8* dest, limit_t limit = nullptr)
 	{
-		return std::is_null_pointer<limit_t>::value || dest < static_cast<uint8*>(limit);
+		return (std::is_null_pointer<limit_t>::value || dest < static_cast<uint8*>(limit));
 	}
 
 	template <typename uintX, typename limit_t = std::nullptr_t>
@@ -74,59 +74,13 @@ namespace Pentagram { namespace nsBilinearScaler {
 		return (b << 16) + (a - (b)) * (fac);
 	}
 
-#define CopyLerp(d, a, b, f)                       \
+#define LerpRGB(d, a, b, f)                       \
 	do {                                           \
 		(d)[0] = SimpleLerp2(b[0], a[0], f) >> 16; \
 		(d)[1] = SimpleLerp2(b[1], a[1], f) >> 16; \
 		(d)[2] = SimpleLerp2(b[2], a[2], f) >> 16; \
 	} while (false)
 
-#define FilterPixelM(a, b, f, g, fx, fy, limit)                  \
-	do {                                                        \
-		WritePix<uintX>(                                        \
-				pixel,                                          \
-				Manip::rgb(                                     \
-						SimpleLerp(                             \
-								SimpleLerp(a[0], f[0], fx),     \
-								SimpleLerp(b[0], g[0], fx), fy) \
-								>> 16,                          \
-						SimpleLerp(                             \
-								SimpleLerp(a[1], f[1], fx),     \
-								SimpleLerp(b[1], g[1], fx), fy) \
-								>> 16,                          \
-						SimpleLerp(                             \
-								SimpleLerp(a[2], f[2], fx),     \
-								SimpleLerp(b[2], g[2], fx), fy) \
-								>> 16),                         \
-				limit);                                         \
-	} while (false)
-
-#define ScalePixel2xClipped(a, b, f, g, limit)                       \
-	do {                                                             \
-		WritePix<uintX>(pixel, Manip::rgb(a[0], a[1], a[2]), limit); \
-		WritePix<uintX>(                                             \
-				pixel + sizeof(uintX),                               \
-				Manip::rgb(                                          \
-						(a[0] + f[0]) >> 1, (a[1] + f[1]) >> 1,      \
-						(a[2] + f[2]) >> 1),                         \
-				limit);                                              \
-		pixel += pitch;                                              \
-		WritePix<uintX>(                                             \
-				pixel,                                               \
-				Manip::rgb(                                          \
-						(a[0] + b[0]) >> 1, (a[1] + b[1]) >> 1,      \
-						(a[2] + b[2]) >> 1),                         \
-				limit);                                              \
-		WritePix<uintX>(                                             \
-				pixel + sizeof(uintX),                               \
-				Manip::rgb(                                          \
-						(a[0] + b[0] + f[0] + g[0]) >> 2,            \
-						(a[1] + b[1] + f[1] + g[1]) >> 2,            \
-						(a[2] + b[2] + f[2] + g[2]) >> 2),           \
-				limit);                                              \
-		pixel += pitch;                                              \
-	} while (false)
-#define ScalePixel2x(a, b, f, g) ScalePixel2xClipped(a, b, f, g, nullptr)
 
 #define X2Xy24xLerps(c0, c1, y)                                              \
 	do {                                                                     \
@@ -171,34 +125,34 @@ namespace Pentagram { namespace nsBilinearScaler {
 
 #define X2xY24xDoColsA()                     \
 	do {                                     \
-		CopyLerp(cols[0][0], a, b, 0x0000);  \
-		CopyLerp(cols[0][1], a, b, 0x6AAA);  \
-		CopyLerp(cols[0][2], a, b, 0xD554);  \
-		CopyLerp(cols[0][3], b, c, 0x3FFE);  \
-		CopyLerp(cols[0][4], b, c, 0xAAA8);  \
-		CopyLerp(cols[0][5], c, d, 0x1552);  \
-		CopyLerp(cols[0][6], c, d, 0x7FFC);  \
-		CopyLerp(cols[0][7], c, d, 0xEAA6);  \
-		CopyLerp(cols[0][8], d, e, 0x5550);  \
-		CopyLerp(cols[0][9], d, e, 0xBFFA);  \
-		CopyLerp(cols[0][10], e, l, 0x2AA4); \
-		CopyLerp(cols[0][11], e, l, 0x954E); \
+		LerpRGB(cols[0][0], a, b, 0x0000);  \
+		LerpRGB(cols[0][1], a, b, 0x6AAA);  \
+		LerpRGB(cols[0][2], a, b, 0xD554);  \
+		LerpRGB(cols[0][3], b, c, 0x3FFE);  \
+		LerpRGB(cols[0][4], b, c, 0xAAA8);  \
+		LerpRGB(cols[0][5], c, d, 0x1552);  \
+		LerpRGB(cols[0][6], c, d, 0x7FFC);  \
+		LerpRGB(cols[0][7], c, d, 0xEAA6);  \
+		LerpRGB(cols[0][8], d, e, 0x5550);  \
+		LerpRGB(cols[0][9], d, e, 0xBFFA);  \
+		LerpRGB(cols[0][10], e, l, 0x2AA4); \
+		LerpRGB(cols[0][11], e, l, 0x954E); \
 	} while (false)
 
 #define X2xY24xDoColsB()                     \
 	do {                                     \
-		CopyLerp(cols[1][0], f, g, 0x0000);  \
-		CopyLerp(cols[1][1], f, g, 0x6AAA);  \
-		CopyLerp(cols[1][2], f, g, 0xD554);  \
-		CopyLerp(cols[1][3], g, h, 0x3FFE);  \
-		CopyLerp(cols[1][4], g, h, 0xAAA8);  \
-		CopyLerp(cols[1][5], h, i, 0x1552);  \
-		CopyLerp(cols[1][6], h, i, 0x7FFC);  \
-		CopyLerp(cols[1][7], h, i, 0xEAA6);  \
-		CopyLerp(cols[1][8], i, j, 0x5550);  \
-		CopyLerp(cols[1][9], i, j, 0xBFFA);  \
-		CopyLerp(cols[1][10], j, k, 0x2AA4); \
-		CopyLerp(cols[1][11], j, k, 0x954E); \
+		LerpRGB(cols[1][0], f, g, 0x0000);  \
+		LerpRGB(cols[1][1], f, g, 0x6AAA);  \
+		LerpRGB(cols[1][2], f, g, 0xD554);  \
+		LerpRGB(cols[1][3], g, h, 0x3FFE);  \
+		LerpRGB(cols[1][4], g, h, 0xAAA8);  \
+		LerpRGB(cols[1][5], h, i, 0x1552);  \
+		LerpRGB(cols[1][6], h, i, 0x7FFC);  \
+		LerpRGB(cols[1][7], h, i, 0xEAA6);  \
+		LerpRGB(cols[1][8], i, j, 0x5550);  \
+		LerpRGB(cols[1][9], i, j, 0xBFFA);  \
+		LerpRGB(cols[1][10], j, k, 0x2AA4); \
+		LerpRGB(cols[1][11], j, k, 0x954E); \
 	} while (false)
 
 #define X1xY12xCopy(y) \
@@ -222,12 +176,12 @@ namespace Pentagram { namespace nsBilinearScaler {
 
 #define X1xY12xDoCols()                  \
 	do {                                 \
-		CopyLerp(cols[0], a, b, 0x0000); \
-		CopyLerp(cols[1], a, b, 0xD554); \
-		CopyLerp(cols[2], b, c, 0xAAA8); \
-		CopyLerp(cols[3], c, d, 0x7FFC); \
-		CopyLerp(cols[4], d, e, 0x5550); \
-		CopyLerp(cols[5], e, l, 0x2AA4); \
+		LerpRGB(cols[0], a, b, 0x0000); \
+		LerpRGB(cols[1], a, b, 0xD554); \
+		LerpRGB(cols[2], b, c, 0xAAA8); \
+		LerpRGB(cols[3], c, d, 0x7FFC); \
+		LerpRGB(cols[4], d, e, 0x5550); \
+		LerpRGB(cols[5], e, l, 0x2AA4); \
 	} while (false)
 
 

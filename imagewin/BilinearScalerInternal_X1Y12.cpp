@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "BilinearScalerInternal.h"
 #include "manip.h"
 
-namespace Pentagram { namespace nsBilinearScaler {
+namespace Pentagram { namespace BilinearScaler {
 
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_X1Y12(
@@ -41,7 +41,7 @@ namespace Pentagram { namespace nsBilinearScaler {
 		uintS*    tex_end   = texel + (sh - 5) * tpitch;
 		const int tex_diff  = (tpitch * 5) - sw;
 
-		// 1x5 block of RGBA Souurce Pixels
+		// 1x5 block of RGBA Source Pixels
 		uint8 a[4];
 		uint8 b[4];
 		uint8 c[4];

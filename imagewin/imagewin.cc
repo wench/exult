@@ -133,7 +133,7 @@ Image_window::ScalerVector::ScalerVector() {
 	push_back(Interlaced);
 
 	const ScalerInfo Bilinear
-			= {"Bilinear", 0xFFFFFFFF, new Pentagram::BilinearScaler(),
+			= {"Bilinear", 0xFFFFFFFF, new Pentagram::BilinearScaler::Scaler(),
 			   nullptr,    nullptr,    nullptr,
 			   nullptr,    nullptr};
 	push_back(Bilinear);
