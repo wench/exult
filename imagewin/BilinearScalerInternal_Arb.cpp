@@ -25,30 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 namespace Pentagram { namespace BilinearScaler {
 
-	template <
-			class uintX, class Manip, class uintS,
-			typename limit_t = std::nullptr_t>
-	BSI_FORCE_INLINE void FilterPixel(
-			const uint8* const tl, const uint8* const bl, const uint8* const tr,
-			const uint8* const br, const fixedu1616 fx, const fixedu1616 fy,
-			uint8* const pixel, limit_t limit = nullptr) {
-		WritePix<uintX>(
-				pixel,
-				Manip::rgb(
-						SimpleLerp(
-								SimpleLerp(tl[0], tr[0], fx),
-								SimpleLerp(bl[0], br[0], fx), fy)
-								>> 16,
-						SimpleLerp(
-								SimpleLerp(tl[1], tr[1], fx),
-								SimpleLerp(bl[1], br[1], fx), fy)
-								>> 16,
-						SimpleLerp(
-								SimpleLerp(tl[2], tr[2], fx),
-								SimpleLerp(bl[2], br[2], fx), fy)
-								>> 16),
-				limit);
-	}
+
 
 	// This takes 4 texels and generates the scaled pixels between them given
 	// the fixed point coordinates and limits specified
@@ -56,7 +33,7 @@ namespace Pentagram { namespace BilinearScaler {
 	template <
 			class uintX, class Manip, class uintS,
 			typename limit_t = std::nullptr_t>
-	BSI_FORCE_INLINE uint8* Scale2x2Block_Arb(
+	BSI_FORCE_INLINE uint8* ScaleBlockArb(
 			const uint8* const tl, const uint8* const bl, const uint8* const tr,
 			const uint8* const br, uint8*& blockline_start, uint8*& next_block,
 			fixedu1616& pos_y, fixedu1616& pos_x, fixedu1616& end_y,
@@ -72,7 +49,7 @@ namespace Pentagram { namespace BilinearScaler {
 			pixel = blockline_start;
 			blockline_start += pitch;
 			while (posx < end_x && IsUnclipped(pixel, limit)) {
-				FilterPixel<uintX, Manip, uintS>(
+				FilterPixel8<uintX, Manip, uintS>(
 						tl, bl, tr, br, (end_x - posx) >> 8,
 						(end_y - posy) >> 8, pixel, limit);
 				pixel += sizeof(uintX);
@@ -235,22 +212,22 @@ namespace Pentagram { namespace BilinearScaler {
 
 				// a f
 				// b g
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						a, b, f, g, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 				// b g
 				// c h
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						b, c, g, h, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 				// c h
 				// d i
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						c, d, h, i, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 				// d i
 				// e j
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						d, e, i, j, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 
@@ -274,22 +251,22 @@ namespace Pentagram { namespace BilinearScaler {
 
 				// f a
 				// g b
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						f, g, a, b, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 				//  g b
 				//  h c
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						g, h, b, c, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 				// h c
 				// i d
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						h, i, c, d, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 				// i d
 				// j e
-				pixel = Scale2x2Block_Arb<uintX, Manip, uintS>(
+				pixel = ScaleBlockArb<uintX, Manip, uintS>(
 						i, j, d, e, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 				end_y -= 4 << 16;
@@ -317,22 +294,22 @@ namespace Pentagram { namespace BilinearScaler {
 				//
 				// a f
 				// b g
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						a, b, f, g, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 				// b g
 				// c h
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						b, c, g, h, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 				// c h
 				// d i
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						c, d, h, i, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 				// d i
 				// e j
-				pixel = Scale2x2Block_Arb<uintX, Manip, uintS>(
+				pixel = ScaleBlockArb<uintX, Manip, uintS>(
 						d, e, i, j, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch);
 
@@ -352,25 +329,25 @@ namespace Pentagram { namespace BilinearScaler {
 
 					// f f
 					// g g
-					Scale2x2Block_Arb<uintX, Manip, uintS>(
+					ScaleBlockArb<uintX, Manip, uintS>(
 							f, g, f, g, blockline_start, next_block, pos_y,
 							pos_x, end_y, end_x, add_y, add_x, block_start_x,
 							pitch);
 					// g g
 					// h h
-					Scale2x2Block_Arb<uintX, Manip, uintS>(
+					ScaleBlockArb<uintX, Manip, uintS>(
 							g, h, g, h, blockline_start, next_block, pos_y,
 							pos_x, end_y, end_x, add_y, add_x, block_start_x,
 							pitch);
 					// h h
 					// i i
-					Scale2x2Block_Arb<uintX, Manip, uintS>(
+					ScaleBlockArb<uintX, Manip, uintS>(
 							h, i, h, i, blockline_start, next_block, pos_y,
 							pos_x, end_y, end_x, add_y, add_x, block_start_x,
 							pitch);
 					// i i
 					// j j
-					pixel = Scale2x2Block_Arb<uintX, Manip, uintS>(
+					pixel = ScaleBlockArb<uintX, Manip, uintS>(
 							i, j, i, j, blockline_start, next_block, pos_y,
 							pos_x, end_y, end_x, add_y, add_x, block_start_x,
 							pitch);
@@ -429,26 +406,26 @@ namespace Pentagram { namespace BilinearScaler {
 
 				// a f
 				// b g
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						a, b, f, g, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
 				// b g
 				// c h
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						b, c, g, h, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
 				// c h
 				// d i
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						c, d, h, i, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
 
 				// d i
 				// e j
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						d, e, i, j, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
@@ -471,25 +448,25 @@ namespace Pentagram { namespace BilinearScaler {
 
 				// j a
 				// g b
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						f, g, a, b, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
 				//  g b
 				//  h c
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						g, h, b, c, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
 				// h c
 				// i d
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						h, i, c, d, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
 				// i d
 				// j e
-				pixel = Scale2x2Block_Arb<uintX, Manip, uintS>(
+				pixel = ScaleBlockArb<uintX, Manip, uintS>(
 						i, j, d, e, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
@@ -519,25 +496,25 @@ namespace Pentagram { namespace BilinearScaler {
 
 				// a f
 				// b g
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						a, b, f, g, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
 				// b g
 				// c h
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						b, c, g, h, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
 				// c h
 				// d i
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						c, d, h, i, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
 				// d i
 				// e j
-				Scale2x2Block_Arb<uintX, Manip, uintS>(
+				ScaleBlockArb<uintX, Manip, uintS>(
 						d, e, i, j, blockline_start, next_block, pos_y, pos_x,
 						end_y, end_x, add_y, add_x, block_start_x, pitch,
 						dst_limit);
@@ -553,25 +530,25 @@ namespace Pentagram { namespace BilinearScaler {
 				if (!(sw & 1)) {
 					// f f
 					// g g
-					Scale2x2Block_Arb<uintX, Manip, uintS>(
+					ScaleBlockArb<uintX, Manip, uintS>(
 							f, g, f, g, blockline_start, next_block, pos_y,
 							pos_x, end_y, end_x, add_y, add_x, block_start_x,
 							pitch, dst_limit);
 					// g g
 					// h h
-					Scale2x2Block_Arb<uintX, Manip, uintS>(
+					ScaleBlockArb<uintX, Manip, uintS>(
 							g, h, g, h, blockline_start, next_block, pos_y,
 							pos_x, end_y, end_x, add_y, add_x, block_start_x,
 							pitch, dst_limit);
 					// h h
 					// i i
-					Scale2x2Block_Arb<uintX, Manip, uintS>(
+					ScaleBlockArb<uintX, Manip, uintS>(
 							h, i, h, i, blockline_start, next_block, pos_y,
 							pos_x, end_y, end_x, add_y, add_x, block_start_x,
 							pitch, dst_limit);
 					// i i
 					// j j
-					Scale2x2Block_Arb<uintX, Manip, uintS>(
+					ScaleBlockArb<uintX, Manip, uintS>(
 							i, j, i, j, blockline_start, next_block, pos_y,
 							pos_x, end_y, end_x, add_y, add_x, block_start_x,
 							pitch, dst_limit);

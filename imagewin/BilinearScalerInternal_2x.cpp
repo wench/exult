@@ -29,38 +29,19 @@ namespace Pentagram { namespace BilinearScaler {
 	template <
 			class uintX, class Manip, class uintS,
 			typename limit_t = std::nullptr_t>
-	// This is mostly an optimized specialization of Scale2x2Block_Arb
-	// with unrolled loops and hardcoded filtering coefficients
-	BSI_FORCE_INLINE void Scale2x2Block2x(
+	BSI_FORCE_INLINE void ScaleBlock2x(
 			const uint8* const tl, const uint8* const bl, const uint8* const tr,
 			const uint8* const br, uint8*& pixel, const uint_fast32_t pitch, 
 		const limit_t limit = nullptr) {                                                             
-	WritePix<uintX>(pixel, Manip::rgb(tl[0], tl[1], tl[2]), limit); 
-	WritePix<uintX>(                                             
-			pixel + sizeof(uintX),                               
-			Manip::rgb(                                          
-					(tl[0] + tr[0]) >> 1, (tl[1] + tr[1]) >> 1,      
-					(tl[2] + tr[2]) >> 1),                         
-			limit);                                              
-	pixel += pitch;                                              
-	WritePix<uintX>(                                             
-			pixel,                                               
-			Manip::rgb(                                          
-					(tl[0] + bl[0]) >> 1, (tl[1] + bl[1]) >> 1,      
-					(tl[2] + bl[2]) >> 1),                         
-			limit);                                              
-	WritePix<uintX>(                                             
-			pixel + sizeof(uintX),                               
-			Manip::rgb(                                          
-					(tl[0] + bl[0] + tr[0] + br[0]) >> 2,            
-					(tl[1] + bl[1] + tr[1] + br[1]) >> 2,            
-					(tl[2] + bl[2] + tr[2] + br[2]) >> 2),           
-			limit);                                              
-	pixel += pitch;                                              
-} 
+	
+ScaleBlock2x1<uintX, Manip, uintS>(
+				tl, bl, tr, br, 256, 128, 256, pixel, pitch, limit);
+ScaleBlock2x1<uintX, Manip, uintS>(
+				tl, bl, tr, br, 256, 128, 128, pixel, pitch, limit);
+	} 
 	// 2x Blinear Scaler
 	// 2x scaler is a specialization of Arb. It works almost identically to Arb
-	// But instead of using Scale2x2Block_Arb it uses Scale2x2Block_2x 
+	// But instead of using ScaleBlockArb it uses ScaleBlock2x 
 	// without fixed point values used to calculate the filtering coefficents
 	template <class uintX, class Manip, class uintS>
 	bool BilinearScalerInternal_2x(
@@ -161,10 +142,10 @@ namespace Pentagram { namespace BilinearScaler {
 				// as right
 				// Generate all dest pixels for The 4 inputsource pixels
 
-				Scale2x2Block2x<uintX, Manip, uintS>(a, b, f, g, pixel, pitch);
-				Scale2x2Block2x<uintX, Manip, uintS>(b, c, g, h, pixel, pitch);
-				Scale2x2Block2x<uintX, Manip, uintS>(c, d, h, i, pixel, pitch);
-				Scale2x2Block2x<uintX, Manip, uintS>(d, e, i, j, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(a, b, f, g, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(b, c, g, h, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(c, d, h, i, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(d, e, i, j, pixel, pitch);
 
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
@@ -180,10 +161,10 @@ namespace Pentagram { namespace BilinearScaler {
 				// as right Generate all dest pixels for The 4 input source
 				// pixels
 
-				Scale2x2Block2x<uintX, Manip, uintS>(f, g, a, b, pixel, pitch);
-				Scale2x2Block2x<uintX, Manip, uintS>(g, h, b, c, pixel, pitch);
-				Scale2x2Block2x<uintX, Manip, uintS>(h, i, c, d, pixel, pitch);
-				Scale2x2Block2x<uintX, Manip, uintS>(i, j, d, e, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(f, g, a, b, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(g, h, b, c, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(h, i, c, d, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(i, j, d, e, pixel, pitch);
 
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
@@ -204,23 +185,23 @@ namespace Pentagram { namespace BilinearScaler {
 
 				// Interpolate abcde as left and fghij as right
 				//
-				Scale2x2Block2x<uintX, Manip, uintS>(a, b, f, g, pixel, pitch);
-				Scale2x2Block2x<uintX, Manip, uintS>(b, c, g, h, pixel, pitch);
-				Scale2x2Block2x<uintX, Manip, uintS>(c, d, h, i, pixel, pitch);
-				Scale2x2Block2x<uintX, Manip, uintS>(d, e, i, j, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(a, b, f, g, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(b, c, g, h, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(c, d, h, i, pixel, pitch);
+				ScaleBlock2x<uintX, Manip, uintS>(d, e, i, j, pixel, pitch);
 
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
 
 				// odd widths do not need the second column
 				if (!(sw & 1)) {
-					Scale2x2Block2x<uintX, Manip, uintS>(
+					ScaleBlock2x<uintX, Manip, uintS>(
 							f, g, f, g, pixel, pitch);
-					Scale2x2Block2x<uintX, Manip, uintS>(
+					ScaleBlock2x<uintX, Manip, uintS>(
 							g, h, g, h, pixel, pitch);
-					Scale2x2Block2x<uintX, Manip, uintS>(
+					ScaleBlock2x<uintX, Manip, uintS>(
 							h, i, h, i, pixel, pitch);
-					Scale2x2Block2x<uintX, Manip, uintS>(
+					ScaleBlock2x<uintX, Manip, uintS>(
 							i, j, i, j, pixel, pitch);
 
 					pixel -= pitch * 8;
@@ -262,13 +243,13 @@ namespace Pentagram { namespace BilinearScaler {
 				texel++;
 
 
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						a, b, f, g, pixel, pitch, dst_limit);
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						b, c, g, h, pixel, pitch, dst_limit);
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						c, d, h, i, pixel, pitch, dst_limit);
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						d, e, i, j, pixel, pitch, dst_limit);
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
@@ -280,13 +261,13 @@ namespace Pentagram { namespace BilinearScaler {
 				ReadTexelsV<Manip>(clipping, texel, tpitch, a, b, c, d, e);
 				texel++;
 
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						f, g, a, b, pixel, pitch, dst_limit);
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						g, h, b, c, pixel, pitch, dst_limit);
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						h, i, c, d, pixel, pitch, dst_limit);
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						i, j, d, e, pixel, pitch, dst_limit);
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
@@ -307,26 +288,26 @@ namespace Pentagram { namespace BilinearScaler {
 				ReadTexelsV<Manip>(clipping, texel, tpitch, f, g, h, i, j);
 				texel++;
 
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						a, b, f, g, pixel, pitch, dst_limit);
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						b, c, g, h, pixel, pitch, dst_limit);
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						c, d, h, i, pixel, pitch, dst_limit);
-				Scale2x2Block2x<uintX, Manip, uintS>(
+				ScaleBlock2x<uintX, Manip, uintS>(
 						d, e, i, j, pixel, pitch, dst_limit);
 
 				pixel -= pitch * 8;
 				pixel += sizeof(uintX) * 2;
 
 				if (!(sw & 1)) {
-					Scale2x2Block2x<uintX, Manip, uintS>(
+					ScaleBlock2x<uintX, Manip, uintS>(
 							f, g, f, g, pixel, pitch, dst_limit);
-					Scale2x2Block2x<uintX, Manip, uintS>(
+					ScaleBlock2x<uintX, Manip, uintS>(
 							g, h, g, h, pixel, pitch, dst_limit);
-					Scale2x2Block2x<uintX, Manip, uintS>(
+					ScaleBlock2x<uintX, Manip, uintS>(
 							h, i, h, i, pixel, pitch, dst_limit);
-					Scale2x2Block2x<uintX, Manip, uintS>(
+					ScaleBlock2x<uintX, Manip, uintS>(
 							i, j, i, j, pixel, pitch, dst_limit);
 
 				}

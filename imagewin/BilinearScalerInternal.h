@@ -65,20 +65,71 @@ namespace Pentagram { namespace BilinearScaler {
 		}
 	}
 	BSI_FORCE_INLINE uint_fast32_t
-			SimpleLerp(uint_fast32_t a, uint_fast32_t b, uint_fast32_t fac) {
-		return (b << 8) + (a - b) * (fac);
+			SimpleLerp8(uint_fast32_t a, uint_fast32_t b, uint_fast32_t fac) {
+		return (b << 8) + (a - b) * fac;
 	}
 
 	BSI_FORCE_INLINE uint_fast32_t
-			SimpleLerp2(uint_fast32_t a, uint_fast32_t b, uint_fast32_t fac) {
-		return (b << 16) + (a - (b)) * (fac);
+			SimpleLerp16(uint_fast32_t a, uint_fast32_t b, uint_fast32_t fac) {
+		return (b << 16) + (a - (b)) * fac;
+	}
+
+	template <
+			class uintX, class Manip, class uintS,
+			typename limit_t = std::nullptr_t>
+	BSI_FORCE_INLINE void FilterPixel8(
+			const uint8* const tl, const uint8* const bl, const uint8* const tr,
+			const uint8* const br, const uint_fast32_t fx,
+			const uint_fast32_t fy,
+			uint8* const pixel, limit_t limit = nullptr) {
+
+		WritePix<uintX>(
+				pixel,
+				Manip::rgb(
+						SimpleLerp8(
+								SimpleLerp8(tl[0], tr[0], fx),
+								SimpleLerp8(bl[0], br[0], fx), fy)
+								>> 16,
+						SimpleLerp8(
+								SimpleLerp8(tl[1], tr[1], fx),
+								SimpleLerp8(bl[1], br[1], fx), fy)
+								>> 16,
+						SimpleLerp8(
+								SimpleLerp8(tl[2], tr[2], fx),
+								SimpleLerp8(bl[2], br[2], fx), fy)
+								>> 16),
+				limit);
+	}
+
+	template <
+			class uintX, class Manip, class uintS,
+			typename limit_t = std::nullptr_t>
+	/// This is mostly a specialization of ScaleBlockArb
+	/// with unrolled loops to geneate a 2 pixel row using the given filtering coefficents 
+	/// \param tl Top Left source pixel
+	/// \param bl Bottom Left source pixel
+	/// \param tr Top Right source pixel 
+	/// \param br Bottom Right source pixel 
+	/// \param x1 horizontal filtering coefficent for left pixel (256 - 0)
+	/// \param x2 horizontal filtering coefficent for right pixel (256 - 0)
+	/// \param y vertical filtering coefficent for both pixels (256 - 0)
+	BSI_FORCE_INLINE void ScaleBlock2x1(
+			const uint8* const tl, const uint8* const bl, const uint8* const tr,
+			const uint8* const br, const uint_fast32_t x1, uint_fast32_t x2,
+			uint_fast32_t y, uint8*& pixel,
+			const uint_fast32_t pitch, const limit_t limit = nullptr) {
+		FilterPixel8<uintX, Manip, uintS>(
+				tl, bl, tr, br, x1, y, pixel, limit);
+		FilterPixel8<uintX, Manip, uintS>(
+				tl, bl, tr, br, x2, y, pixel + sizeof(uintX), limit);
+		pixel += pitch;
 	}
 
 #define LerpRGB(d, a, b, f)                       \
 	do {                                           \
-		(d)[0] = SimpleLerp2(b[0], a[0], f) >> 16; \
-		(d)[1] = SimpleLerp2(b[1], a[1], f) >> 16; \
-		(d)[2] = SimpleLerp2(b[2], a[2], f) >> 16; \
+		(d)[0] = SimpleLerp16(b[0], a[0], f) >> 16; \
+		(d)[1] = SimpleLerp16(b[1], a[1], f) >> 16; \
+		(d)[2] = SimpleLerp16(b[2], a[2], f) >> 16; \
 	} while (false)
 
 
