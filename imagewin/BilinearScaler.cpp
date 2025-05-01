@@ -56,31 +56,38 @@ namespace Pentagram { namespace BilinearScaler {
 			//
 			// Call the correct specialized function as appropriate
 			//
-
+			bool result = false;
 			// 2x Scaling
-			if ((sw * 2 == dw) && (sh * 2 == dh)) {
-				return BilinearScalerInternal_2x<uintX, Manip, uintS>(
+			if (!result && (sw * 2 == dw) && (sh * 2 == dh)) {
+				result = BilinearScalerInternal_2x<uintX, Manip, uintS>(
 						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
 			}
-			// 2 X 2.4 Y
-			else if (
-					(sw * 2 == dw) && (dh * 5 == sh * 12) && !(sh % 5)
-					&& !(sw % 4)) {
-				return BilinearScalerInternal_X2Y24<uintX, Manip, uintS>(
+			// 2 X 2.4 Y aka Aspect Correcting 2x
+			// This has some implicit requirements.
+			// sh must be a multiple of 5 and dh must be a multiple of 12
+			// This is pretty much has to be true if source and dest heights are integers
+			// Source height scaled by 2.4 only results in an integer if source height 
+			// is a multiple of 5 and 2.4 multipled by a multiple of 5 is always a multiple of 12
+			if (!result &&
+					(sw * 2 == dw) && (dh * 5 == sh * 12)) {
+				result = BilinearScalerInternal_X2Y24<uintX, Manip, uintS>(
 						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
 			}
-			// 1 X 1.2 Y
-			else if (
+			// 1 X 1.2 Y aka Aspect Correction with no scaling
+			// Same as above there is implicit requiements except dh must be a multiple of 6
+			if (!result &&
 					(sw == dw) && (dh * 5 == sh * 6) && !(sh % 5)
 					&& !(sw % 4)) {
-				return BilinearScalerInternal_X1Y12<uintX, Manip, uintS>(
+				result = BilinearScalerInternal_X1Y12<uintX, Manip, uintS>(
 						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
 			}
 			// Arbitrary has no restrictions
-			else {
+			if (!result) {
 				return BilinearScalerInternal_Arb<uintX, Manip, uintS>(
 						tex, sx, sy, sw, sh, pixel, dw, dh, pitch, clamp_src);
 			}
+
+			return result;
 		}
 	};
 

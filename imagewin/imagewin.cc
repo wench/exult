@@ -969,7 +969,7 @@ void Image_window::show(int x, int y, int w, int h) {
 	// discontinuity to 1 scaled pixel from the edge In theory the discontinuity
 	// can be placed anywhere on screen. but unless someone even notices
 	// anything I will not change it
-	rects[numrects++] = TileRect(x, y, w, h+1);
+	rects[numrects++] = TileRect(x, y, w, h);
 
 	// Zero out unused rects
 	while (numrects < std::size(rects)) {
