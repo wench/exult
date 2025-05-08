@@ -171,15 +171,10 @@ jobs:
         with:
           name: "windows snapshot"
           path: windows-snapshot
-      - name: Upload Exult-i686-unstripped.bz2 artifact 
+      - name: Upload unsctripped executable artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Exult-i686-unstripped.bz2
-          path: exult-i686/Exult-i686-unstripped.bz2
-          compression-level: 0
-      - name: Upload Exult-x86_64-unstripped.bz2 artifact 
-        uses: actions/upload-artifact@v4
-        with:
-          name: Exult-x86_64-unstripped.bz2
-          path: exult-x86_64/Exult-x86_64-unstripped.bz2
+          name: Unstripped executables
+          path: exult-i686/Exult-i686-unstripped.bz2 |
+           exult-x86_64/Exult-x86_64-unstripped.bz2
           compression-level: 0
