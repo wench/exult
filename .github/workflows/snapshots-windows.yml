@@ -112,12 +112,14 @@ jobs:
           SNAPSHOT_PATH=$(cygpath -m ~/Exult-dist)
           cd $GITHUB_WORKSPACE/exult-$ARCH
           mkdir -p ${SNAPSHOT_PATH}
-          make -j 2 -f Makefile.mingw SNAPSHOT=1 DISTPATH=${SNAPSHOT_PATH} dist studiodist toolsdist plugindist
+          make -j 2 -f Makefile.mingw SNAPSHOT=1 DISTPATH=${SNAPSHOT_PATH} DEBUG_LEVEL=-g1 dist studiodist toolsdist plugindist
           for ff in bgkeyring islefaq sifixes; do
             pushd content/${ff}
             make -j 2 -f Makefile.mingw ${ff}dir=${SNAPSHOT_PATH}/${ff} install
             popd
           done
+          bzip2 Exult.exe
+          mv Exult.exe.bz2 Exult-i686-unstripped.bz2
           echo "EXULT_SNAPSHOT_PATH=${SNAPSHOT_PATH}" >> $GITHUB_ENV
           echo "MSYSHOME=${HOME}" >> $GITHUB_ENV
       - name: Checkout code for x86_64 build
@@ -134,7 +136,9 @@ jobs:
           SNAPSHOT_PATH=$(cygpath -m ~/Exult-dist)
           cd $GITHUB_WORKSPACE/exult-$ARCH
           mkdir -p ${SNAPSHOT_PATH}
-          make -j 2 -f Makefile.mingw SNAPSHOT=1 DISTPATH=${SNAPSHOT_PATH} dist studiodist toolsdist plugindist aseprite-plugindist
+          make -j 2 -f Makefile.mingw SNAPSHOT=1 DISTPATH=${SNAPSHOT_PATH} DEBUG_LEVEL=-g1 dist studiodist toolsdist plugindist aseprite-plugindist
+          bzip2 Exult.exe
+          mv Exult.exe.bz2 Exult-x86_64-unstripped.bz2
           echo "EXULT_SNAPSHOT_PATH=${SNAPSHOT_PATH}" >> $GITHUB_ENV
       - name: Create installers
         if: ${{ env.EXULT_REPO_ALIVE == 'true' }}
@@ -167,3 +171,15 @@ jobs:
         with:
           name: "windows snapshot"
           path: windows-snapshot
+      - name: Upload Exult-i686-unstripped.bz2 artifact 
+        uses: actions/upload-artifact@v4
+        with:
+          name: Exult-i686-unstripped.bz2
+          path: exult-i686/Exult-i686-unstripped.bz2
+          compression-level: 0
+      - name: Upload Exult-x86_64-unstripped.bz2 artifact 
+        uses: actions/upload-artifact@v4
+        with:
+          name: Exult-x86_64-unstripped.bz2
+          path: exult-x86_64/Exult-x86_64-unstripped.bz2
+          compression-level: 0
