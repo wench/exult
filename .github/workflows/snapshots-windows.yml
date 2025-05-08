@@ -175,6 +175,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Unstripped executables
-          path: exult-i686/Exult-i686-unstripped.bz2 |
+          path: |
+           exult-i686/Exult-i686-unstripped.bz2
            exult-x86_64/Exult-x86_64-unstripped.bz2
           compression-level: 0
