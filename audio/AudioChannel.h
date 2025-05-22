@@ -21,10 +21,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define AUDIOCHANNEL_H_INCLUDED
 
 #include "AudioSample.h"
-
+#include <memory>
+#include <atomic>
 namespace Pentagram {
 
-	class AudioChannel {
+	class AudioChannel  {
+	protected:
 		// We have:
 		// 1x decompressor size
 		// 2x frame size
@@ -36,7 +38,7 @@ namespace Pentagram {
 		uint32 sample_rate;
 		bool   stereo;
 
-		sint32       loop   = 0;
+		std::atomic_int32_t       loop   = 0;
 		AudioSample* sample = nullptr;
 
 		// Info for sampling
@@ -56,13 +58,13 @@ namespace Pentagram {
 
 	public:
 		AudioChannel(uint32 sample_rate, bool stereo);
-		~AudioChannel();
+		virtual ~AudioChannel();
 		AudioChannel(const AudioChannel&)            = delete;
-		AudioChannel(AudioChannel&&)                 = default;
+		AudioChannel(AudioChannel&&)                 = delete;
 		AudioChannel& operator=(const AudioChannel&) = delete;
-		AudioChannel& operator=(AudioChannel&&)      = default;
+		AudioChannel& operator=(AudioChannel&&)      = delete;
 
-		void stop() {
+		virtual void stop() {
 			if (sample) {
 				if (playdata) {
 					sample->freeDecompressor(decomp);
@@ -72,11 +74,14 @@ namespace Pentagram {
 			}
 		}
 
-		void playSample(
+		virtual void playSample(
 				AudioSample* sample, int loop, int priority, bool paused,
 				uint32 pitch_shift, int lvol, int rvol, sint32 instance_id);
 		void resampleAndMix(sint16* stream, uint32 bytes);
 
+		virtual bool isMT() const {
+			return false;
+		}
 		bool isPlaying() const {
 			return sample != nullptr;
 		}
@@ -147,10 +152,26 @@ namespace Pentagram {
 			return instance_id;
 		}
 
-	private:
-		//
-		void DecompressNextFrame();
+	void getRawFrame(sint16* stream, uint32 bytes);
 
+	protected:
+		//
+		virtual void DecompressFirstFrame();
+
+		//
+		virtual void DecompressNextFrame();
+
+		virtual uint32 DecompressFrame(int dest);
+
+
+
+		virtual void rewind();
+
+		virtual bool looping_needs_rewind() const{
+			return true;
+		}
+
+	private:
 		//
 		// Resampling
 		//

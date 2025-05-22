@@ -21,6 +21,8 @@ libaudio_la_SOURCES =	\
 	convmusic.h     \
 	AudioChannel.cc \
 	AudioChannel.h  \
+	AudioChannelMT.cc \
+	AudioChannelMT.h  \
 	AudioMixer.cc   \
 	AudioMixer.h    \
 	AudioSample.cc  \
