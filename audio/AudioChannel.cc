@@ -62,9 +62,8 @@ namespace Pentagram {
 			: sample_rate(sample_rate_), stereo(stereo_) {}
 
 	AudioChannel::~AudioChannel() {
-		if (sample && playdata) {
-			sample->freeDecompressor(decomp);
-		}
+		stop();
+
 		if (sample) {
 			sample->Release();
 		}
@@ -151,7 +150,7 @@ namespace Pentagram {
 		fp_speed      = (pitch_shift * sample->getRate()) / sample_rate;
 
 		// Decompress frame 0
-		frame0_size = sample->decompressFrame(decomp, frames[0]);
+		DecompressFirstFrame();
 
 		// Decompress frame 1
 		DecompressNextFrame();
@@ -218,10 +217,7 @@ namespace Pentagram {
 			if (bytes || (position == frame0_size)) {
 				// No more data
 				if (!frame1_size) {
-					if (sample) {
-						sample->Release();
-					}
-					sample = nullptr;
+					stop();
 					return;
 				}
 
@@ -235,7 +231,7 @@ namespace Pentagram {
 				DecompressNextFrame();
 			}
 
-		} while (bytes != 0);
+		} while (sample && bytes != 0);
 	}
 
 	uint32 AudioChannel::getPlaybackLength() const {
@@ -253,11 +249,29 @@ namespace Pentagram {
 		return (overall_position * UINT64_C(1000)) / sample->getRate();
 	}
 
+	void AudioChannel::getRawFrame(sint16* stream, uint32 bytes) {
+		std::memcpy(
+				stream, frames[1 - frame_evenodd],
+				std::min(bytes, frame1_size));
+		DecompressNextFrame();
+		// No more data
+		if (!frame1_size) {
+			if (sample) {
+				sample->Release();
+			}
+			sample = nullptr;
+			return;
+		}
+	}
+
+	void AudioChannel::DecompressFirstFrame() {
+		frame0_size = DecompressFrame(0);
+	}
+
 	// Decompress a frame
 	void AudioChannel::DecompressNextFrame() {
 		// Get next frame of data
-		uint8* src2 = frames[1 - frame_evenodd];
-		frame1_size = sample->decompressFrame(decomp, src2);
+		frame1_size = DecompressFrame(1 - frame_evenodd);
 
 		// No stream, go back to beginning and get first frame
 		if (!frame1_size && loop) {
@@ -265,12 +279,25 @@ namespace Pentagram {
 				loop--;
 			}
 			overall_position = 0;
-			sample->rewind(decomp);
-			frame1_size = sample->decompressFrame(decomp, src2);
+			if (looping_needs_rewind()) {
+				rewind();
+			}
+			frame1_size = DecompressFrame(1 - frame_evenodd);
 		} else if (!frame1_size) {
-			sample->freeDecompressor(decomp);
+			stop();
 		}
 	}
+
+	uint32 AudioChannel::DecompressFrame(int dest) {
+		return sample?sample->decompressFrame(decomp, frames[dest]):0;
+		;
+	}
+
+
+	void AudioChannel::rewind() {
+		overall_position = 0;
+		sample->rewind(decomp);
+}
 
 	//
 	// 8 Bit
