@@ -75,12 +75,3 @@ void Virtue_stone_object::write_ireg(ODataSource* out) {
 	out->write(reinterpret_cast<char*>(buf), ptr - buf);
 }
 
-// Get size of IREG. Returns -1 if can't write to buffer
-int Virtue_stone_object::get_ireg_size() {
-	// These shouldn't ever happen, but you never know
-	if (gumpman->find_gump(this) || Usecode_script::find(this)) {
-		return -1;
-	}
-
-	return 8 + get_common_ireg_size();
-}
