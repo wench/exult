@@ -392,7 +392,7 @@ public:
 	void kill_cache();
 	// Get all objects and actors for use when writing memory cache.
 	// returns size require to save
-	int get_obj_actors(
+	void get_obj_actors(
 			std::vector<Game_object*>& removes, std::vector<Actor*>& actors);
 
 	void write(ODataSource& out, bool v2);
