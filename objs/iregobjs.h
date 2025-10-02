@@ -135,20 +135,8 @@ public:
 	// Write common IREG data.
 	unsigned char* write_common_ireg(int norm_len, unsigned char* buf);
 
-	int get_common_ireg_size() const {
-		if (get_shapenum() >= 1024 || get_framenum() >= 64) {
-			return 7;
-		}
-		if (get_lift() > 15) {
-			return 6;
-		}
-		return 5;
-	}
-
 	// Write out to IREG file.
 	void write_ireg(ODataSource* out) override;
-	// Get size of IREG. Returns -1 if can't write to buffer
-	int get_ireg_size() override;
 
 	virtual int get_high_shape() const {
 		return highshape;
