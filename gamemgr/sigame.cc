@@ -979,6 +979,7 @@ void SI_Game::top_menu() {
 void SI_Game::show_journey_failed() {
 	pal->fade_out(50);
 	gwin->clear_screen(true);
+	pal->load(MAINSHP_FLX, PATCH_MAINSHP, 26);
 	sman->paint_shape(topx, topy, get_menu_shape());
 	journey_failed_text();
 }

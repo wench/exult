@@ -40,11 +40,13 @@
 #include "gamemgr/modmgr.h"
 #include "gamemgr/sigame.h"
 #include "gamewin.h"
+#include "Gump_manager.h"
 #include "istring.h"
 #include "items.h"
 #include "keys.h"
 #include "menulist.h"
 #include "mouse.h"
+#include "Newfile_gump.h"
 #include "palette.h"
 #include "shapeid.h"
 #include "shapes/miscinf.h"
@@ -717,7 +719,8 @@ bool Game::show_menu(bool skip) {
 			}
 		}
 
-		const int choice = menu->handle_events(gwin);
+		int       keymod;
+		const int choice = menu->handle_events(gwin,keymod);
 		switch (choice) {
 		case -1:    // Exit
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID)
@@ -738,6 +741,28 @@ bool Game::show_menu(bool skip) {
 			top_menu();
 			break;
 		case 2:    // Journey Onwards
+			// If control held show Newfile_gump first
+			if (keymod & SDL_KMOD_CTRL) {
+				// Load normal mouse pointers
+				Mouse gumpmouse(gwin);
+				// Load all shapes
+				Shape_manager::get_instance()->load();
+				pal->fade_out(c_fade_out_time);
+				gwin->clear_screen(true);
+				gwin->get_pal()->fade(0, 1, 0);
+				// Create a newfile gump in main menu mode (only loading of
+				// savegames allowed)
+				Newfile_gump gump(true);
+				gwin->get_gump_man()->do_modal_gump(&gump, Mouse::hand);
+
+				// User didn't load a game so do nothing
+				if (!gump.restored_game()) {
+					gwin->clear_screen(true);
+					top_menu();
+					break;
+				}
+
+			}
 			created = gwin->init_gamedat(false);
 			if (!created) {
 				show_journey_failed();

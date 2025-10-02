@@ -427,7 +427,8 @@ BaseGameInfo* ExultMenu::show_mods_menu(ModManager* selgame) {
 				gwin->get_win()->get_end_x() - font->get_text_width(VERSION),
 				gwin->get_win()->get_end_y() - font->get_text_height() - 5,
 				VERSION);
-		const int choice = menu->handle_events(gwin);
+		int       keymods;
+		const int choice = menu->handle_events(gwin,keymods);
 		switch (choice) {
 		case -10:    // The incompatibility notice; do nothing
 			break;
@@ -567,7 +568,8 @@ BaseGameInfo* ExultMenu::run() {
 				gwin->get_win()->get_end_x() - font->get_text_width(VERSION),
 				gwin->get_win()->get_end_y() - font->get_text_height() - 5,
 				VERSION);
-		const int choice = menu->handle_events(gwin);
+		int       keymod;
+		const int choice = menu->handle_events(gwin, keymod);
 
 		switch (choice) {
 		case -4:    // Setup

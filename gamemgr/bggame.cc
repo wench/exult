@@ -1730,6 +1730,7 @@ void BG_Game::top_menu() {
 void BG_Game::show_journey_failed() {
 	pal->fade_out(50);
 	gwin->clear_screen(true);
+	pal->load(INTROPAL_DAT, PATCH_INTROPAL, 6);
 	sman->paint_shape(topx, topy, get_menu_shape());
 	journey_failed_text();
 }

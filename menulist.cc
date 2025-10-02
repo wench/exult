@@ -320,7 +320,7 @@ void MenuList::set_cancel(int val) {
 	has_cancel = true;
 }
 
-int MenuList::handle_events(Game_window* gwin) {
+int MenuList::handle_events(Game_window* gwin, int& keymods) {
 	const int count = entries.size();
 	for (int i = 0; i < count; i++) {
 		entries[i]->dirty = true;
@@ -460,6 +460,7 @@ int MenuList::handle_events(Game_window* gwin) {
 		}
 	} while (!exit_loop);
 	Mouse::mouse()->hide();
+	keymods = SDL_GetModState();
 	if (entries[selection]->get_has_id()) {
 		return entries[selection]->get_id();
 	} else {
