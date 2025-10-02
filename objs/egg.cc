@@ -1599,16 +1599,7 @@ void Egg_object::write_ireg(ODataSource* out) {
 	Game_map::write_scheduled(out, this);
 }
 
-// Get size of IREG. Returns -1 if can't write to buffer
-int Egg_object::get_ireg_size() {
-	// These shouldn't ever happen, but you never know
-	if (gumpman->find_gump(this) || Usecode_script::find(this)) {
-		return -1;
-	}
-	const char* str1 = get_str1();
-	return 8 + get_common_ireg_size() + ((data3 > 0) ? 2 : 0)
-		   + (*str1 ? Game_map::write_string(nullptr, str1) : 0);
-}
+
 
 /*
  *  Create.
@@ -1740,10 +1731,7 @@ void Field_object::write_ireg(ODataSource* out) {
 	Ireg_game_object::write_ireg(out);
 }
 
-// Get size of IREG. Returns -1 if can't write to buffer
-int Field_object::get_ireg_size() {
-	return Ireg_game_object::get_ireg_size();
-}
+
 
 /*
  *  It's a Mirror
@@ -1841,8 +1829,3 @@ void Mirror_object::write_ireg(ODataSource* out) {
 	Ireg_game_object::write_ireg(out);
 }
 
-// Get size of IREG. Returns -1 if can't write to buffer
-int Mirror_object::get_ireg_size() {
-	// TODO!!!!!!!
-	return Ireg_game_object::get_ireg_size();
-}

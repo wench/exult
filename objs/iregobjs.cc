@@ -181,11 +181,4 @@ void Ireg_game_object::write_ireg(ODataSource* out) {
 	Game_map::write_scheduled(out, this);
 }
 
-// Get size of IREG. Returns -1 if can't write to buffer
-int Ireg_game_object::get_ireg_size() {
-	// These shouldn't ever happen, but you never know
-	if (gumpman->find_gump(this) || Usecode_script::find(this)) {
-		return -1;
-	}
-	return 6 + get_common_ireg_size();
-}
+

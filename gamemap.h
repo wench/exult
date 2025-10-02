@@ -72,8 +72,7 @@ class Game_map {
 	std::unique_ptr<Map_chunk> objects[c_num_chunks][c_num_chunks];
 	bool  schunk_read[144];        // Flag for reading in each "ifix".
 	bool  schunk_modified[144];    // Flag for modified "ifix".
-	char* schunk_cache[144];
-	int   schunk_cache_sizes[144];
+	std::array<std::vector<unsigned char>,144> schunk_cache;
 	int   caching_out;    // >0 in 'cache_out_schunk'.
 	std::unique_ptr<Map_patch_collection> map_patches;
 

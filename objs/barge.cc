@@ -946,31 +946,6 @@ void Barge_object::write_ireg(ODataSource* out) {
 	Game_map::write_scheduled(out, this);
 }
 
-// Get size of IREG. Returns -1 if can't write to buffer
-int Barge_object::get_ireg_size() {
-	// These shouldn't ever happen, but you never know
-	if (gwin->get_moving_barge() == this || Usecode_script::find(this)) {
-		return -1;
-	}
-
-	int total_size = 8 + get_common_ireg_size();
-
-	for (int i = 0; i < perm_count; i++) {
-		Game_object* obj  = get_object(i);
-		const int    size = obj->get_ireg_size();
-
-		if (size < 0) {
-			return -1;
-		}
-
-		total_size += size;
-	}
-
-	total_size += 1;
-
-	return total_size;
-}
-
 /*
  *  This is called after all elements have been read in and added.
  */

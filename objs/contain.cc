@@ -693,33 +693,6 @@ void Container_game_object::write_ireg(ODataSource* out) {
 	Game_map::write_scheduled(out, this);
 }
 
-// Get size of IREG. Returns -1 if can't write to buffer
-int Container_game_object::get_ireg_size() {
-	// These shouldn't ever happen, but you never know
-	if (gumpman->find_gump(this) || Usecode_script::find(this)) {
-		return -1;
-	}
-
-	int total_size = 8 + get_common_ireg_size();
-
-	// Now what's inside.
-	if (!objects.is_empty()) {
-		Game_object*    obj;
-		Object_iterator next(objects);
-		while ((obj = next.get_next()) != nullptr) {
-			const int size = obj->get_ireg_size();
-
-			if (size < 0) {
-				return -1;
-			}
-
-			total_size += size;
-		}
-		total_size += 1;
-	}
-
-	return total_size;
-}
 
 /*
  *  Write contents (if there is any).

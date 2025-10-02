@@ -244,17 +244,17 @@ void Game_map::init() {
 				terrain_map[scx + cx][scy + cy] = little_endian::Read2(mapdata);
 			}
 		}
+		// Clear flags and cache
+		schunk_read[schunk] = false;
+		schunk_modified[schunk] = false;
+		schunk_cache[schunk].clear();		
 	}
-	// Clear object lists, flags.
+	// Clear object lists.
 	for (auto& row : objects) {
 		for (auto& obj : row) {
 			obj.reset();
 		}
 	}
-	std::fill(std::begin(schunk_read), std::end(schunk_read), false);
-	std::fill(std::begin(schunk_modified), std::end(schunk_modified), false);
-	std::fill(std::begin(schunk_cache), std::end(schunk_cache), nullptr);
-	std::fill(std::begin(schunk_cache_sizes), std::end(schunk_cache_sizes), -1);
 
 	didinit = true;
 }
@@ -287,8 +287,8 @@ void Game_map::clear() {
 
 	if (didinit) {
 		// Delete all chunks (& their objs).
-		for (auto* i : schunk_cache) {
-			delete[] i;
+		for (auto& s : schunk_cache) {
+			 s.clear();
 		}
 	}
 	for (auto& row : objects) {
@@ -301,8 +301,7 @@ void Game_map::clear() {
 	// Clear 'read' flags.
 	std::fill(std::begin(schunk_read), std::end(schunk_read), false);
 	std::fill(std::begin(schunk_modified), std::end(schunk_modified), false);
-	std::fill(std::begin(schunk_cache), std::end(schunk_cache), nullptr);
-	std::fill(std::begin(schunk_cache_sizes), std::end(schunk_cache_sizes), -1);
+
 }
 
 /*
@@ -758,14 +757,15 @@ void Game_map::write_ireg() {
 	// Write each superchunk to Iregxx.
 	for (int schunk = 0; schunk < c_num_schunks * c_num_schunks; schunk++) {
 		// Only write what we've read.
-		if (schunk_cache[schunk] && schunk_cache_sizes[schunk] >= 0) {
+		if (!schunk_cache[schunk].empty()) {
 			// It's loaded in a memory buffer
 			char fname[128];    // Set up name.
 			auto ireg_stream
 					= U7open_out(get_schunk_file_name(U7IREG, schunk, fname));
 			if (ireg_stream) {
 				ireg_stream->write(
-						schunk_cache[schunk], schunk_cache_sizes[schunk]);
+						reinterpret_cast<char*>(schunk_cache[schunk].data()),
+						schunk_cache[schunk].size());
 			}
 		} else if (schunk_read[schunk]) {
 			// It's active
@@ -824,13 +824,9 @@ void Game_map::get_ireg_objects(int schunk    // Superchunk # (0-143).
 	char                         fname[128];    // Set up name.
 	std::unique_ptr<IDataSource> ireg;
 
-	if (schunk_cache[schunk] && schunk_cache_sizes[schunk] >= 0) {
-		// No items
-		if (schunk_cache_sizes[schunk] == 0) {
-			return;
-		}
+	if (!schunk_cache[schunk].empty()) {
 		ireg = std::make_unique<IBufferDataView>(
-				schunk_cache[schunk], schunk_cache_sizes[schunk]);
+				schunk_cache[schunk].data(), schunk_cache[schunk].size());
 #ifdef DEBUG
 		std::cout << "Reading " << get_schunk_file_name(U7IREG, schunk, fname)
 				  << " from memory" << std::endl;
@@ -854,11 +850,7 @@ void Game_map::get_ireg_objects(int schunk    // Superchunk # (0-143).
 			vec[0]->move(2937, 2727, 2);
 		}
 	}
-	if (schunk_cache[schunk]) {
-		delete[] schunk_cache[schunk];
-		schunk_cache[schunk]       = nullptr;
-		schunk_cache_sizes[schunk] = -1;
-	}
+	schunk_cache[schunk].clear();
 }
 
 /*
@@ -1893,7 +1885,6 @@ void Game_map::cache_out_schunk(int schunk) {
 	Game_object_vector removes;
 	Actor_vector       actors;
 
-	int buf_size = 0;
 
 #ifdef DEBUG
 	std::cout << "Killing superchunk: " << schunk << std::endl;
@@ -1901,46 +1892,23 @@ void Game_map::cache_out_schunk(int schunk) {
 	// Go through chunks and get all the items
 	for (cy = 0; cy < 16; cy++) {
 		for (cx = 0; cx < 16; cx++) {
-			const int size = get_chunk_unsafe(scx + cx, scy + cy)
-									 ->get_obj_actors(removes, actors);
+			get_chunk_unsafe(scx + cx, scy + cy)->get_obj_actors(removes, actors);
 
-			if (size < 0) {
-#ifdef DEBUG
-				std::cerr << "Failed attempting to kill superchunk"
-						  << std::endl;
-#endif
-				return;
-			}
-			buf_size += size + 2;
 		}
 	}
 
 	schunk_read[schunk] = false;
 	++caching_out;
 
-#ifdef DEBUG
-	std::cout << "Buffer size of " << buf_size
-			  << " bytes required to store super chunk" << std::endl;
-#endif
-
-	// Clear old (this shouldn't happen)
-	if (schunk_cache[schunk]) {
-		delete[] schunk_cache[schunk];
-		schunk_cache[schunk]       = nullptr;
-		schunk_cache_sizes[schunk] = -1;
-	}
-
-	// Create new
-	schunk_cache[schunk]       = new char[buf_size];
-	schunk_cache_sizes[schunk] = buf_size;
-
-	OBufferDataSpan ds(schunk_cache[schunk], schunk_cache_sizes[schunk]);
+	OVectorDataSource ds{std::move(schunk_cache[schunk])};
 
 	write_ireg_objects(schunk, &ds);
 
 #ifdef DEBUG
 	std::cout << "Wrote " << ds.getPos() << " bytes" << std::endl;
 #endif
+
+	schunk_cache[schunk]       = ds.move_data();
 
 	// Now remove the objects
 	for (auto* remove : removes) {

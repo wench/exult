@@ -798,10 +798,6 @@ public:
 		ignore_unused_variable_warning(out);
 	}
 
-	int get_ireg_size() override {
-		return 0;
-	}
-
 	void write(ODataSource* nfile);    // Write out (to 'npc.dat').
 	void write_contents(ODataSource* out) override;    // Write contents
 	void set_actor_shape();           // Set shape based on sex, skin color
@@ -1011,7 +1007,6 @@ public:
 	}
 
 	void write_ireg(ODataSource* out) override;
-	int  get_ireg_size() override;
 };
 
 using Dead_body_shared = std::shared_ptr<Dead_body>;

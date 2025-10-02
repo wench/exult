@@ -574,10 +574,6 @@ public:
 		ignore_unused_variable_warning(out);
 	}
 
-	// Get size of IREG. Returns -1 if can't write to buffer
-	virtual int get_ireg_size() {
-		return 0;
-	}
 
 	// Write out IFIX, CHUNKS.
 	virtual void write_ifix(ODataSource* ifix, bool v2) {
