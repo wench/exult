@@ -87,9 +87,6 @@ public:
 	void activate(int event = 1) override;
 	// Write out to IREG file.
 	void write_ireg(ODataSource* out) override;
-	// Get size of IREG.
-	// Returns -1 if can't write to buffer
-	int get_ireg_size() override;
 };
 
 #endif
