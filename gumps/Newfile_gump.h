@@ -177,6 +177,10 @@ protected:
 	int  slide_start = -1;                  // Pixel (v) where a slide started
 	char newname[MAX_SAVEGAME_NAME_LEN];    // The new name for the game
 
+	// Run in reduced functionality restore mode. Can only load and delete
+	// games. Loading games only Restores Gamedat
+	bool restore_mode;
+
 	int BackspacePressed();
 	int DeletePressed();
 	int MoveCursor(int count);
@@ -188,7 +192,9 @@ protected:
 	void PaintSaveName(int line);
 
 public:
-	Newfile_gump();
+	// Construct a Newfile_gump. Optionally using reduced functionality restore
+	// mode
+	Newfile_gump(bool restore_mode = false);
 	~Newfile_gump() override;
 
 	void load();           // 'Load' was clicked.
