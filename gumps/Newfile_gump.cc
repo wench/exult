@@ -143,44 +143,19 @@ public:
 		}
 		return get_text_msg(0x67F - msg_file_start);    // th
 	}
+
+	static auto No_Screenshot(int line) {
+		if (line > 5) {
+			return "";
+		}
+		return get_text_msg(0x65B + line - msg_file_start);
+	}
 };
 
 /*
  *  Macros:
  */
 
-/*
- *  Statics:
- */
-// Button Coords
-const short Newfile_gump::btn_rows[5] = {186, 2, 15, 156, 169};
-const short Newfile_gump::btn_cols[5] = {2, 46, 88, 150, 209};
-
-// Text field info
-const short Newfile_gump::fieldx     = 2;      // Start Y of each field
-const short Newfile_gump::fieldy     = 2;      // Start X of first
-const short Newfile_gump::fieldw     = 207;    // Width of each field
-const short Newfile_gump::fieldh     = 12;     // Height of each field
-const short Newfile_gump::fieldgap   = 1;      // Gap between fields
-const short Newfile_gump::fieldcount = 14;     // Number of fields
-const short Newfile_gump::textx      = 12;     // X Offset in field
-const short Newfile_gump::texty      = 2;      // Y Offset in field
-const short Newfile_gump::textw
-		= 190;    // Maximum allowable width of text (pixels)
-const short Newfile_gump::iconx = 2;    // X Offset in field
-const short Newfile_gump::icony = 2;    // Y Offset in field
-
-// Scrollbar and Slider Info
-const short Newfile_gump::scrollx = 212;    // X Offset
-const short Newfile_gump::scrolly = 28;     // Y Offset
-const short Newfile_gump::scrollh = 129;    // Height of Scroll Bar
-const short Newfile_gump::sliderw = 7;      // Width of Slider
-const short Newfile_gump::sliderh = 7;      // Height of Slider
-
-const short Newfile_gump::infox = 224;
-const short Newfile_gump::infoy = 67;
-const short Newfile_gump::infow = 92;
-const short Newfile_gump::infoh = 79;
 
 /*
  *  One of our buttons.
@@ -195,10 +170,10 @@ using Newfile_Textbutton = CallbackTextButton<Newfile_gump>;
 Newfile_gump::Newfile_gump(bool restore_mode)
 		: Modal_gump(
 				  nullptr, gwin->get_width() / 2 - 160,
-				  gwin->get_height() / 2 - 100, EXULT_FLX_SAVEGUMP_SHP,
-				  SF_EXULT_FLX),
+				  gwin->get_height() / 2 - 100, -1),
 		  restore_mode(restore_mode) {
-	set_object_area(TileRect(0, 0, 320, 200), -6, 178);    //+++++ ???
+	// set_object_area(TileRect(0, 0, 320, 200), -6, 178);    //+++++ ???
+	SetProceduralBackground(TileRect(0, 0, 320, 200),-1,false);
 
 	if (restore_mode) {
 		list_position = -1;
@@ -404,8 +379,14 @@ void Newfile_gump::scroll_page(int dir) {
 	scroll_line(dir * fieldcount);
 }
 
-void Newfile_gump::PaintSaveName(int line) {
+void Newfile_gump::PaintSaveField(int line, Image_buffer8* ibuf) {
 	const int actual_game = line + list_position;
+
+	const int fx = x + fieldx;
+	const int fy = y + fieldy + line * (fieldh + fieldgap);
+	// Always paint the field background
+	ibuf->draw_beveled_box(
+			fx, fy, fieldw, fieldh, 1, 137, 144, 144, 140, 140, 142);
 
 	if (actual_game < -2 || actual_game >= int(games.size())) {
 		return;
@@ -428,23 +409,23 @@ void Newfile_gump::PaintSaveName(int line) {
 	}
 
 	sman->paint_text(
-			2, text, x + fieldx + textx,
-			y + fieldy + texty + line * (fieldh + fieldgap));
+			2, text, fx + textx,
+			fy + texty);
 
 	// Being Edited? If so paint cursor
 	if (selected == actual_game && cursor != -1) {
 		gwin->get_win()->fill8(
 				0, 1, sman->get_text_height(2),
-				x + fieldx + textx + sman->get_text_width(2, text, cursor),
-				y + fieldy + texty + line * (fieldh + fieldgap));
+				fx + textx + sman->get_text_width(2, text, cursor),
+				fy + texty);
 	}
 
 	// If selected, show selected icon
 	if (selected == actual_game) {
 		ShapeID icon(EXULT_FLX_SAV_SELECTED_SHP, 0, SF_EXULT_FLX);
 		icon.paint_shape(
-				x + fieldx + iconx,
-				y + fieldy + icony + line * (fieldh + fieldgap));
+				fx + iconx,
+				fy + icony);
 	}
 }
 
@@ -453,16 +434,24 @@ void Newfile_gump::PaintSaveName(int line) {
  */
 
 void Newfile_gump::paint() {
-	// if (games.empty()) {
-	// return;    // No list, so skip out.
-	//}
+
 	Modal_gump::paint();
 
-	// Paint text objects.
+	Image_window8* iwin = gwin->get_win();
+	Image_buffer8* ibuf = iwin->get_ib8();
+
+	// draw slider and button backgrounds
+	ibuf->draw_box(x + 212, y + 3, 7, 25, 0, 145, 142);
+	ibuf->draw_box(x + 212, y + 28, 7, 129, 0, 143, 142);
+	ibuf->draw_box(x + 212, y + 157, 7, 38, 0, 145, 142);
+	ibuf->draw_box(x + 3, y + 188, 209, 7, 0, 145, 142);
+
+	// Paint fields
 	int i;
 
 	for (i = 0; i < fieldcount; i++) {
-		PaintSaveName(i);
+
+		PaintSaveField(i,ibuf);
 	}
 
 	// Paint Buttons
@@ -490,7 +479,32 @@ void Newfile_gump::paint() {
 	if (screenshot) {
 		sman->paint_shape(x + 222, y + 2, screenshot->get_frame(0));
 	} else {
+		// Paint No Screenshot background
+		ibuf->draw_box(x + 222, y + 2, 96, 60, 0, 143, 142);
+
+		int lines = 0;
+		for (lines = 0; lines <= 5; ++lines)
+		{
+			auto msg = Strings::No_Screenshot(lines);
+			if (!msg || !*msg) {
+				break;
+			}
+		}
+		int tx = x + 270;
+		int ty = y + 30 - lines*5;
+		while (lines--)
+		{
+			auto msg  = Strings::No_Screenshot(lines);
+			int  tw = font->get_text_width(msg);
+
+			font->draw_text(ibuf, tx - tw / 2, ty + lines * 10, msg);
+		}
+		//font->draw_text_box(iwin,)
+
 	}
+	// Draw details background
+	ibuf->draw_beveled_box(
+			x + 222, y + 63, 96, 79, 1, 137, 144, 145, 140, 139, 142);
 
 	// Need to ensure that the avatar's shape actually exists
 	if (party && !sman->have_si_shapes()
