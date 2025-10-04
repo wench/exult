@@ -49,36 +49,42 @@ protected:
 
 	std::array<std::unique_ptr<Gump_button>, id_count> buttons;
 
-	static const short btn_cols[5];    // x-coord of each button.
-	static const short btn_rows[5];    // y-coord of each button.
+	// Button Coords
+	const short btn_rows[5] = {186, 2, 15, 156, 169};
+	const short btn_cols[5] = {2, 46, 88, 150, 209};
 
 	// Text field info
-	static const short fieldx;        // Start Y of each field
-	static const short fieldy;        // Start X of first
-	static const short fieldw;        // Width of each field
-	static const short fieldh;        // Height of each field
-	static const short fieldgap;      // Gap between fields
-	static const short fieldcount;    // Number of fields
-	static const short textx;         // X Offset in field
-	static const short texty;         // Y Offset in field
-	static const short textw;         // Maximum allowable width of text
-	static const short iconx;         // X Offset in field
-	static const short icony;         // Y Offset in field
+	const short fieldx     = 2;      // Start Y of each field
+	const short fieldy     = 2;      // Start X of first
+	const short fieldw     = 207;    // Width of each field
+	const short fieldh     = 12;     // Height of each field
+	const short fieldgap   = 1;      // Gap between fields
+	const short fieldcount = 14;     // Number of fields
+	const short textx      = 12;     // X Offset in field
+	const short texty      = 2;      // Y Offset in field
+	const short textw      = 190;    // Maximum allowable width of text (pixels)
+	const short iconx      = 2;      // X Offset in field
+	const short icony      = 2;      // Y Offset in field
 
 	// Scrollbar and Slider Info
-	static const short scrollx;    // X Offset
-	static const short scrolly;    // Y Offset
-	static const short scrollh;    // Height of Scroll Bar
-	static const short sliderw;    // Width of Slider
-	static const short sliderh;    // Height of Slider
+	const short scrollx = 212;    // X Offset
+	const short scrolly = 28;     // Y Offset
+	const short scrollh = 129;    // Height of Scroll Bar
+	const short sliderw = 7;      // Width of Slider
+	const short sliderh = 7;      // Height of Slider
 
-	// Side Text
-	static const short infox;    // X Offset for info
-	static const short infoy;    // Y Offset for info
-	static const short infow;    // Width of info box
-	static const short infoh;    // Height of info box
+	const short infox = 224;
+	const short infoy = 67;
+	const short infow = 92;
+	const short infoh = 79;
 
 	unsigned char restored = 0;    // Set to 1 if we restored a game.
+
+	enum SaveSlots {
+		EmptySlot     = -3,
+		GamedatSlot   = -2,
+		QuicksaveSlot = -1,
+	};
 
 	std::unique_ptr<Image_buffer> back;
 
@@ -119,7 +125,7 @@ protected:
 	void LoadSaveGameDetails();    // Loads (and sorts) all the savegame details
 	void FreeSaveGameDetails();    // Frees all the savegame details
 
-	void PaintSaveName(int line);
+	void PaintSaveField(int line, Image_buffer8 * ibuf);
 
 public:
 	// Construct a Newfile_gump. Optionally using reduced functionality restore

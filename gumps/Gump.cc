@@ -48,7 +48,8 @@ Gump::Gump(
 		int initx, int inity,           // Coords. on screen.
 		int       shnum,                // Shape #.
 		ShapeFile shfile)
-		: Gump_Base(shnum, 0, shfile), container(cont), x(initx), y(inity),
+		: Gump_Base(shnum, shnum == -1 ? -1 : 0, shfile), container(cont),
+		  x(initx), y(inity),
 		  handles_kbd(false) {
 	if (container) {
 		if (container->validGumpXY()) {

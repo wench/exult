@@ -328,6 +328,9 @@
 0x65A:pm
 
 #Newfile_gump.cc
+#multiline no screenshot message(0x65B-0x65f)
+0x65B:No
+0x65C:Screenshot
 #Info Box Strings
 0x660:Avatar
 0x661:Exp
