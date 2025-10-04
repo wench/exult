@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define NEWFILE_GUMP_H
 
 #include "Modal_gump.h"
+#include "SaveInfo.h"
 
 #include <array>
 #include <memory>
@@ -27,81 +28,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 class Shape_file;
 class Image_buffer;
 
-#define MAX_SAVEGAME_NAME_LEN 0x50
-
-struct SaveGame_Details {
-	// Time that the game was saved (needed????)
-	char  real_minute;    // 1
-	char  real_hour;      // 2
-	char  real_day;       // 3
-	char  real_month;     // 4
-	short real_year;      // 6
-
-	// The Game Time that the save was done at
-	char  game_minute;    // 7
-	char  game_hour;      // 8
-	short game_day;       // 10
-
-	short save_count;    // 12
-	char  party_size;    // 13
-
-	char unused;    // 14 Quite literally unused
-
-	char real_second;    // 15
-
-	// Incase we want to add more later
-	char reserved0;        // 16
-	char reserved1[48];    // 64
-};
-
-struct SaveGame_Party {
-	char         name[18];    // 18
-	short        shape;       // 20
-	unsigned int exp;         // 24
-	unsigned int flags;       // 28
-	unsigned int flags2;      // 32
-
-	unsigned char food;        // 33
-	unsigned char str;         // 34
-	unsigned char combat;      // 35
-	unsigned char dext;        // 36
-	unsigned char intel;       // 37
-	unsigned char magic;       // 38
-	unsigned char mana;        // 39
-	unsigned char training;    // 40
-	short         health;      // 42
-
-	short shape_file;    // 44
-
-	// Incase we want to add more later
-	int reserved1;    // 48
-	int reserved2;    // 52
-	int reserved3;    // 56
-	int reserved4;    // 60
-	int reserved5;    // 64
-};
-
 /*
  *  The file save/load box:
  */
 class Newfile_gump : public Modal_gump {
 public:
-	struct SaveInfo {
-		int                         num      = 0;
-		char*                       filename = nullptr;
-		char*                       savename = nullptr;
-		bool                        readable = true;
-		SaveGame_Details*           details  = nullptr;
-		SaveGame_Party*             party    = nullptr;
-		std::unique_ptr<Shape_file> screenshot;
-
-		static int CompareGames(const void* a, const void* b);
-		int        CompareThis(const SaveInfo* other) const;
-		void       SetSeqNumber();
-
-		~SaveInfo();
-	};
-
 protected:
 	enum button_ids {
 		id_first = 0,
@@ -151,19 +82,18 @@ protected:
 
 	std::unique_ptr<Image_buffer> back;
 
-	SaveInfo* games      = nullptr;    // The list of savegames
-	int       num_games  = 0;          // Number of save games
-	int       first_free = 0;          // The number of the first free savegame
+	std::vector<SaveInfo> games;    // The list of savegames
+	int first_free = 0;             // The number of the first free savegame
 
-	std::unique_ptr<Shape_file> cur_shot;       // Screenshot for current game
-	SaveGame_Details* cur_details = nullptr;    // Details of current game
-	SaveGame_Party*   cur_party   = nullptr;    // Party of current game
+	std::unique_ptr<Shape_file> cur_shot;    // Screenshot for current game
+	std::unique_ptr<SaveGame_Details> cur_details;    // Details of current game
+	std::unique_ptr<SaveGame_Party[]> cur_party;      // Party of current game
 
 	// Gamedat is being used as a 'quicksave'
 	int last_selected = -4;    // keeping track of the selected line for iOS
-	std::unique_ptr<Shape_file> gd_shot;    // Screenshot in Gamedat
-	SaveGame_Details*           gd_details = nullptr;    // Details in Gamedat
-	SaveGame_Party*             gd_party   = nullptr;    // Parts in Gamedat
+	std::unique_ptr<Shape_file>       gd_shot;       // Screenshot in Gamedat
+	std::unique_ptr<SaveGame_Details> gd_details;    // Details in Gamedat
+	std::unique_ptr<SaveGame_Party[]> gd_party;      // Party in Gamedat
 
 	Shape_file*       screenshot  = nullptr;    // The picture to be drawn
 	SaveGame_Details* details     = nullptr;    // The game details to show

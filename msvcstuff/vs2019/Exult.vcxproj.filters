@@ -1492,6 +1492,9 @@
     <ClInclude Include="..\..\playscene.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\SaveInfo.h">
+      <Filter>gumps</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\.git\index" />
