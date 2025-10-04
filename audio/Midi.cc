@@ -1072,7 +1072,7 @@ bool MyMidiPlayer::ogg_play_track(
 
 	int vol         = (ogg_volume * 255) / 100;
 	ogg_instance_id = mixer->playSample(
-			ogg_sample, repeat ? -1 : 0, INT_MAX, false, 65536, vol, vol);
+			ogg_sample, repeat ? -1 : 0, INT_MAX, false, 65536, vol, vol,true);
 
 	ogg_sample->Release();
 

@@ -90,6 +90,7 @@
 		E700DC281A6E2CE7006C8BE4 /* VocAudioSample.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DBAB1A6E2CE7006C8BE4 /* VocAudioSample.cc */; };
 		E700DC291A6E2CE7006C8BE4 /* WavAudioSample.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DBAD1A6E2CE7006C8BE4 /* WavAudioSample.cc */; };
 		E700DC2C1A6E2D6A006C8BE4 /* soundtest.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DC2A1A6E2D6A006C8BE4 /* soundtest.cc */; };
+		E700DC2F1A6E2DED006C8BE4 /* AudioChannelMT.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DC2D1A6E2D6A006C8BE4 /* AudioChannelMT.cc */; };
 		E700DC8D1A6E30A7006C8BE4 /* actions.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DC341A6E30A7006C8BE4 /* actions.cc */; };
 		E700DC8E1A6E30A7006C8BE4 /* actorio.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DC361A6E30A7006C8BE4 /* actorio.cc */; };
 		E700DC8F1A6E30A7006C8BE4 /* actors.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DC371A6E30A7006C8BE4 /* actors.cc */; };
@@ -459,6 +460,8 @@
 		E700DBAE1A6E2CE7006C8BE4 /* WavAudioSample.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WavAudioSample.h; sourceTree = "<group>"; };
 		E700DC2A1A6E2D6A006C8BE4 /* soundtest.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = soundtest.cc; sourceTree = "<group>"; };
 		E700DC2B1A6E2D6A006C8BE4 /* soundtest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = soundtest.h; sourceTree = "<group>"; };
+		E700DC2D1A6E2D6A006C8BE4 /* AudioChannelMT.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = AudioChannelMT.cc; path = AudioChannelMT.cc; sourceTree = "<group>"; };
+		E700DC2E1A6E2D6A006C8BE4 /* AudioChannelMT.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AudioChannelMT.h; path = AudioChannelMT.h; sourceTree = "<group>"; };
 		E700DC2E1A6E2DBC006C8BE4 /* common_types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = common_types.h; sourceTree = "<group>"; };
 		E700DC2F1A6E2DBC006C8BE4 /* exceptions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = exceptions.h; sourceTree = "<group>"; };
 		E700DC301A6E2DBC006C8BE4 /* gamma.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gamma.h; sourceTree = "<group>"; };
@@ -1031,6 +1034,8 @@
 				E700DBAC1A6E2CE7006C8BE4 /* VocAudioSample.h */,
 				E700DBAD1A6E2CE7006C8BE4 /* WavAudioSample.cc */,
 				E700DBAE1A6E2CE7006C8BE4 /* WavAudioSample.h */,
+				E700DC2D1A6E2D6A006C8BE4 /* AudioChannelMT.cc */,
+				E700DC2E1A6E2D6A006C8BE4 /* AudioChannelMT.h */,
 			);
 			name = audio;
 			path = ../audio;
@@ -1925,6 +1930,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E700DC2F1A6E2DED006C8BE4 /* AudioChannelMT.cc in Sources */,
 				8AC797C81C8D0E4F001AF014 /* zip.cc in Sources */,
 				E700DF441A6E34C6006C8BE4 /* debugserver.cc in Sources */,
 				E700DE2F1A6E344D006C8BE4 /* scale_hq2x.cc in Sources */,

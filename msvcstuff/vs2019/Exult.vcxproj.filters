@@ -749,6 +749,9 @@
     <ClCompile Include="..\..\win32\crash.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\audio\AudioChannelMT.cc">
+      <Filter>audio</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\actions.h">
@@ -1485,6 +1488,9 @@
     </ClInclude>
     <ClInclude Include="..\..\gumps\IterableGump_widget.h">
       <Filter>gumps</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\audio\AudioChannelMT.h">
+      <Filter>audio</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

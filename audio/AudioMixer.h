@@ -49,7 +49,7 @@ namespace Pentagram {
 		sint32 playSample(
 				AudioSample* sample, int loop, int priority,
 				bool paused = false, uint32 pitch_shift = AUDIO_DEF_PITCH,
-				int lvol = AUDIO_MAX_VOLUME, int rvol = AUDIO_MAX_VOLUME);
+				int lvol = AUDIO_MAX_VOLUME, int rvol = AUDIO_MAX_VOLUME, bool wantmt=false);
 		bool   isPlaying(sint32 instance_id) const;
 		bool   isPlaying(AudioSample* sample) const;
 		bool   isPlayingVoice() const;
@@ -96,7 +96,7 @@ namespace Pentagram {
 		int                 midi_volume;
 		std::vector<sint16> internal_buffer;
 
-		std::vector<AudioChannel> channels;
+		std::vector<std::unique_ptr<AudioChannel>> channels;
 		sint32                    id_counter;
 
 		std::unique_ptr<SDLAudioDevice> device;
