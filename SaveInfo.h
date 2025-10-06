@@ -86,28 +86,76 @@ class SaveInfo {
 	std::string filename_;
 
 public:
-	int               num = 0;
+	int               num = -1;
 
 	std::string                       savename;
-	bool                              readable = true;
+	bool                              readable = false;
 	std::unique_ptr<SaveGame_Details> details;
 	std::unique_ptr<SaveGame_Party[]> party;
 	std::unique_ptr<Shape_file>       screenshot;
 
-	SaveInfo(const std::string& filename) : filename_(filename) {}
 
+	// Default constructor is allowed
+	SaveInfo() {}
+
+	// Move Costructor from a std::string filename
+	SaveInfo(std::string&& filename) : filename_(std::move(filename)) {
+
+		// Filename is likely a path so find the last directory separator
+		size_t filename_start = filename_.find_last_of("/\\");
+
+		// No diretory separators so actual filename starts at 0
+		if (filename_start == std::string::npos) {
+			filename_start = 0;
+		}
+		// Find where the savenume number starts
+		size_t number_start
+				= filename_.find_first_of("0123456789", filename_start);
+
+		if (number_start == std::string::npos
+			|| number_start < filename_start + 5) {
+			// the savegame filename is not in the expected format
+			// this should never happen as filename glob should only list
+			// filenames in mostly the correct format
+			// EXULT*.sav
+			// Don't attempt to parse the savegame number
+			num  = -1;
+			type = UNKNOWN;
+			return;
+			// quicksaves have Q before the number
+		} else if (std::tolower(filename_[number_start - 1]) == 'q') {
+			type = QUICKSAVE;
+			// autosaves have A before the number
+		} else if (std::tolower(filename_[number_start - 1]) == 'a') {
+			type = AUTOSAVE;
+			// regular saves have t from exult as character before the number
+		} else if (std::tolower(filename_[number_start - 1]) == 't') {
+			type = REGULAR;
+		} else {
+			// Filename format is unknown
+			num  = -1;
+			type = UNKNOWN;
+			return;
+		}
+
+		num = strtol(filename_.c_str() + number_start, nullptr, 10);
+	}
+
+	// No copy constructor, only move
 	SaveInfo(const SaveInfo&) = delete;
 	SaveInfo(SaveInfo&&) = default;
 
-	SaveInfo& operator= (const SaveInfo&) = delete;
+	// No copy assignment operator, only move
+	SaveInfo& operator=(const SaveInfo&) = delete;
 	SaveInfo& operator= (SaveInfo&&) = default;
 
 	enum Type {
 		UNKNOWN   = -1,
-		REGULAR   = 0,
-		QUICKSAVE = 'q',
-		AUTOSAVE  = 'a',
-	} type;
+		REGULAR = 0,
+		AUTOSAVE,
+		QUICKSAVE,
+		NUM_TYPES
+	} type= UNKNOWN;
 
 	// const getter for filename
 	const std::string& filename() const{
@@ -115,6 +163,11 @@ public:
 	}
 
 	int compare(const SaveInfo* other) const noexcept {
+		// First by type in reverse order
+		if (type != other->type)
+		{
+			return other->type - type;
+		}
 		// Check by time first, if possible
 		if (details && other->details) {
 			if (details->real_year < other->details->real_year) {
@@ -170,47 +223,6 @@ public:
 
 	bool operator<(const SaveInfo& other) const noexcept {
 		return compare(&other) < 0;
-	}
-
-	void SetSeqNumber() {
-		// Filename is likely a path so find the last directory separator
-		size_t filename_start = filename_.find_last_of("/\\");
-
-		// No diretory separators so actual filename starts at 0
-		if (filename_start == std::string::npos) {
-			filename_start = 0;
-		}
-		// Find where the savenume number starts
-		size_t number_start
-				= filename_.find_first_of("0123456789", filename_start);
-
-		if (number_start == std::string::npos
-			|| number_start < filename_start + 5) {
-			// the savegame filename is not in the expected format
-			// this should never happen as filename glob should only list
-			// filenames in mostly the correct format
-			// EXULT*.sav
-			// Don't attempt to parse the savegame number
-			num  = -1;
-			type = UNKNOWN;
-			return;
-			// quicksaves have Q before the number
-		} else if (std::tolower(filename_[number_start - 1]) == 'q') {
-			type = QUICKSAVE;
-			// autosaves have A before the number
-		} else if (std::tolower(filename_[number_start - 1]) == 'a') {
-			type = AUTOSAVE;
-			// regular saves have t from exult as character before the number
-		} else if (std::tolower(filename_[number_start - 1]) == 't') {
-			type = REGULAR;
-		} else {
-			// Filename format is unknown
-			num  = -1;
-			type = UNKNOWN;
-			return;
-		}
-
-		num = strtol(filename_.c_str() + number_start, nullptr, 10);
 	}
 };
 
