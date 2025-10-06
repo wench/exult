@@ -52,6 +52,7 @@ class Font;
 class Game_object;
 class Game_clock;
 class Time_sensitive;
+class SaveInfo;
 class Gump;
 class Gump_button;
 class Ireg_game_object;
@@ -161,7 +162,7 @@ class Game_window {
 	// Private methods:
 	void set_scrolls(Tile_coord cent);
 	void clear_world(bool restoremapedit);    // Clear out world's contents.
-	void read_save_names();                   // Read in saved-game names.
+	void read_save_infos();                   // Read in saved-game names.
 	long check_time_stopped();
 
 	// Red plasma animation during game load
@@ -750,6 +751,10 @@ private:
 	void restore_flex_files(IDataSource& in, const char* basepath);
 
 public:
+	//! @brief Get Vector of all savegame info
+	//! @return 
+	const std::vector<SaveInfo>& GetSaveGameInfos(int & firstfree);
+
 	void write_saveinfo(
 			bool screenshot = true);    // Write the save info to gamedat
 

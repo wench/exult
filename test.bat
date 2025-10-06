@@ -1,0 +1,1 @@
+for /f "tokens=* delims=" %%u in ('git branch --show-current') do git branch  --omit-empty --list "%%u" --format="%%(if)%%(upstream)%%(then)#define GIT_REMOTE_BRANCH \"%%(upstream:strip=-1)\"%%(end)"

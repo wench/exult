@@ -1412,7 +1412,7 @@ bool Game_window::init_gamedat(bool create) {
 		}
 		// scroll coords.
 	}
-	read_save_names();    // Read in saved-game names.
+	read_save_infos();    // Read in saved-game names.
 	return true;
 }
 

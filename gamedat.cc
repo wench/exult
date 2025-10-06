@@ -86,6 +86,13 @@ using std::tm;
 // Save game compression level
 extern int save_compression;
 
+namespace Globals {
+	static std::vector<SaveInfo> save_infos;
+	static std::array <int,SaveInfo::NUM_TYPES> first_free;
+	static std::string           save_mask;
+}
+
+
 /*
  *  Write files from flex assuming first 13 characters of
  *  each flex object are an 8.3 filename.
@@ -328,6 +335,10 @@ void Game_window::save_gamedat(
 		const char* savename    // User's savegame name.
 ) {
 	// First check for compressed save game
+	
+	// Clear the save_infos
+	Globals::save_infos.clear();
+
 #ifdef HAVE_ZIP_SUPPORT
 	if (save_compression > 0 && save_gamedat_zip(fname, savename)) {
 		return;
@@ -428,30 +439,91 @@ void Game_window::save_gamedat(
 /*
  *  Read in the saved game names.
  */
-void Game_window::read_save_names() {
-	for (size_t i = 0; i < save_names.size(); i++) {
-		char fname[50];    // Set up name.
-		snprintf(
-				fname, sizeof(fname), SAVENAME, static_cast<int>(i),
-				GAME_BG ? "bg" : (GAME_SI ? "si" : "dev"));
-		try {
-			auto pIn = U7open_in(fname);
-			if (!pIn) {    // Okay if file not there.
-				save_names[i].clear();
-				continue;
+void Game_window::read_save_infos() {
+
+	char mask[256];
+	snprintf(
+			mask, sizeof(mask), SAVENAME2,
+			GAME_BG   ? "bg"
+			: GAME_SI ? "si"
+					  : "dev");
+	string save_mask = get_system_path(mask);
+	// If save_mask is the same and we've already read the save infos do nothing
+	if (save_mask == Globals::save_mask && !Globals::save_infos.empty())
+	{
+		return;
+	}
+	Globals::save_mask = std::move(save_mask);
+
+	Globals::save_infos.clear();
+
+
+
+	FileList filenames;
+	U7ListFiles(Globals::save_mask, filenames);
+
+	// Sort filenames
+	if (filenames.size()) {
+		std::sort(filenames.begin(), filenames.end());
+	}
+
+	// Setup basic details
+	for (auto& filename : filenames) {
+		Globals::save_infos.emplace_back(std::move(filename));
+	}
+
+
+	Globals::first_free.fill(-1);
+
+	std::array<int,SaveInfo::NUM_TYPES> last;
+	last.fill(-1);
+
+	// Read and cache all details
+	for (auto& saveinfo : Globals::save_infos) {
+		saveinfo.readable = get_saveinfo(
+				saveinfo.filename(), saveinfo.savename, saveinfo.screenshot,
+				saveinfo.details, saveinfo.party);
+
+		// Handling of regular savegame with a savegame number
+		if (saveinfo.type != SaveInfo::UNKNOWN && saveinfo.num >= 0) {
+
+			if (size_t(saveinfo.num) < save_names.size()&& saveinfo.type == SaveInfo::REGULAR)
+			{
+				save_names[saveinfo.num] = saveinfo.savename;
 			}
-			auto& in = *pIn;
-			char  buf[0x50]{};    // It's at start of file.
-			in.read(buf, sizeof(buf) - 1);
-			if (in.good()) {    // Okay if file not there.
-				save_names[i] = buf;
-			} else {
-				save_names[i].clear();
+			// First free not yet found
+			if (Globals::first_free[saveinfo.type] == -1) {
+
+				// If the last save was not 1 before this there is a gap wer can use
+				if (last[saveinfo.type] + 1 != saveinfo.num)
+				{
+					Globals::first_free[saveinfo.type] = last[saveinfo.type] + 1;
+				}
+
+				last[saveinfo.type] = saveinfo.num;
 			}
-		} catch (const file_exception& /*f*/) {
-			save_names[i].clear();
 		}
 	}
+	// If no gaps found set forst free of each type to last +1
+	for (int type = 0; type < SaveInfo::NUM_TYPES;++type)
+	if (Globals::first_free[type] == -1) {
+		Globals::first_free[type] = last[type]+1;
+	}
+
+	// Sort infos
+	if (Globals::save_infos.size()) {
+		std::sort(Globals::save_infos.begin(), Globals::save_infos.end());
+	}
+}
+
+const std::vector<SaveInfo>& Game_window::GetSaveGameInfos(int& firstfree) {
+	// read save infos if needed
+	read_save_infos();
+	firstfree = Globals::first_free[SaveInfo::REGULAR];
+
+	return Globals::save_infos;
+
+
 }
 
 void Game_window::write_saveinfo(bool screenshot) {

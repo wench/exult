@@ -88,7 +88,7 @@ protected:
 
 	std::unique_ptr<Image_buffer> back;
 
-	std::vector<SaveInfo> games;    // The list of savegames
+	const std::vector<SaveInfo> *games;    // The list of savegames
 	int first_free = 0;             // The number of the first free savegame
 
 	std::unique_ptr<Shape_file> cur_shot;    // Screenshot for current game

@@ -241,7 +241,7 @@ void Newfile_gump::load() {
 
 	// Aborts if unsuccessful.
 	if (selected != -1) {
-		gwin->restore_gamedat(games[selected].num);
+		gwin->restore_gamedat((*games)[selected].num);
 	}
 
 	// Read Gamedat if not in restore mode
@@ -289,7 +289,7 @@ void Newfile_gump::save() {
 
 	// Now write to savegame file
 	if (selected >= 0) {
-		gwin->save_gamedat(games[selected].num, newname);
+		gwin->save_gamedat((*games)[selected].num, newname);
 	} else if (selected == -2) {
 		gwin->save_gamedat(first_free, newname);
 	}
@@ -325,12 +325,12 @@ void Newfile_gump::delete_file() {
 		return;
 	}
 
-	U7remove(games[selected].filename().c_str());
+	U7remove((*games)[selected].filename().c_str());
 	filename    = nullptr;
 	is_readable = false;
 
 	cout << "Deleted Save game #" << selected << " ("
-		 << games[selected].filename() << ") successfully." << endl;
+		 << (*games)[selected].filename() << ") successfully." << endl;
 
 	// Reset everything
 	selected = -3;
@@ -352,8 +352,8 @@ void Newfile_gump::delete_file() {
 void Newfile_gump::scroll_line(int dir) {
 	list_position += dir;
 
-	if (list_position > int(games.size()) - fieldcount) {
-		list_position = games.size() - fieldcount;
+	if (list_position > int((games?games->size():0)) - fieldcount) {
+		list_position = (games?games->size():0) - fieldcount;
 	}
 
 	// When in mainmenu, we don't slot for a new savedgame
@@ -388,7 +388,7 @@ void Newfile_gump::PaintSaveField(int line, Image_buffer8* ibuf) {
 	ibuf->draw_beveled_box(
 			fx, fy, fieldw, fieldh, 1, 137, 144, 144, 140, 140, 142);
 
-	if (actual_game < -2 || actual_game >= int(games.size())) {
+	if (actual_game < -2 || actual_game >= int((games?games->size():0))) {
 		return;
 	}
 
@@ -403,7 +403,7 @@ void Newfile_gump::PaintSaveField(int line, Image_buffer8* ibuf) {
 			text = "Empty Slot";
 		}
 	} else if (actual_game != selected || buttons[id_load]) {
-		text = games[actual_game].savename.c_str();
+		text = (*games)[actual_game].savename.c_str();
 	} else {
 		text = newname;
 	}
@@ -464,7 +464,7 @@ void Newfile_gump::paint() {
 	// Paint scroller
 
 	// First thing, work out number of positions that the scroller can be in
-	int num_pos = (2 + games.size()) - fieldcount;
+	int num_pos = (2 + (games?games->size():0)) - fieldcount;
 	if (num_pos < 1) {
 		num_pos = 1;
 	}
@@ -661,7 +661,7 @@ bool Newfile_gump::mouse_down(
 	// Check for scroller
 	if (gx >= scrollx && gx < scrollx + sliderw && gy >= scrolly
 		&& gy < scrolly + scrollh) {
-		int num_pos = (2 + games.size()) - fieldcount;
+		int num_pos = (2 + (games?games->size():0)) - fieldcount;
 		if (num_pos < 1) {
 			num_pos = 1;
 		}
@@ -708,7 +708,7 @@ bool Newfile_gump::mouse_down(
 	}
 
 	last_selected = selected;
-	if (hit + list_position >= int(games.size()) || hit + list_position < -2
+	if (hit + list_position >= int((games?games->size():0)) || hit + list_position < -2
 		|| selected == hit + list_position) {
 		return Modal_gump::mouse_down(mx, my, button);
 	}
@@ -743,13 +743,13 @@ bool Newfile_gump::mouse_down(
 		is_readable = true;
 		filename    = nullptr;
 	} else {
-		screenshot = games[selected].screenshot.get();
-		details    = games[selected].details.get();
-		party      = games[selected].party.get();
-		strcpy(newname, games[selected].savename.c_str());
+		screenshot = (*games)[selected].screenshot.get();
+		details    = (*games)[selected].details.get();
+		party      = (*games)[selected].party.get();
+		strcpy(newname, (*games)[selected].savename.c_str());
 		cursor      = static_cast<int>(strlen(newname));
-		is_readable = want_load = games[selected].readable;
-		filename                = games[selected].filename().c_str();
+		is_readable = want_load = (*games)[selected].readable;
+		filename                = (*games)[selected].filename().c_str();
 	}
 
 	if (restore_mode) {
@@ -877,7 +877,7 @@ bool Newfile_gump::mouse_drag(
 	sy -= sliderh / 2;
 
 	// Now work out the number of positions
-	const int num_pos = (2 + games.size()) - fieldcount;
+	const int num_pos = (2 + (games?games->size():0)) - fieldcount;
 
 	// Can't scroll if there is less than 1 pos
 	if (num_pos < 1) {
@@ -1174,63 +1174,14 @@ void Newfile_gump::LoadSaveGameDetails() {
 		screenshot = cur_shot.get();
 		details    = cur_details.get();
 	}
-
-	// Now read save game details
-	char mask[256];
-
-	snprintf(
-			mask, sizeof(mask), SAVENAME2,
-			GAME_BG   ? "bg"
-			: GAME_SI ? "si"
-					  : "dev");
-
-	FileList filenames;
-	U7ListFiles(mask, filenames);
-
-	games.clear();
-
-	// games = new SaveInfo[games.size()];
-
-	// Setup basic details
-	for (const auto& filename : filenames) {
-		SaveInfo si{filename};
-		si.SetSeqNumber();
-		games.push_back(std::move(si));
-	}
-
-	// First sort the games so they will be sorted by filename
-	// This is so I can work out the first free game
-	if (games.size()) {
-		std::sort(games.begin(), games.end());
-	}
-
-	// Reand and cache all details
-	first_free = -1;
-	for (size_t i = 0; i < games.size(); i++) {
-		games[i].readable = gwin->get_saveinfo(
-				games[i].filename(), games[i].savename, games[i].screenshot,
-				games[i].details, games[i].party);
-
-		if (first_free == -1 && int(i) != games[i].num) {
-			first_free = i;
-		}
-	}
-
-	if (first_free == -1) {
-		first_free = games.size();
-	}
-
-	// Now sort it again, with all the details so it can be done by date
-	if (games.size()) {
-		std::sort(games.begin(), games.end());
-	}
+	games=&gwin->GetSaveGameInfos(first_free);
 
 	// We'll now output the info if debugging
 #ifdef DEBUG
-	cout << "Listing " << games.size() << " Save games" << endl;
-	for (size_t i = 0; i < games.size(); i++) {
-		cout << i << " = " << games[i].num << " : " << games[i].filename()
-			 << " : " << games[i].savename << endl;
+	cout << "Listing " << (games?games->size():0) << " Save games" << endl;
+	for (size_t i = 0; i < (games?games->size():0); i++) {
+		cout << i << " = " << (*games)[i].num << " : " << (*games)[i].filename()
+			 << " : " << (*games)[i].savename << endl;
 	}
 
 	cout << "First Free Game " << first_free << endl;
@@ -1250,7 +1201,6 @@ void Newfile_gump::FreeSaveGameDetails() {
 	details  = nullptr;
 	party    = nullptr;
 
-	// The SaveInfo struct will delete everything that it's got allocated
-	// So we don't need to worry about that
-	games.clear();
+
+	games = nullptr;
 }
