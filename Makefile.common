@@ -297,7 +297,6 @@ EXULT_FLX_OBJECTS := \
 	data/extras.shp \
 	data/notebook.shp \
 	data/stats_extra.shp \
-	data/savegump.shp \
 	data/sav_downdown.shp \
 	data/sav_down.shp \
 	data/sav_up.shp \

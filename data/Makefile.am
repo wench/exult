@@ -13,7 +13,6 @@ EXULT_FLX_OBJECTS = \
 	extras.shp		\
 	notebook.shp		\
 	stats_extra.shp		\
-	savegump.shp		\
 	sav_downdown.shp	\
 	sav_down.shp		\
 	sav_up.shp		\
