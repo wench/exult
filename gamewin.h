@@ -751,9 +751,8 @@ private:
 	void restore_flex_files(IDataSource& in, const char* basepath);
 
 public:
-	//! @brief Get Vector of all savegame info
-	//! @return 
-	const std::vector<SaveInfo>& GetSaveGameInfos(int & firstfree);
+	//Get Vector of all savegame info
+	const std::vector<SaveInfo>& GetSaveGameInfos();
 
 	void write_saveinfo(
 			bool screenshot = true);    // Write the save info to gamedat
@@ -762,6 +761,9 @@ public:
 	inline const std::string& get_save_name(size_t i) const {
 		return save_names[i];
 	}
+
+	// Get the filename for savegame num of specified SaveInfo:Type
+	std::string get_save_filename(int num, int type);
 
 	void setup_game(bool map_editing);    // Prepare for game
 	void read_npcs();                     // Read in npc's.
@@ -775,6 +777,9 @@ public:
 	// Save "gamedat".
 	void save_gamedat(const char* fname, const char* savename);
 	void save_gamedat(int num, const char* savename);
+	// Save gamedat to a new savegame of the specified SaveInfo:Type with the
+	// given name
+	void save_gamedat(const char* savename, int type);
 	bool init_gamedat(bool create);    // Initialize gamedat directory
 
 	// Emergency save Creates a new save in the next available index

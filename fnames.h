@@ -126,6 +126,7 @@
 #define MIDISFXFILE          "u7sfx"
 #define SAVENAME             "<SAVEGAME>/exult%02d%s.sav"
 #define SAVENAME2            "<SAVEGAME>/exult*%s.sav"
+#define SAVENAME3       "<SAVEGAME>/exult%s%02d%s.sav"
 #define INTROSND             "<STATIC>/introsnd.dat"
 #define PATCH_INTROSND       "<PATCH>/introsnd.dat"
 #define PATCH_ARMOR          "<PATCH>/armor.dat"

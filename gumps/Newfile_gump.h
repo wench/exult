@@ -88,9 +88,7 @@ protected:
 
 	std::unique_ptr<Image_buffer> back;
 
-	const std::vector<SaveInfo> *games;    // The list of savegames
-	int first_free = 0;             // The number of the first free savegame
-
+	const std::vector<SaveInfo>* games;    // The list of savegames
 	std::unique_ptr<Shape_file> cur_shot;    // Screenshot for current game
 	std::unique_ptr<SaveGame_Details> cur_details;    // Details of current game
 	std::unique_ptr<SaveGame_Party[]> cur_party;      // Party of current game
@@ -125,7 +123,7 @@ protected:
 	void LoadSaveGameDetails();    // Loads (and sorts) all the savegame details
 	void FreeSaveGameDetails();    // Frees all the savegame details
 
-	void PaintSaveField(int line, Image_buffer8 * ibuf);
+	void PaintSaveField(int line, Image_buffer8* ibuf);
 
 public:
 	// Construct a Newfile_gump. Optionally using reduced functionality restore
