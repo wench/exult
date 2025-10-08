@@ -87,11 +87,10 @@ using std::tm;
 extern int save_compression;
 
 namespace Globals {
-	static std::vector<SaveInfo> save_infos;
-	static std::array <int,SaveInfo::NUM_TYPES> first_free;
-	static std::string           save_mask;
-}
-
+	static std::vector<SaveInfo>                save_infos;
+	static std::array<int, SaveInfo::NUM_TYPES> first_free;
+	static std::string                          save_mask;
+}    // namespace Globals
 
 /*
  *  Write files from flex assuming first 13 characters of
@@ -335,7 +334,7 @@ void Game_window::save_gamedat(
 		const char* savename    // User's savegame name.
 ) {
 	// First check for compressed save game
-	
+
 	// Clear the save_infos
 	Globals::save_infos.clear();
 
@@ -413,6 +412,38 @@ for (const auto* savefile : savefiles) {
 	}
 }
 
+std::string Game_window::get_save_filename(int num, int type) {
+	// preallocate string to a size that should be big enough
+	std::string fname(std::size(SAVENAME3) + 3, 0);
+	for (;;) {
+		auto needed = snprintf(
+				fname.data(), fname.size(), SAVENAME3,
+				type == SaveInfo::AUTOSAVE    ? "a"
+				: type == SaveInfo::QUICKSAVE ? "q"
+				: type == SaveInfo::CRASHSAVE ? "c"
+											  : "",
+				num,
+				Game::get_game_type() == BLACK_GATE     ? "bg"
+				: Game::get_game_type() == SERPENT_ISLE ? "si"
+														: "dev");
+		// snprintf failed
+		if (needed < 0) {
+			return "";
+		}
+		// buffer was too small so resize bigger
+		if (size_t(needed) > fname.size()) {
+			fname.resize(needed);
+			continue;
+		}
+		// Had enough space so resize down to exact string size
+		else {
+			fname.resize(needed);
+			return fname;
+		}
+	}
+	return "";
+}
+
 /*
  *  Save to one of the numbered savegame files (and update save_names).
  *
@@ -423,24 +454,29 @@ void Game_window::save_gamedat(
 		int         num,        // 0-9, currently.
 		const char* savename    // User's savegame name.
 ) {
-	char fname[50];    // Set up name.
-	snprintf(
-			fname, sizeof(fname), SAVENAME, num,
-			Game::get_game_type() == BLACK_GATE     ? "bg"
-			: Game::get_game_type() == SERPENT_ISLE ? "si"
-													: "dev");
-	save_gamedat(fname, savename);
+	std::string fname
+			= get_save_filename(num, SaveInfo::REGULAR);    // Set up name.
+	save_gamedat(fname.c_str(), savename);
 	if (num >= 0 && num < 10) {
 		// Update name
 		save_names[num] = savename;
 	}
 }
 
+void Game_window::save_gamedat(
+		const char* savename,    // User's savegame name.
+		int         type) {
+	std::string fname = get_save_filename(
+			Globals::first_free[type], type);    // Set up name.
+	save_gamedat(fname.c_str(), savename);
+
+	// Update save_info
+}
+
 /*
  *  Read in the saved game names.
  */
 void Game_window::read_save_infos() {
-
 	char mask[256];
 	snprintf(
 			mask, sizeof(mask), SAVENAME2,
@@ -449,15 +485,12 @@ void Game_window::read_save_infos() {
 					  : "dev");
 	string save_mask = get_system_path(mask);
 	// If save_mask is the same and we've already read the save infos do nothing
-	if (save_mask == Globals::save_mask && !Globals::save_infos.empty())
-	{
+	if (save_mask == Globals::save_mask && !Globals::save_infos.empty()) {
 		return;
 	}
 	Globals::save_mask = std::move(save_mask);
 
 	Globals::save_infos.clear();
-
-
 
 	FileList filenames;
 	U7ListFiles(Globals::save_mask, filenames);
@@ -472,10 +505,9 @@ void Game_window::read_save_infos() {
 		Globals::save_infos.emplace_back(std::move(filename));
 	}
 
-
 	Globals::first_free.fill(-1);
 
-	std::array<int,SaveInfo::NUM_TYPES> last;
+	std::array<int, SaveInfo::NUM_TYPES> last;
 	last.fill(-1);
 
 	// Read and cache all details
@@ -486,18 +518,17 @@ void Game_window::read_save_infos() {
 
 		// Handling of regular savegame with a savegame number
 		if (saveinfo.type != SaveInfo::UNKNOWN && saveinfo.num >= 0) {
-
-			if (size_t(saveinfo.num) < save_names.size()&& saveinfo.type == SaveInfo::REGULAR)
-			{
+			if (size_t(saveinfo.num) < save_names.size()
+				&& saveinfo.type == SaveInfo::REGULAR) {
 				save_names[saveinfo.num] = saveinfo.savename;
 			}
 			// First free not yet found
 			if (Globals::first_free[saveinfo.type] == -1) {
-
-				// If the last save was not 1 before this there is a gap wer can use
-				if (last[saveinfo.type] + 1 != saveinfo.num)
-				{
-					Globals::first_free[saveinfo.type] = last[saveinfo.type] + 1;
+				// If the last save was not 1 before this there is a gap wer can
+				// use
+				if (last[saveinfo.type] + 1 != saveinfo.num) {
+					Globals::first_free[saveinfo.type]
+							= last[saveinfo.type] + 1;
 				}
 
 				last[saveinfo.type] = saveinfo.num;
@@ -505,9 +536,10 @@ void Game_window::read_save_infos() {
 		}
 	}
 	// If no gaps found set forst free of each type to last +1
-	for (int type = 0; type < SaveInfo::NUM_TYPES;++type)
-	if (Globals::first_free[type] == -1) {
-		Globals::first_free[type] = last[type]+1;
+	for (int type = 0; type < SaveInfo::NUM_TYPES; ++type) {
+		if (Globals::first_free[type] == -1) {
+			Globals::first_free[type] = last[type] + 1;
+		}
 	}
 
 	// Sort infos
@@ -516,14 +548,11 @@ void Game_window::read_save_infos() {
 	}
 }
 
-const std::vector<SaveInfo>& Game_window::GetSaveGameInfos(int& firstfree) {
+const std::vector<SaveInfo>& Game_window::GetSaveGameInfos() {
 	// read save infos if needed
 	read_save_infos();
-	firstfree = Globals::first_free[SaveInfo::REGULAR];
 
 	return Globals::save_infos;
-
-
 }
 
 void Game_window::write_saveinfo(bool screenshot) {
@@ -1311,71 +1340,43 @@ void Game_window::MakeEmergencySave(const char* savename) {
 	std::cerr << "Trying to create an emergency save named \"" << savename
 			  << "\"" << std::endl;
 
-	// find the next available savegame index
-	int freesaveindex = -1;
+	// Get the gamedat path and the crashtemp path
+	auto gamedatpath   = get_system_path("<GAMEDAT>");
+	auto crashtemppath = get_system_path("<GAMEDAT>.crashtemp");
 
-	// Just check if the save files exist
-	// The NewFileGump uses a more complicated method with no actual limit
-	// but I want this simple and unlimited seems like a bad idea for this
-	// Dont ever expect a user to have 1000 save games so I think this is ok
-	for (int i = 0; i < 1000; i++) {
-		char filename[std::size(SAVENAME) + 2];
-		snprintf(
-				filename, sizeof(filename), SAVENAME, i,
-				GAME_BG   ? "bg"
-				: GAME_SI ? "si"
-						  : "dev");
+	// change <GAMEDAT> to point to crashtemp
+	add_system_path("<GAMEDAT>", crashtemppath);
 
-		if (!U7exists(filename)) {
-			freesaveindex = i;
-			break;
-		}
+	// Remove old crashtemp if it exists
+	std::filesystem::remove_all(crashtemppath);
+
+	// create dorectory for crashtemp
+	std::filesystem::create_directory(crashtemppath);
+
+	// Copy the files from gamedat to crashtemp by iterating the directory
+	// manually so we can continue on failure
+	// std::filesystem::copy_all crashes on the exultserver file
+	for (const auto& entry : std::filesystem::directory_iterator(gamedatpath)) {
+		auto newpath = crashtemppath + "/" + entry.path().filename().string();
+
+		// Copy files ignoring errors
+		std::error_code ec;
+		std::filesystem::copy_file(entry.path(), newpath, ec);
 	}
 
-	if (freesaveindex == -1) {
-		std::cerr << " unable to find free save number for emergency save"
-				  << std::endl;
-	} else {
-		// Get the gamedat path and the crashtemp path
-		auto gamedatpath   = get_system_path("<GAMEDAT>");
-		auto crashtemppath = get_system_path("<GAMEDAT>.crashtemp");
+	// Write out current gamestate to gamedat
+	std::cerr << " attempting to save current gamestate to gamedat"
+			  << std::endl;
+	write(true);
 
-		// change <GAMEDAT> to point to crashtemp
-		add_system_path("<GAMEDAT>", crashtemppath);
+	// save it as the save
+	std::cerr << " attempting to save gamedat as \"" << savename << "\""
+			  << std::endl;
+	save_gamedat(savename, SaveInfo::CRASHSAVE);
 
-		// Remove old crashtemp if it exists
-		std::filesystem::remove_all(crashtemppath);
+	// Remove crashtemp
+	std::filesystem::remove_all(crashtemppath);
 
-		// create dorectory for crashtemp
-		std::filesystem::create_directory(crashtemppath);
-
-		// Copy the files from gamedat to crashtemp by iterating the directory
-		// manually so we can continue on failure
-		// std::filesystem::copy_all crashes on the exultserver file
-		for (const auto& entry :
-			 std::filesystem::directory_iterator(gamedatpath)) {
-			auto newpath
-					= crashtemppath + "/" + entry.path().filename().string();
-
-			// Copy files ignoring errors
-			std::error_code ec;
-			std::filesystem::copy_file(entry.path(), newpath, ec);
-		}
-
-		// Write out current gamestate to gamedat
-		std::cerr << " attempting to save current gamestate to gamedat"
-				  << std::endl;
-		write(true);
-
-		// save it as the save
-		std::cerr << " attempting to save gamedat as \"" << savename << "\""
-				  << std::endl;
-		save_gamedat(freesaveindex, savename);
-
-		// Remove crashtemp
-		std::filesystem::remove_all(crashtemppath);
-
-		// Put <GAMEDAT> back to how it was
-		add_system_path("<GAMEDAT>", gamedatpath);
-	}
+	// Put <GAMEDAT> back to how it was
+	add_system_path("<GAMEDAT>", gamedatpath);
 }
