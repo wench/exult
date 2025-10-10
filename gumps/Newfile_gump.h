@@ -123,7 +123,6 @@ protected:
 	void LoadSaveGameDetails();    // Loads (and sorts) all the savegame details
 	void FreeSaveGameDetails();    // Frees all the savegame details
 
-	void PaintSaveField(int line, Image_buffer8* ibuf);
 
 public:
 	// Construct a Newfile_gump. Optionally using reduced functionality restore
@@ -157,6 +156,8 @@ public:
 	int restored_game() {    // 1 if user restored.
 		return restored;
 	}
+
+	void PaintSaveField(int line, Image_buffer8* ibuf);
 
 	// Paint it and its contents.
 	void paint() override;

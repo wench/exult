@@ -15,11 +15,10 @@ EXULT_FLX_OBJECTS = \
 	stats_extra.shp		\
 	sav_downdown.shp	\
 	sav_down.shp		\
-	sav_up.shp		\
+	sav_up.shp			\
 	sav_upup.shp		\
 	sav_slider.shp		\
-	sav_selected.shp	\
-	hp_bar.shp		\
+	hp_bar.shp			\
 	sfx_icon.shp		\
 	mtgm.mid			\
 	sb_combat.shp \

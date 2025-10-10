@@ -415,8 +415,15 @@ void Newfile_gump::PaintSaveField(int line, Image_buffer8* ibuf) {
 
 	// If selected, show selected icon
 	if (selected == actual_game) {
-		ShapeID icon(EXULT_FLX_SAV_SELECTED_SHP, 0, SF_EXULT_FLX);
-		icon.paint_shape(fx + iconx, fy + icony);
+		int ix = iconx + fx;
+		int iy = icony + fy;
+
+		for (int l = 0; l < 4; l++) {
+			ibuf->draw_line8(142, ix + l, iy + l, ix + l, iy + 6 - l);
+		}
+
+		ibuf->draw_line8(146, ix + 1, iy + 7, ix + 4, iy + 4);
+		ibuf->draw_line8(146, ix + 1, iy + 6, ix + 3, iy + 4);
 	}
 }
 
