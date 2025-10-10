@@ -499,32 +499,26 @@ void Newfile_gump::paint() {
 	ibuf->draw_beveled_box(
 			x + 222, y + 63, 96, 79, 1, 137, 144, 145, 140, 139, 142);
 
-	// Need to ensure that the avatar's shape actually exists
-	if (party && !sman->have_si_shapes()
-		&& Shapeinfo_lookup::IsSkinImported(party[0].shape)) {
-		// Female if odd, male if even
-		if (party[0].shape % 2) {
-			party[0].shape = Shapeinfo_lookup::GetFemaleAvShape();
-		} else {
-			party[0].shape = Shapeinfo_lookup::GetMaleAvShape();
-		}
-	}
-
-	if (details && party) {
+	if (details && party && party->size()) {
 		int i;
 
-		for (i = 0; i < 4 && i < details->party_size; i++) {
-			ShapeID shape(
-					party[i].shape, 16,
-					static_cast<ShapeFile>(party[i].shape_file));
-			shape.paint_shape(x + 249 + i * 23, y + 169);
-		}
+		for (i = party->size() - 1; i >= 0; --i) {
+			int  shape_num  = (*party)[i].shape;
+			auto shape_file = ShapeFile((*party)[i].shape_file);
 
-		for (i = 4; i < 8 && i < details->party_size; i++) {
-			ShapeID shape(
-					party[i].shape, 16,
-					static_cast<ShapeFile>(party[i].shape_file));
-			shape.paint_shape(x + 249 + (i - 4) * 23, y + 198);
+			// Need to ensure that the avatar's shape actually exists
+			if (i == 0 && !sman->have_si_shapes()
+				&& Shapeinfo_lookup::IsSkinImported(shape_num)
+				&& shape_file == SF_SHAPES_VGA) {
+				// Female if odd, male if even
+				if (shape_num % 2) {
+					shape_num = Shapeinfo_lookup::GetFemaleAvShape();
+				} else {
+					shape_num = Shapeinfo_lookup::GetMaleAvShape();
+				}
+			}
+			ShapeID shape(shape_num, 16, shape_file);
+			shape.paint_shape(x + 249 + (i & 3) * 23, y + 169 + i / 4 * 29);
 		}
 
 		char info[320];
@@ -543,10 +537,11 @@ void Newfile_gump::paint() {
 				"%s: %i%s %s %04i\n"
 				"%s: %02i:%02i",
 
-				Strings::Avatar(), party[0].name, Strings::Exp(), party[0].exp,
-				Strings::Hp(), party[0].health, Strings::Str(), party[0].str,
-				Strings::Dxt(), party[0].dext, Strings::Int(), party[0].intel,
-				Strings::Trn(), party[0].training, Strings::GameDay(),
+				Strings::Avatar(), party->front().name, Strings::Exp(),
+				party->front().exp, Strings::Hp(), party->front().health,
+				Strings::Str(), party->front().str, Strings::Dxt(),
+				party->front().dext, Strings::Int(), party->front().intel,
+				Strings::Trn(), party->front().training, Strings::GameDay(),
 				details->game_day, Strings::GameTime(), details->game_hour,
 				details->game_minute, Strings::SaveCount(), details->save_count,
 				Strings::Date(), details->real_day,
@@ -719,8 +714,8 @@ bool Newfile_gump::mouse_down(
 		want_delete = false;
 		want_save   = false;
 		screenshot  = cur_shot.get();
-		details     = cur_details.get();
-		party       = cur_party.get();
+		details     = &cur_details;
+		party       = &cur_party;
 		newname[0]  = 0;
 		cursor      = 0;
 		is_readable = true;
@@ -728,16 +723,16 @@ bool Newfile_gump::mouse_down(
 	} else if (selected == -1) {
 		want_delete = false;
 		screenshot  = gd_shot.get();
-		details     = gd_details.get();
-		party       = gd_party.get();
+		details     = &gd_details;
+		party       = &gd_party;
 		strcpy(newname, "Gamedat Directory");
 		cursor      = -1;    // No cursor
 		is_readable = true;
 		filename    = nullptr;
 	} else {
 		screenshot = (*games)[selected].screenshot.get();
-		details    = (*games)[selected].details.get();
-		party      = (*games)[selected].party.get();
+		details    = &((*games)[selected].details);
+		party      = &((*games)[selected].party);
 		strcpy(newname, (*games)[selected].savename.c_str());
 		cursor      = static_cast<int>(strlen(newname));
 		is_readable = want_load = (*games)[selected].readable;
@@ -911,8 +906,8 @@ bool Newfile_gump::text_input(const char* text) {
 	buttons[id_delete].reset();
 
 	screenshot = cur_shot.get();
-	details    = cur_details.get();
-	party      = cur_party.get();
+	details    = &cur_details;
+	party      = &cur_party;
 
 	gwin->set_all_dirty();
 	return true;
@@ -1023,8 +1018,8 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 	// This sets the game details to the cur set
 	if (update_details) {
 		screenshot = cur_shot.get();
-		details    = cur_details.get();
-		party      = cur_party.get();
+		details    = &cur_details;
+		party      = &cur_party;
 		repaint    = true;
 	}
 	if (repaint) {
@@ -1100,47 +1095,40 @@ void Newfile_gump::LoadSaveGameDetails() {
 		cur_shot = gwin->create_mini_screenshot();
 
 		// Current Details
-		cur_details = std::make_unique<SaveGame_Details>();
+		cur_details = SaveGame_Details();
 
 		gwin->get_win()->put(back.get(), 0, 0);
 
 		if (gd_details) {
-			cur_details->save_count = gd_details->save_count;
+			cur_details.save_count = gd_details.save_count;
 		} else {
-			cur_details->save_count = 0;
+			cur_details.save_count = 0;
 		}
 
-		cur_details->party_size = partyman->get_count() + 1;
-		cur_details->game_day
+		cur_details.game_day
 				= static_cast<short>(gclock->get_total_hours() / 24);
-		cur_details->game_hour   = gclock->get_hour();
-		cur_details->game_minute = gclock->get_minute();
+		cur_details.game_hour   = gclock->get_hour();
+		cur_details.game_minute = gclock->get_minute();
 
 		const time_t t        = time(nullptr);
 		tm*          timeinfo = localtime(&t);
 
-		cur_details->real_day    = timeinfo->tm_mday;
-		cur_details->real_hour   = timeinfo->tm_hour;
-		cur_details->real_minute = timeinfo->tm_min;
-		cur_details->real_month  = timeinfo->tm_mon + 1;
-		cur_details->real_year   = timeinfo->tm_year + 1900;
-		cur_details->real_second = timeinfo->tm_sec;
-
+		cur_details.real_day    = timeinfo->tm_mday;
+		cur_details.real_hour   = timeinfo->tm_hour;
+		cur_details.real_minute = timeinfo->tm_min;
+		cur_details.real_month  = timeinfo->tm_mon + 1;
+		cur_details.real_year   = timeinfo->tm_year + 1900;
+		cur_details.real_second = timeinfo->tm_sec;
+		cur_details.good        = true;
 		// Current Party
-		cur_party = std::make_unique<SaveGame_Party[]>(cur_details->party_size);
+		cur_party.clear();
+		cur_party.reserve(partyman->get_count() + 1);
 
-		for (int i = 0; i < cur_details->party_size; i++) {
-			Actor* npc;
-			if (i == 0) {
-				npc = gwin->get_main_actor();
-			} else {
-				npc = gwin->get_npc(partyman->get_member(i - 1));
-			}
-
-			SaveGame_Party& current = cur_party[i];
-			std::string     namestr = npc->get_npc_name();
-			namestr.resize(sizeof(current.name), '\0');
-			std::memmove(current.name, namestr.data(), sizeof(current.name));
+		for (auto npc : partyman->IterateWithMainActor) {
+			auto&       current = cur_party.emplace_back();
+			std::string namestr = npc->get_npc_name();
+			std::strncpy(current.name, namestr.c_str(), std::size(current.name) - 1);
+			current.name[std::size(current.name)-1]=0;
 			current.shape      = npc->get_shapenum();
 			current.shape_file = npc->get_shapefile();
 
@@ -1158,9 +1146,9 @@ void Newfile_gump::LoadSaveGameDetails() {
 			current.flags2   = npc->get_flags2();
 		}
 
-		party      = cur_party.get();
+		party      = &cur_party;
 		screenshot = cur_shot.get();
-		details    = cur_details.get();
+		details    = &cur_details;
 	}
 	games = &gwin->GetSaveGameInfos();
 
@@ -1176,12 +1164,12 @@ void Newfile_gump::LoadSaveGameDetails() {
 
 void Newfile_gump::FreeSaveGameDetails() {
 	cur_shot.reset();
-	cur_details.reset();
-	cur_party.reset();
+	cur_details = SaveGame_Details();
+	cur_party.clear();
 
 	gd_shot.reset();
-	gd_details.reset();
-	gd_party.reset();
+	gd_details = SaveGame_Details();
+	gd_party.clear();
 
 	filename = nullptr;
 	details  = nullptr;
