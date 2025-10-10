@@ -24,12 +24,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <vector>
 
 class Shape_file;
 
 #define MAX_SAVEGAME_NAME_LEN 0x50
 
 struct SaveGame_Details {
+	bool good = false;
+
+	operator bool() const {
+		return good;
+	}
+
 	// Time that the game was saved (needed????)
 	char  real_minute;    // 1
 	char  real_hour;      // 2
@@ -42,8 +49,9 @@ struct SaveGame_Details {
 	char  game_hour;      // 8
 	short game_day;       // 10
 
-	short save_count;    // 12
-	char  party_size;    // 13
+	short save_count;        // 12
+	char  old_party_size;    // 13 Party size is stored on disk here but this
+							 // field is no longer used
 
 	char unused;    // 14 Quite literally unused
 
@@ -88,11 +96,11 @@ class SaveInfo {
 public:
 	int num = -1;
 
-	std::string                       savename;
-	bool                              readable = false;
-	std::unique_ptr<SaveGame_Details> details;
-	std::unique_ptr<SaveGame_Party[]> party;
-	std::unique_ptr<Shape_file>       screenshot;
+	std::string                 savename;
+	bool                        readable = false;
+	SaveGame_Details            details;
+	std::vector<SaveGame_Party> party;
+	std::unique_ptr<Shape_file> screenshot;
 
 	// Default constructor is allowed
 	SaveInfo() {}
@@ -152,14 +160,9 @@ public:
 	SaveInfo(const SaveInfo& other, std::unique_ptr<Shape_file>&& newscreenshot)
 			: filename_(other.filename_), num(other.num),
 			  savename(other.savename), readable(other.readable),
-			  details(std::make_unique<SaveGame_Details>(*other.details)),
-			  party(std::make_unique<SaveGame_Party[]>(
-					  other.details->party_size)),
+			  details(other.details), party(other.party),
 			  screenshot(std::move(newscreenshot)) {
 		// Copy the party
-		std::copy(
-				other.party.get(), other.party.get() + details->party_size,
-				party.get());
 	}
 
 	// No copy assignment operator, only move
@@ -187,45 +190,45 @@ public:
 		}
 		// Check by time first, if possible
 		if (details && other->details) {
-			if (details->real_year < other->details->real_year) {
+			if (details.real_year < other->details.real_year) {
 				return 1;
 			}
-			if (details->real_year > other->details->real_year) {
+			if (details.real_year > other->details.real_year) {
 				return -1;
 			}
 
-			if (details->real_month < other->details->real_month) {
+			if (details.real_month < other->details.real_month) {
 				return 1;
 			}
-			if (details->real_month > other->details->real_month) {
+			if (details.real_month > other->details.real_month) {
 				return -1;
 			}
 
-			if (details->real_day < other->details->real_day) {
+			if (details.real_day < other->details.real_day) {
 				return 1;
 			}
-			if (details->real_day > other->details->real_day) {
+			if (details.real_day > other->details.real_day) {
 				return -1;
 			}
 
-			if (details->real_hour < other->details->real_hour) {
+			if (details.real_hour < other->details.real_hour) {
 				return 1;
 			}
-			if (details->real_hour > other->details->real_hour) {
+			if (details.real_hour > other->details.real_hour) {
 				return -1;
 			}
 
-			if (details->real_minute < other->details->real_minute) {
+			if (details.real_minute < other->details.real_minute) {
 				return 1;
 			}
-			if (details->real_minute > other->details->real_minute) {
+			if (details.real_minute > other->details.real_minute) {
 				return -1;
 			}
 
-			if (details->real_second < other->details->real_second) {
+			if (details.real_second < other->details.real_second) {
 				return 1;
 			}
-			if (details->real_second > other->details->real_second) {
+			if (details.real_second > other->details.real_second) {
 				return -1;
 			}
 		} else if (details) {    // If the other doesn't have time we are first

@@ -88,20 +88,22 @@ protected:
 
 	std::unique_ptr<Image_buffer> back;
 
-	const std::vector<SaveInfo>* games;    // The list of savegames
+	const std::vector<SaveInfo> *games;    // The list of savegames
+	std::vector<SaveInfo> old_games;    // The list of savegames
+
 	std::unique_ptr<Shape_file> cur_shot;    // Screenshot for current game
-	std::unique_ptr<SaveGame_Details> cur_details;    // Details of current game
-	std::unique_ptr<SaveGame_Party[]> cur_party;      // Party of current game
+	SaveGame_Details cur_details;    // Details of current game
+	std::vector<SaveGame_Party> cur_party;      // Party of current game
 
 	// Gamedat is being used as a 'quicksave'
 	int last_selected = -4;    // keeping track of the selected line for iOS
-	std::unique_ptr<Shape_file>       gd_shot;       // Screenshot in Gamedat
-	std::unique_ptr<SaveGame_Details> gd_details;    // Details in Gamedat
-	std::unique_ptr<SaveGame_Party[]> gd_party;      // Party in Gamedat
+	std::unique_ptr<Shape_file> gd_shot;       // Screenshot in Gamedat
+	SaveGame_Details            gd_details;    // Details in Gamedat
+	std::vector<SaveGame_Party> gd_party;      // Party in Gamedat
 
-	Shape_file*       screenshot  = nullptr;    // The picture to be drawn
-	SaveGame_Details* details     = nullptr;    // The game details to show
-	SaveGame_Party*   party       = nullptr;    // The party to show
+	const Shape_file*       screenshot  = nullptr;    // The picture to be drawn
+	const SaveGame_Details* details     = nullptr;    // The game details to show
+	const  std::vector<SaveGame_Party> *party       = nullptr;    // The party to show
 	bool              is_readable = false;      // Is the save game readable
 	const char* filename = nullptr;    // Filename of the savegame, if exists
 
