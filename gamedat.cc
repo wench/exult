@@ -602,17 +602,11 @@ void Game_window::write_saveinfo(bool screenshot) {
 			out.write1(0);
 		}
 
-		for (int i = 0; i < party_size; i++) {
-			Actor* npc;
-			if (i == 0) {
-				npc = main_actor;
-			} else {
-				npc = get_npc(party_man->get_member(i - 1));
-			}
+		for (auto npc : party_man->IterateWithMainActor) {			
 
 			std::string name(npc->get_npc_name());
-			name.resize(18, '\0');
-			out.write(name.data(), name.size());
+			name.resize(sizeof(SaveGame_Party::name) - 1, '\0');
+			out.write(name.c_str(), sizeof(SaveGame_Party::name));
 			out.write2(npc->get_shapenum());
 
 			out.write4(npc->get_property(Actor::exp));
@@ -631,7 +625,7 @@ void Game_window::write_saveinfo(bool screenshot) {
 			out.write2(npc->get_property(Actor::health));
 			out.write2(npc->get_shapefile());
 
-			// Packing for the rest of the structure
+			// Write zeros for the reseved yet to be used parts of the structure
 			for (size_t j = offsetof(SaveGame_Party, reserved1);
 				 j < sizeof(SaveGame_Party); j++) {
 				out.write1(0);
@@ -669,65 +663,70 @@ void Game_window::write_saveinfo(bool screenshot) {
 }
 
 void Game_window::read_saveinfo(
-		IDataSource* in, std::unique_ptr<SaveGame_Details>& details,
-		std::unique_ptr<SaveGame_Party[]>& party) {
-	int i;
-	details = std::make_unique<SaveGame_Details>();
+		IDataSource* in, SaveGame_Details& details,
+		std::vector<SaveGame_Party>& party) {
+
+	details = SaveGame_Details();
+	party.clear();
 
 	// This order must match struct SaveGame_Details
 	// Time that the game was saved
-	details->real_minute = in->read1();
-	details->real_hour   = in->read1();
-	details->real_day    = in->read1();
-	details->real_month  = in->read1();
-	details->real_year   = in->read2();
+	details.real_minute = in->read1();
+	details.real_hour   = in->read1();
+	details.real_day    = in->read1();
+	details.real_month  = in->read1();
+	details.real_year   = in->read2();
 
 	// The Game Time that the save was done at
-	details->game_minute = in->read1();
-	details->game_hour   = in->read1();
-	details->game_day    = in->read2();
+	details.game_minute = in->read1();
+	details.game_hour   = in->read1();
+	details.game_day    = in->read2();
 
-	details->save_count = in->read2();
-	details->party_size = in->read1();
+	details.save_count = in->read2();
+	auto party_size     = in->read1();
 
-	details->unused = in->read1();    // Unused
+	details.unused = in->read1();    // Unused
 
-	details->real_second = in->read1();    // 15
+	details.real_second = in->read1();    // 15
 
 	// Packing for the rest of the structure
 	in->skip(sizeof(SaveGame_Details) - offsetof(SaveGame_Details, reserved0));
 
-	party = std::make_unique<SaveGame_Party[]>(details->party_size);
-	for (i = 0; i < 8 && i < details->party_size; i++) {
-		in->read(party[i].name, 18);
-		party[i].shape = in->read2();
+	party.reserve(party_size);
+	while (party_size--) {
+		auto &p = party.emplace_back();
+		in->read(p.name, sizeof(p.name));
+		// Make sure it's null terminated
+		p.name[sizeof(p.name)-1] = 0;
+		p.shape = in->read2();
 
-		party[i].exp    = in->read4();
-		party[i].flags  = in->read4();
-		party[i].flags2 = in->read4();
+		p.exp    = in->read4();
+		p.flags  = in->read4();
+		p.flags2 = in->read4();
 
-		party[i].food     = in->read1();
-		party[i].str      = in->read1();
-		party[i].combat   = in->read1();
-		party[i].dext     = in->read1();
-		party[i].intel    = in->read1();
-		party[i].magic    = in->read1();
-		party[i].mana     = in->read1();
-		party[i].training = in->read1();
+		p.food           = in->read1();
+		p.str            = in->read1();
+		p.combat   = in->read1();
+		p.dext     = in->read1();
+		p.intel    = in->read1();
+		p.magic    = in->read1();
+		p.mana     = in->read1();
+		p.training = in->read1();
 
-		party[i].health     = in->read2();
-		party[i].shape_file = in->read2();
+		p.health     = in->read2();
+		p.shape_file = in->read2();
 
-		// Packing for the rest of the structure
+		// Skip all the reserved fields not yet used
 		in->skip(sizeof(SaveGame_Party) - offsetof(SaveGame_Party, reserved1));
 	}
+	details.good = true;
 }
 
 bool Game_window::get_saveinfo(
 		const std::string& filename, std::string& name,
 		std::unique_ptr<Shape_file>&       map,
-		std::unique_ptr<SaveGame_Details>& details,
-		std::unique_ptr<SaveGame_Party[]>& party) {
+		SaveGame_Details& details,
+		std::vector<SaveGame_Party>& party) {
 	// First check for compressed save game
 #ifdef HAVE_ZIP_SUPPORT
 	if (get_saveinfo_zip(filename.c_str(), name, map, details, party)) {
@@ -797,15 +796,15 @@ bool Game_window::get_saveinfo(
 
 void Game_window::get_saveinfo(
 		std::unique_ptr<Shape_file>&       map,
-		std::unique_ptr<SaveGame_Details>& details,
-		std::unique_ptr<SaveGame_Party[]>& party) {
+		SaveGame_Details& details,
+		std::vector<SaveGame_Party>& party) {
 	{
 		IFileDataSource ds(GSAVEINFO);
 		if (ds.good()) {
 			read_saveinfo(&ds, details, party);
 		} else {
-			details = nullptr;
-			party   = nullptr;
+			details = SaveGame_Details();
+			party.clear();
 		}
 	}
 
@@ -836,8 +835,8 @@ static const char* remove_dir(const char* fname) {
 
 bool Game_window::get_saveinfo_zip(
 		const char* fname, std::string& name, std::unique_ptr<Shape_file>& map,
-		std::unique_ptr<SaveGame_Details>& details,
-		std::unique_ptr<SaveGame_Party[]>& party) {
+		SaveGame_Details& details,
+		std::vector<SaveGame_Party>& party) {
 	// If a flex, so can't read it
 	if (Flex::is_flex(fname)) {
 		return false;
