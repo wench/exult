@@ -153,11 +153,11 @@ static inline uint32 make_resolution(uint16 width, uint16 height) {
 	return (uint32(width) << 16) | uint32(height);
 }
 
-static inline uint16 get_width(uint32 resolution) {
+static inline uint16 get_resolution_width(uint32 resolution) {
 	return resolution >> 16;
 }
 
-static inline uint16 get_height(uint32 resolution) {
+static inline uint16 get_resolution_height(uint32 resolution) {
 	return resolution & 0xffffu;
 }
 
@@ -171,7 +171,7 @@ static string resolutionstring(uint32 resolution) {
 	if (resolution == 0) {
 		return Strings::Auto();
 	}
-	return resolutionstring(get_width(resolution), get_height(resolution));
+	return resolutionstring(get_resolution_width(resolution), get_resolution_height(resolution));
 }
 
 using VideoOptions_button = CallbackTextButton<VideoOptions_gump>;
@@ -479,7 +479,7 @@ void VideoOptions_gump::load_settings(bool Fullscreen) {
 			win_resolutions.reserve(Resolutions.size());
 			for (const auto elem : Resolutions) {
 				if (Image_window::VideoModeOK(
-							get_width(elem), get_height(elem), false)) {
+							get_resolution_width(elem), get_resolution_height(elem), false)) {
 					win_resolutions.push_back(elem);
 				}
 			}
@@ -562,10 +562,10 @@ VideoOptions_gump::VideoOptions_gump()
 }
 
 void VideoOptions_gump::save_settings() {
-	int resx = get_width(resolution);
-	int resy = get_height(resolution);
-	int gw   = get_width(game_resolution);
-	int gh   = get_height(game_resolution);
+	int resx = get_resolution_width(resolution);
+	int resy = get_resolution_height(resolution);
+	int gw   = get_resolution_width(game_resolution);
+	int gh   = get_resolution_height(game_resolution);
 
 	int tgw = gw;
 	int tgh = gh;
@@ -597,10 +597,10 @@ void VideoOptions_gump::save_settings() {
 	msg += Strings::Keep_();
 
 	if (!Countdown_gump::ask(msg.c_str(), 20)) {
-		resx = get_width(o_resolution);
-		resy = get_height(o_resolution);
-		gw   = get_width(o_game_resolution);
-		gh   = get_height(o_game_resolution);
+		resx = get_resolution_width(o_resolution);
+		resy = get_resolution_height(o_resolution);
+		gw   = get_resolution_width(o_game_resolution);
+		gh   = get_resolution_height(o_game_resolution);
 		bool o_fullscreen;
 		config->value("config/video/fullscreen", o_fullscreen, true);
 		if (fullscreen != o_fullscreen) {    // use old settings from the config

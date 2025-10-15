@@ -69,7 +69,7 @@ public:
 	//! Transform point from screen space to local
 	virtual void screen_to_local(int& sx, int& sy) const = 0;
 
-	//! Transform point deom local to screen space
+	//! Transform point from local to screen space
 	virtual void local_to_screen(int& sx, int& sy) const = 0;
 
 	// Basic Input events These all return true if the event was handled
@@ -122,6 +122,59 @@ public:
 
 	virtual bool run() {
 		return false;
+	}
+
+	virtual TileRect get_rect() const {
+		int sx = 0;
+		int sy = 0;
+
+		local_to_screen(sx, sy);
+
+		Shape_frame* s = get_shape();
+
+		if (!s) {
+			return TileRect(0, 0, 0, 0);
+		}
+
+		return TileRect(
+				sx - s->get_xleft(), sy - s->get_yabove(), s->get_width(),
+				s->get_height());
+	}
+
+	virtual int get_width() const {
+		auto r = get_rect();
+		screen_to_local(r.x, r.y);
+		return r.w;
+	}
+
+	virtual int get_height() const {
+		auto r = get_rect();
+		screen_to_local(r.x, r.y);
+		return r.h;
+	}
+
+	virtual int get_xleft() const {
+		auto r = get_rect();
+		screen_to_local(r.x, r.y);
+		return -r.x;
+	}
+
+	virtual int get_xright() const {
+		auto r = get_rect();
+		screen_to_local(r.x, r.y);
+		return r.w + r.x - 1;
+	}
+
+	virtual int get_yabove() const {
+		auto r = get_rect();
+		screen_to_local(r.x, r.y);
+		return -r.y;
+	}
+
+	virtual int get_ybelow() const {
+		auto r = get_rect();
+		screen_to_local(r.x, r.y);
+		return r.h + r.y - 1;
 	}
 };
 
@@ -240,8 +293,7 @@ public:
 		return false;
 	}
 
-	virtual bool     has_point(int x, int y) const;
-	virtual TileRect get_rect() const;
+	virtual bool has_point(int x, int y) const;
 
 	// Is the gump partially or completely off screen
 	// Only check shape rectangle, not against the actual shape
