@@ -76,7 +76,6 @@ public:
 
 	void paint() override;
 
-	virtual TileRect get_rect() const;
 
 	// update the widget, if required
 	virtual void update_widget() {}
