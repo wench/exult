@@ -19,7 +19,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define SLIDER_WIDGET_H_INCLUDED
 #include "Gump_widget.h"
 
-class Slider_widget;
+#include <optional>
+
+class Image_buffer8;
 
 //! Slider_Widget implements most of the functionality to create a slider like
 //! used by Slider_Gump exccpt for the text display and background. Text or a
@@ -37,6 +39,44 @@ public:
 
 	ICallback* callback;
 
+	class Diamond : public Gump_widget {
+	public:
+		Diamond(Gump_Base* parent, int px=0, int py=0,
+				std::optional<ShapeID> sidDiamond= std::nullopt)
+				: Gump_widget(
+						  parent, -1, px, py,
+						  -1,
+						  SF_OTHER)
+		{
+			if (sidDiamond) {
+				auto sid = sidDiamond.value_or(ShapeID(-1, -1, SF_OTHER));
+				set_shape(sid.get_shapenum());
+				set_frame(sid.get_framenum());
+				set_file(sid.get_shapefile());
+			}
+		}
+
+
+
+		TileRect get_rect() const override
+		{
+			if (get_framenum() != -1) {
+				return Gump_widget::get_rect();
+			}
+			
+				TileRect r(0,0,7,7);
+
+			local_to_screen(r.x, r.y);
+
+			return r;
+		}
+
+	// Is a given point on the widget?
+		bool on_widget(int mx, int my) const override;
+
+		void paint() override;
+	};
+
 public:
 	//! Construct a Slider Widget
 	//! /param par Parent of this Widget, If it implements ICallback, it will be
@@ -44,8 +84,9 @@ public:
 	//! /param width. How wide the sliding region should be.
 	//!  determines how far apart the left and right buttons should be
 	Slider_widget(
-			Gump_Base* par, int px, int py, ShapeID sidLeft, ShapeID sidRight,
-			ShapeID sidDiamond, int mival, int mxval, int step, int defval,
+			Gump_Base* par, int px, int py, std::optional<ShapeID> sidLeft,
+			std::optional<ShapeID> sidRight, std::optional<ShapeID> sidDiamond,
+			int mival, int mxval, int step, int defval,
 			int width = 64, bool logarithmic = false);
 
 	// By default the callback is set to par by the construcor if par implements
@@ -57,8 +98,6 @@ public:
 
 private:
 	bool logarithmic;
-	int  diamondx;    // Rel. pos. where diamond is shown.
-	int  diamondy;
 	int  min_val, max_val;    // Max., min. values to choose from.
 	int  step_val;            // Amount to step by.
 	int  val;                 // Current value.
@@ -67,8 +106,8 @@ private:
 	int leftbtnx, rightbtnx, btny;
 	int xmin, xmax, xdist;
 
-	ShapeID      diamond;    // Diamond
-	Gump_button *left, *right;
+	std::unique_ptr<Diamond>     diamond;
+	std::unique_ptr<Gump_button> left, right;
 
 	Gump_button* pushed;
 
@@ -91,6 +130,8 @@ public:
 
 	// Paint it and its contents.
 	void paint() override;
+
+
 
 	Gump_button* on_button(int mx, int my) override;
 
