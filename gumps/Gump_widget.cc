@@ -55,26 +55,7 @@ void Gump_widget::paint() {
 	paint_shape(sx, sy);
 }
 
-/*
- *  Get screen area used by a gump.
- */
 
-TileRect Gump_widget::get_rect() const {
-	int sx = 0;
-	int sy = 0;
-
-	local_to_screen(sx, sy);
-
-	Shape_frame* s = get_shape();
-
-	if (!s) {
-		return TileRect(0, 0, 0, 0);
-	}
-
-	return TileRect(
-			sx - s->get_xleft(), sy - s->get_yabove(), s->get_width(),
-			s->get_height());
-}
 
 void Gump_widget::set_pos(int newx, int newy) {
 	// Set old rect dirty
