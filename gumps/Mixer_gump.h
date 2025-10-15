@@ -60,8 +60,6 @@ private:
 								 // set in Constructor based on procedural
 								 // background colour. This will usually be 143
 	int slider_width  = 120;     // Width of the sliders
-	int slider_height = 7;    // Slider track height. This value is set to match
-							  // the height of the diamond in the constructor
 
 public:
 	Mixer_gump();
