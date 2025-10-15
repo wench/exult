@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "Gump_button.h"
 #include "Gump_manager.h"
 #include "gamewin.h"
+#include "misc_buttons.h"
 
 #ifdef __GNUC__
 #	pragma GCC diagnostic push
@@ -39,61 +40,57 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 using std::cout;
 using std::endl;
 
-/*
- *  One of the two arrow button on the slider:
- */
-class SliderWidget_button : public Gump_button {
-	bool is_left;
-
-public:
-	SliderWidget_button(
-			Slider_widget* par, int px, int py, ShapeID shape, bool left)
-			: Gump_button(
-					  par, shape.get_shapenum(), px, py, shape.get_shapefile()),
-			  is_left(left) {}
-
-	// What to do when 'clicked':
-	bool activate(MouseButton button) override {
-		if (button != MouseButton::Left) {
-			return false;
-		}
-		if (is_left) {
-			static_cast<Slider_widget*>(parent)->clicked_left_arrow();
-		} else {
-			static_cast<Slider_widget*>(parent)->clicked_right_arrow();
-		}
-		return true;
-	}
-};
-
 // #define SW_FORCE_AUTO_LOG_SLIDERS 1
 
 Slider_widget::Slider_widget(
-		Gump_Base* par, int px, int py, ShapeID sidLeft, ShapeID sidRight,
-		ShapeID sidDiamond, int mival, int mxval, int step, int defval,
-		int width, bool logarithmic)
-		: Gump_widget(par, -1, px, py, -1), logarithmic(logarithmic),
-		  min_val(mival), max_val(mxval), step_val(step), val(defval),
-		  prev_dragx(INT32_MIN) {
-	auto lshape = sidLeft.get_shape();
-	auto rshape = sidRight.get_shape();
-	auto dshape = sidDiamond.get_shape();
-	leftbtnx    = lshape->get_xleft();    //- 1;
-	xmin        = leftbtnx + lshape->get_xright() + dshape->get_xleft() + 1;
-	xmax        = xmin + width - dshape->get_width();
-	xdist       = xmax - xmin;
-	// rightbtnx   = xmax + dshape->get_xright();//+rshape->get_xleft();
-	rightbtnx
-			= leftbtnx + lshape->get_xright() + width + rshape->get_xleft() + 1;
-	btny = lshape->get_height() - 1;
-	// centre the diamond between button height
-	// int buttontop    = btny + lshape->get_yabove();
-	int buttonbottom = btny + lshape->get_ybelow();
-	diamondy         = buttonbottom - dshape->get_ybelow()
-			   - (lshape->get_height() - dshape->get_height()) / 2;
-	//+dshape->get_ybelow();
+		Gump_Base* par, int px, int py, std::optional<ShapeID> osidLeft,
+		std::optional<ShapeID> osidRight, std::optional<ShapeID> osidDiamond,
+		int mival, int mxval, int step, int defval, int width, bool logarithmic)
+		: Gump_widget(par, -1, px, py, -1), callback(nullptr),
+		  logarithmic(logarithmic), min_val(mival), max_val(mxval),
+		  step_val(step), val(defval), prev_dragx(INT32_MIN) {
+	diamond = std::make_unique<Diamond>(
+			this,0,0, osidDiamond);
 
-	diamond = sidDiamond;
+	if (osidLeft) {
+		auto sid = osidLeft.value_or(ShapeID(-1, -1, SF_OTHER));
+		left = std::make_unique < SelfManaged<CallbackButton<Slider_widget>>>(
+                this, &Slider_widget::clicked_left_arrow, sid.get_shapenum(), 0,
+                0, sid.get_shapefile());
+	} else {
+		left = std::make_unique< SelfManaged<CallbackButtonBase<Slider_widget, Arrow_Button>>>(
+				this, &Slider_widget::clicked_left_arrow, 0, 0,
+				Arrow_Button::Left, false);
+	}
+	if (osidRight) {
+		auto sid = osidRight.value_or(ShapeID(-1, -1, SF_OTHER));
+		right = std::make_unique < SelfManaged<CallbackButton<Slider_widget>>>(
+                this, &Slider_widget::clicked_right_arrow, sid.get_shapenum(),
+                0, 0, sid.get_shapefile());
+	} else {
+		right = std::make_unique<
+				SelfManaged<CallbackButtonBase<Slider_widget, Arrow_Button>>>(
+				this, &Slider_widget::clicked_right_arrow, 0, 0,
+				Arrow_Button::Right, false);
+	}
+	leftbtnx = left->get_xleft();    //- 1;
+	xmin     = leftbtnx + left->get_xright() + diamond->get_xleft() + 1;
+	xmax     = xmin + width - diamond->get_width();
+	xdist    = xmax - xmin;
+	// rightbtnx   = xmax + dshape->get_xright();//+right->get_xleft();
+	rightbtnx = leftbtnx + left->get_xright() + width + right->get_xleft() + 1;
+	btny      = left->get_height() - 1;
+
+	left->set_pos(leftbtnx, btny);
+	right->set_pos(rightbtnx, btny);
+
+	// centre the diamond between button height
+	// int buttontop    = btny + left->get_yabove();
+	int buttonbottom = btny + left->get_ybelow();
+	diamond->set_pos(
+			0, buttonbottom - diamond->get_ybelow()
+					   - (left->get_height() - diamond->get_height()) / 2);
+
 #ifdef SW_FORCE_AUTO_LOG_SLIDERS
 	if (!this->logarithmic) {
 		int range = mxval - mival;
@@ -109,16 +106,14 @@ Slider_widget::Slider_widget(
 	cout << "SliderWidget:  " << min_val << " to " << max_val << " by " << step
 		 << endl;
 #endif
-	left  = std::make_unique<SelfManaged<SliderWidget_button>>(this, leftbtnx, btny, sidLeft, true);
-	right = std::make_unique<SelfManaged<SliderWidget_button>>(
-			this, rightbtnx, btny, sidRight, false);
+
 	// Init. to middle value.
 	if (defval < min_val) {
 		defval = min_val;
 	} else if (defval > max_val) {
 		defval = max_val;
 	}
-	set_val(defval);
+	set_val(defval, true);
 }
 
 /*
@@ -127,6 +122,7 @@ Slider_widget::Slider_widget(
 
 void Slider_widget::set_val(int newval, bool recalcdiamond) {
 	val = newval;
+	int diamondx;
 	if (recalcdiamond) {
 		if (max_val - min_val == 0) {
 			val      = 0;
@@ -137,6 +133,7 @@ void Slider_widget::set_val(int newval, bool recalcdiamond) {
 							   (val - min_val) * xdist / (max_val - min_val),
 							   xdist);
 		}
+		diamond->set_pos(diamondx, diamond->get_y());
 	}
 	if (callback) {
 		callback->OnSliderValueChanged(this, val);
@@ -176,16 +173,7 @@ TileRect Slider_widget::get_rect() const {
 	TileRect leftrect  = left->get_rect();
 	TileRect rightrect = right->get_rect();
 
-	auto     dshape = diamond.get_shape();
-	TileRect diamondrect
-			= dshape ? TileRect(
-							   diamondx + dshape->get_xleft(),
-							   diamondy + dshape->get_yabove(),
-							   dshape->get_width(), dshape->get_width())
-					 : TileRect(diamondx, diamondy, 8, 8);
-
-	local_to_screen(diamondrect.x, diamondrect.y);
-	return leftrect.add(rightrect).add(diamondrect);
+	return leftrect.add(rightrect).add(diamond->get_rect());
 }
 
 /*
@@ -193,11 +181,7 @@ TileRect Slider_widget::get_rect() const {
  */
 
 void Slider_widget::paint() {
-	int sx = diamondx;
-	int sy = diamondy;
-
-	local_to_screen(sx, sy);
-	diamond.paint_shape(sx, sy);
+	diamond->paint();
 
 	left->paint();
 	right->paint();
@@ -235,6 +219,70 @@ bool Slider_widget::run() {
 	return false;
 }
 
+void Slider_widget::Diamond::paint() {
+	if (get_framenum() != -1) {
+		return Gump_widget::paint();
+	}
+
+	auto ibuf8 = gwin->get_win()->get_ib8();
+	int  x = 0, y = 0;
+
+	local_to_screen(x, y);
+
+	struct {
+		uint8 col;
+		int   startx;
+		int   starty;
+		int   endx;
+		int   endy;
+
+		bool ispoint() const {
+			return startx == endx && starty == endy;
+		}
+	} lines[] = {
+			{24, 0, 3, 3, 6},
+            {18, 3, 0, 3, 2},
+            {18, 4, 3, 6, 3},
+			{22, 1, 3, 2, 3},
+            {22, 3, 4, 3, 5},
+            {20, 4, 5, 5, 4},
+			{23, 2, 4, 2, 4},
+            {20, 2, 1, 1, 2},
+            {20, 2, 2, 2, 2},
+			{20, 4, 4, 4, 4},
+            {15, 4, 2, 4, 2},
+            {16, 4, 1, 5, 2},
+			{19, 3, 3, 3, 3}
+    };
+
+	for (const auto& line : lines) {
+		if (line.ispoint()) {
+			ibuf8->put_pixel8(line.col, x + line.startx, y + line.starty);
+		} else {
+			ibuf8->draw_line8(
+					line.col, x + line.startx, y + line.starty, x + line.endx,
+					y + line.endy);
+		}
+	}
+}
+
+bool Slider_widget::Diamond::on_widget(int x, int y) const {
+	if (get_framenum() != -1) {
+		return Gump_widget::on_widget(x, y);
+	}
+	screen_to_local(x, y);
+
+	if (y < 0 || y > 6) {
+		return false;
+	}
+	const int o = y < 4 ? 3 - y : y - 3;
+	if (x < o || x >= 7 - o) {
+		return false;
+	}
+	return true;
+}
+
+
 /*
  *  Handle mouse-down events.
  */
@@ -259,25 +307,28 @@ bool Slider_widget::mouse_down(
 	}
 
 	// See if on diamond.
-	Shape_frame* d_shape = diamond.get_shape();
-	int          lx = mx, ly = my;
-	screen_to_local(lx, ly);
-	if (d_shape->has_point(lx - diamondx, ly - diamondy)) {
+	if (diamond->on_widget(mx, my)) {
 		// Start to drag it.
-		prev_dragx = mx;
+		prev_dragx = diamond->get_x();
 	} else {
-		if (ly < diamondy || ly > diamondy + d_shape->get_height()) {
+		int lx = mx, ly = my;
+		screen_to_local(lx, ly);
+		if (ly < diamond->get_y()
+			|| ly > diamond->get_y() + diamond->get_height()) {
 			return Gump_widget::mouse_down(mx, my, button);
-		}
-		if (lx < xmin || lx > xmax) {
+		} else if (
+				lx < xmin - diamond->get_width()
+				|| lx >= xmax + diamond->get_width()) {
 			return Gump_widget::mouse_down(mx, my, button);
+		} else if (lx < xmin) {
+			lx = xmin;
+		} else if (lx > xmax) {
+			lx = xmax;
 		}
-		diamondx  = lx;
-		int delta = logtolinear(diamondx - xmin, xdist) * (max_val - min_val)
-					/ xdist;
+		int delta = logtolinear(lx - xmin, xdist) * (max_val - min_val) / xdist;
 		// Round down to nearest step.
 		delta -= delta % step_val;
-		set_val(min_val + delta, false);
+		set_val(min_val + delta, true);
 
 		gwin->add_dirty(get_rect());
 	}
@@ -352,19 +403,19 @@ bool Slider_widget::mouse_drag(
 	// clamp the mouse position to the slidable region
 	int lx = mx, ly = my;
 	screen_to_local(lx, ly);
-	DEBUG_VAL(mx);
+	DEBUG_VAL(lx);
 	if (lx > rightbtnx) {
-		mx -= lx - rightbtnx;
+		lx = rightbtnx;
 	} else if (lx < xmin) {
-		mx += xmin - lx;
+		lx = xmin;
 	}
-
-	DEBUG_VAL(diamondx);
-	DEBUG_VAL(mx);
+	int diamondx = diamond->get_x();
+	DEBUG_VAL((diamondx));
+	DEBUG_VAL(lx);
 	DEBUG_VAL(prev_dragx);
-	DEBUG_VAL(mx - prev_dragx);
-	diamondx += mx - prev_dragx;
-	prev_dragx = mx;
+	DEBUG_VAL(lx - prev_dragx);
+	diamondx += lx - prev_dragx;
+	prev_dragx = lx;
 	if (diamondx < xmin) {    // Stop at ends.
 		diamondx = xmin;
 	} else if (diamondx > xmax) {
@@ -386,8 +437,7 @@ bool Slider_widget::mouse_drag(
 	DEBUG_VAL(delta);
 	DEBUG_VAL(step_val);
 	set_val(min_val + delta, false);
-
-	// paint();
+	diamond->set_pos(diamondx, diamond->get_y());
 	gwin->add_dirty(get_rect());
 	return true;
 }
