@@ -466,21 +466,6 @@ bool Gump::has_point(int sx, int sy) const {
 	return s && s->has_point(sx - x, sy - y);
 }
 
-/*
- *  Get screen area used by a gump.
- */
-
-TileRect Gump::get_rect() const {
-	Shape_frame* s = get_shape();
-
-	if (!s) {
-		return TileRect(0, 0, 0, 0);
-	}
-
-	return TileRect(
-			x - s->get_xleft(), y - s->get_yabove(), s->get_width(),
-			s->get_height());
-}
 
 bool Gump::isOffscreen(bool partially) const {
 	auto rect = get_rect();
