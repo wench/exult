@@ -129,16 +129,13 @@ private:
 		right
 	} halign = HAlign::none;
 
-	ShapeID  slider_shape;
-	short    sliderw;    // Width of Slider
-	short    sliderh;    // Height of Slider
 	TileRect scrollrect;
 	int      drag_start = -1;    // Pixel (v) where a slide started
 	int      scroll_max = 0;
 
 	int scrollbg;
 
-	enum button_ids {
+	enum widget_ids {
 		id_first        = 0,
 		id_page_up      = id_first,
 		id_first_button = id_page_up,
@@ -147,6 +144,7 @@ private:
 		id_page_down,
 		id_last_button = id_page_down,
 		id_scrolling,
+		id_diamond,
 		id_count,
 		id_button_count = id_scrolling - id_first_button,
 	};
