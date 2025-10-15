@@ -135,4 +135,22 @@ public:
 	bool activate(MouseButton button) override;
 };
 
+class Arrow_Button : public Basic_button {
+public:
+	enum Direction {
+		Up,
+		Down,
+		Left,
+		Right,
+	} direction;
+
+	bool double_;
+
+	Arrow_Button(
+			Gump_Base* parent, int px, int py, Direction direction,
+			bool double_arrow);
+
+	void paint() override;
+};
+
 #endif
