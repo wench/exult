@@ -211,3 +211,76 @@ bool Cstats_button::activate(MouseButton button) {
 	gumpman->add_gump(nullptr, game->get_shape("gumps/cstats/1") + cnt);
 	return true;
 }
+
+Arrow_Button::Arrow_Button(
+		Gump_Base* parent, int px, int py, Direction direction,
+		bool double_arrow)
+		: Basic_button(
+				  parent, px, py, direction >= Left ? 12 : 11,
+				  direction >= Left ? 11 : 12),
+		  direction(direction), double_(double_arrow) {}
+
+void Arrow_Button::paint() {
+	Basic_button::paint();
+	auto ib8       = gwin->get_win()->get_ib8();
+	auto draw_area = get_draw_area();
+	local_to_screen(draw_area.x , draw_area.y);
+	if (!double_) {
+		// Single arrow
+		for (int l = 0; l < 4; l++) {
+			int startx = 3 - l;
+			int endx   = 3 + l;
+			int starty = 2 + l;
+
+			// If down or right flip the y
+			if (direction == Down || direction == Right) {
+				starty = 7 - starty;
+			}
+
+			int endy = starty;
+			// if left or right swap x and y
+			if (direction >= Left) {
+				std::swap(startx, starty);
+				std::swap(endx, endy);
+			}
+
+			if (startx == endx && starty == endy) {
+				ib8->put_pixel8(0, draw_area.x + startx, draw_area.y + starty);
+			} else {
+				ib8->draw_line8(
+						0, draw_area.x + startx, draw_area.y + starty,
+						draw_area.x + endx, draw_area.y + endy);
+			}
+		}
+
+	} else {
+		// double arrow
+		for (int l = 0; l < 6; l++) {
+			int l3     = l % 3;
+			int startx = 3 - l3;
+			int endx   = 3 + l3;
+			int starty = 1 + l;
+
+			// If down or right flip the y
+			if (direction == Down || direction == Right) {
+				starty = 7 - starty;
+			}
+
+			int endy = starty;
+
+			// if left or right swap x and y
+			if (direction >= Left) {
+				std::swap(startx, starty);
+				std::swap(endx, endy);
+			}
+
+			if (startx == endx && starty == endy) {
+				ib8->put_pixel8(0, draw_area.x + startx, draw_area.y + starty);
+			} else {
+				ib8->draw_line8(
+						0, draw_area.x + startx, draw_area.y + starty,
+						draw_area.x + endx, draw_area.y + endy);
+			}
+		}
+	}
+}
