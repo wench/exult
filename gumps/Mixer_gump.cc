@@ -208,41 +208,36 @@ Mixer_gump::Mixer_gump() : Modal_gump(nullptr, -1) {
 	for (auto& btn : buttons) {
 		btn.reset();
 	}
-	auto shiddiamond = ShapeID(EXULT_FLX_SAV_SLIDER_SHP, 0, SF_EXULT_FLX);
-	auto shidleft    = ShapeID(EXULT_FLX_SCROLL_LEFT_SHP, 0, SF_EXULT_FLX);
-	auto shidright   = ShapeID(EXULT_FLX_SCROLL_RIGHT_SHP, 0, SF_EXULT_FLX);
 
 	if (initial_music_midi != -1) {
 		midislider = std::make_shared<Slider_widget>(
 				this,
 				label_margin + font->get_text_width(Strings::MIDIMusic_()),
-				yForRow(0) - 13, shidleft, shidright, shiddiamond, 0, 100, 1,
+				yForRow(0) - 13, std::nullopt, std::nullopt, std::nullopt, 0, 100, 1,
 				initial_music_midi, slider_width);
 	}
 	if (initial_music_ogg != -1) {
 		oggslider = std::make_shared<Slider_widget>(
 				this, label_margin + font->get_text_width(Strings::OGGMusic_()),
-				yForRow(num_sliders - 3) - 13, shidleft, shidright, shiddiamond,
+				yForRow(num_sliders - 3) - 13, std::nullopt, std::nullopt,
+				std::nullopt,
 				0, 100, 1, initial_music_ogg, slider_width);
 	}
 
 	if (initial_sfx != -1) {
 		sfxslider = std::make_shared<Slider_widget>(
 				this, label_margin + font->get_text_width(Strings::SFX_()),
-				yForRow(num_sliders - 2) - 13, shidleft, shidright, shiddiamond,
+				yForRow(num_sliders - 2) - 13, std::nullopt, std::nullopt,
+				std::nullopt,
 				0, 100, 1, initial_sfx, slider_width);
 	}
 	if (initial_speech != -1) {
 		speechslider = std::make_shared<Slider_widget>(
 				this, label_margin + font->get_text_width(Strings::Speech_()),
-				yForRow(num_sliders - 1) - 13, shidleft, shidright, shiddiamond,
+				yForRow(num_sliders - 1) - 13, std::nullopt, std::nullopt,
+				std::nullopt,
 				0, 100, 1, initial_speech, slider_width);
 	}
-	auto Shapediamond = shiddiamond.get_shape();
-	if (Shapediamond) {
-		slider_height = Shapediamond->get_height();
-	}
-
 	// Ok
 	buttons[id_ok] = std::make_unique<Mixer_Textbutton>(
 			this, &Mixer_gump::close, Strings::OK(), 25, yForRow(num_sliders),
@@ -303,13 +298,13 @@ void Mixer_gump::PaintSlider(
 
 	if (use3dslidertrack) {
 		iwin->get_ib8()->draw_beveled_box(
-				rect.x + 12, rect.y + 2, slider_width, slider_height, 1,
+				rect.x + 12, rect.y + 2, slider_width, Slider_widget::Diamond::get_height_static(), 1,
 				slider_track_color, slider_track_color + 2,
 				slider_track_color + 4, slider_track_color - 2,
 				slider_track_color - 4);
 	} else {
 		iwin->get_ib8()->draw_box(
-				rect.x + 12, rect.y + 2, slider_width, slider_height, 0,
+				rect.x + 12, rect.y + 2, Slider_widget::Diamond::get_height_static(), Slider_widget::Diamond::get_height_static(), 0,
 				slider_track_color, 0xff);
 	}
 
