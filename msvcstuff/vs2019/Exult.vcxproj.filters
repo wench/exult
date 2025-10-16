@@ -596,9 +596,6 @@
     <ClCompile Include="..\..\gumps\Face_stats.cc">
       <Filter>gumps</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\gumps\File_gump.cc">
-      <Filter>gumps</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\gumps\Gamemenu_gump.cc">
       <Filter>gumps</Filter>
     </ClCompile>

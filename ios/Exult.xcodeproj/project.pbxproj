@@ -204,7 +204,6 @@
 		E700DE811A6E3497006C8BE4 /* Enabled_button.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DE3E1A6E3497006C8BE4 /* Enabled_button.cc */; };
 		E700DE821A6E3497006C8BE4 /* Face_button.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DE401A6E3497006C8BE4 /* Face_button.cc */; };
 		E700DE831A6E3497006C8BE4 /* Face_stats.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DE421A6E3497006C8BE4 /* Face_stats.cc */; };
-		E700DE841A6E3497006C8BE4 /* File_gump.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DE441A6E3497006C8BE4 /* File_gump.cc */; };
 		E700DE851A6E3497006C8BE4 /* Gamemenu_gump.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DE461A6E3497006C8BE4 /* Gamemenu_gump.cc */; };
 		E700DE861A6E3497006C8BE4 /* GameDisplayOptions_gump.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DE481A6E3497006C8BE4 /* GameDisplayOptions_gump.cc */; };
 		E700DE871A6E3497006C8BE4 /* Gump_button.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DE4A1A6E3497006C8BE4 /* Gump_button.cc */; };
@@ -709,7 +708,6 @@
 		E700DE411A6E3497006C8BE4 /* Face_button.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Face_button.h; path = ../gumps/Face_button.h; sourceTree = "<group>"; };
 		E700DE421A6E3497006C8BE4 /* Face_stats.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Face_stats.cc; path = ../gumps/Face_stats.cc; sourceTree = "<group>"; };
 		E700DE431A6E3497006C8BE4 /* Face_stats.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Face_stats.h; path = ../gumps/Face_stats.h; sourceTree = "<group>"; };
-		E700DE441A6E3497006C8BE4 /* File_gump.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = File_gump.cc; path = ../gumps/File_gump.cc; sourceTree = "<group>"; };
 		E700DE451A6E3497006C8BE4 /* File_gump.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = File_gump.h; path = ../gumps/File_gump.h; sourceTree = "<group>"; };
 		E700DE461A6E3497006C8BE4 /* Gamemenu_gump.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Gamemenu_gump.cc; path = ../gumps/Gamemenu_gump.cc; sourceTree = "<group>"; };
 		E700DE471A6E3497006C8BE4 /* Gamemenu_gump.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Gamemenu_gump.h; path = ../gumps/Gamemenu_gump.h; sourceTree = "<group>"; };
@@ -1429,7 +1427,6 @@
 				E700DE411A6E3497006C8BE4 /* Face_button.h */,
 				E700DE421A6E3497006C8BE4 /* Face_stats.cc */,
 				E700DE431A6E3497006C8BE4 /* Face_stats.h */,
-				E700DE441A6E3497006C8BE4 /* File_gump.cc */,
 				E700DE451A6E3497006C8BE4 /* File_gump.h */,
 				E700DE461A6E3497006C8BE4 /* Gamemenu_gump.cc */,
 				E700DE471A6E3497006C8BE4 /* Gamemenu_gump.h */,
@@ -2018,7 +2015,6 @@
 				E700DD5C1A6E3121006C8BE4 /* npcdollinf.cc in Sources */,
 				E700DF521A6E34C6006C8BE4 /* ucsymtbl.cc in Sources */,
 				E700DE9B1A6E3497006C8BE4 /* Text_button.cc in Sources */,
-				E700DE841A6E3497006C8BE4 /* File_gump.cc in Sources */,
 				E700DD8F1A6E3161006C8BE4 /* listfiles.cc in Sources */,
 				E700DD5B1A6E3121006C8BE4 /* monstinf.cc in Sources */,
 				E700DC241A6E2CE7006C8BE4 /* RawAudioSample.cc in Sources */,
