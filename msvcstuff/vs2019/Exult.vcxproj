@@ -442,7 +442,6 @@ for /f "tokens=* delims=" %%u in ('git ls-remote --get-url') do echo #define GIT
     <ClCompile Include="..\..\gumps\Enabled_button.cc" />
     <ClCompile Include="..\..\gumps\Face_button.cc" />
     <ClCompile Include="..\..\gumps\Face_stats.cc" />
-    <ClCompile Include="..\..\gumps\File_gump.cc" />
     <ClCompile Include="..\..\gumps\Gamemenu_gump.cc" />
     <ClCompile Include="..\..\gumps\GameDisplayOptions_gump.cc" />
     <ClCompile Include="..\..\gumps\Gump.cc" />

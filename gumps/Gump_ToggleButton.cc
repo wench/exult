@@ -32,6 +32,7 @@ void Gump_ToggleButton::setselection(int newsel) {
 
 
 void Gump_ToggleTextButton::setselection(int selectionnum) {
+	gwin->add_dirty(get_rect());
 	set_frame(selectionnum);
 	text = selections[get_framenum()];
 	init();
@@ -55,9 +56,9 @@ bool Toggle_button<base>::activate(MouseButton button) {
 		return false;
 	}
 
-	this->setselection((base::get_framenum() + delta) % numselections);
-	toggle(base::get_framenum());
-	base::gwin->add_dirty(base::get_rect());
+	this->setselection((this->get_framenum() + delta) % numselections);
+	toggle(this->get_framenum());
+	base::gwin->add_dirty(this->get_rect());
 	return true;
 }
 
@@ -66,7 +67,7 @@ bool Toggle_button<base>::push(MouseButton button)
 {
 	if (button == MouseButton::Left || button == MouseButton::Right) {
 		this->set_pushed(button);
-		base::gwin->add_dirty(base::get_rect());
+		base::gwin->add_dirty(this->get_rect());
 		return true;
 	}
 	return false;
@@ -76,7 +77,7 @@ template <typename base>
 void Toggle_button<base>::unpush(MouseButton button) {
 	if (button == MouseButton::Left || button == MouseButton::Right) {
 		this->set_pushed(false);
-		base::gwin->add_dirty(base::get_rect());
+		base::gwin->add_dirty(this->get_rect());
 	}
 }
 

@@ -14,7 +14,6 @@ libgumps_la_SOURCES = \
 	Actor_gump.h	\
 	Book_gump.cc	\
 	Book_gump.h	\
-	File_gump.cc	\
 	File_gump.h	\
 	Gamemenu_gump.cc	\
 	Gamemenu_gump.h	\

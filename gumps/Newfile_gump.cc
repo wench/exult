@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2001-2024  The Exult Team
+ *  Copyright (C) 2001-2025  The Exult Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,18 +24,20 @@
 
 #include "Audio.h"
 #include "Configuration.h"
+#include "Gump_ToggleButton.h"
 #include "Gump_button.h"
 #include "Gump_manager.h"
+#include "Slider_widget.h"
 #include "Text_button.h"
 #include "Yesno_gump.h"
 #include "actors.h"
 #include "exult.h"
-#include "exult_flx.h"
 #include "game.h"
 #include "gameclk.h"
 #include "gamewin.h"
 #include "items.h"
 #include "listfiles.h"
+#include "misc_buttons.h"
 #include "miscinf.h"
 #include "mouse.h"
 #include "party.h"
@@ -144,38 +146,91 @@ public:
 		return get_text_msg(0x67F - msg_file_start);    // th
 	}
 
-	static auto No_Screenshot(int line) {
-		if (line > 5) {
-			return "";
+	static auto No_Screenshot() {
+		static std::string rw;
+		if (rw.empty()) {
+			rw = get_text_msg(0x6D2 - msg_file_start);
+
+			// Replace all ~ with \n
+			for (char& c : rw) {
+				if (c == '~') {
+					c = '\n';
+				}
+			}
 		}
-		return get_text_msg(0x65B + line - msg_file_start);
+		return rw.c_str();
+	}
+
+	static auto QUIT() {
+		return get_text_msg(0x6D3 - msg_file_start);
+	}
+
+	static auto GamedatDirectory() {
+		return get_text_msg(0x6D4 - msg_file_start);
+	}
+
+	static auto NewQuickSave() {
+		return get_text_msg(0x6D5 - msg_file_start);
+	}
+
+	static auto EmptySlot() {
+		return get_text_msg(0x6D6 - msg_file_start);
+	}
+
+	static auto Unreadable_Savegame() {
+		static std::string rw;
+		if (rw.empty()) {
+			rw = get_text_msg(0x6D0 - msg_file_start);
+
+			// Replace all ~ with \n
+			for (char& c : rw) {
+				if (c == '~') {
+					c = '\n';
+				}
+			}
+		}
+		return rw.c_str();
+	}
+
+	static auto NoInfo() {
+		return get_text_msg(0x6D1 - msg_file_start);
 	}
 };
 
-/*
- *  Macros:
- */
-
-/*
- *  One of our buttons.
- */
-using Newfile_button     = CallbackButton<Newfile_gump>;
-using Newfile_Textbutton = CallbackTextButton<Newfile_gump>;
+//
+// Enable or disable a button.
+//
+void Newfile_gump::SetButtonEnabled(button_ids id, bool newenabled) {
+	auto& source = newenabled ? disabled_buttons : buttons;
+	auto& dest   = newenabled ? buttons : disabled_buttons;
+	// Only move to dest if source exists
+	// Don't want to overwrite an existing button in dest with a nullptr
+	if (source[id]) {
+		dest[id] = std::move(source[id]);
+		source[id].reset();
+	}
+}
 
 /*
  *  Create the load/save box.
  */
 
-Newfile_gump::Newfile_gump(bool restore_mode)
+Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 		: Modal_gump(
 				  nullptr, gwin->get_width() / 2 - 160,
 				  gwin->get_height() / 2 - 100, -1),
-		  restore_mode(restore_mode) {
-	// set_object_area(TileRect(0, 0, 320, 200), -6, 178);    //+++++ ???
-	SetProceduralBackground(TileRect(0, 0, 320, 200), -1, false);
-
+		  restore_mode(restore_mode_), old_style_mode(old_style_mode_),
+		  tinyfont(fontManager.get_font("TINY_BLACK_FONT")) {
 	if (restore_mode) {
-		list_position = -1;
+		old_style_mode = false;
+	} else if (!old_style_mode) {
+		// Only check for old style mode config setting if not in restore mode
+		// and old_style_mode has not been forced by constructor parameter
+		config->value(
+				"config/disk/use_old_style_save_load", old_style_mode, false);
+		config->set(
+				"config/disk/use_old_style_save_load",
+				old_style_mode ? "yes" : "no", true);
 	}
 
 	newname[0] = 0;
@@ -185,26 +240,94 @@ Newfile_gump::Newfile_gump(bool restore_mode)
 			gwin->get_width(), gwin->get_height());
 	gwin->get_win()->get(back.get(), 0, 0);
 
-	// Cancel
-	buttons[id_close] = std::make_unique<Newfile_Textbutton>(
-			this, &Newfile_gump::close, Strings::CANCEL(), btn_cols[3],
-			btn_rows[0], 59);
+	if (old_style_mode) {
+		fieldcount = 10;
+		// Old style mode has 1 pixel offset hence origin at 1,1
+		SetProceduralBackground(TileRect(1, 1, 210, 156), -1, false);
 
-	// Scrollers.
-	buttons[id_page_up] = std::make_unique<Newfile_button>(
-			this, &Newfile_gump::page_up, EXULT_FLX_SAV_UPUP_SHP, btn_cols[4],
-			btn_rows[1], SF_EXULT_FLX);
-	buttons[id_line_up] = std::make_unique<Newfile_button>(
-			this, &Newfile_gump::line_up, EXULT_FLX_SAV_UP_SHP, btn_cols[4],
-			btn_rows[2], SF_EXULT_FLX);
-	buttons[id_line_down] = std::make_unique<Newfile_button>(
-			this, &Newfile_gump::line_down, EXULT_FLX_SAV_DOWN_SHP, btn_cols[4],
-			btn_rows[3], SF_EXULT_FLX);
-	buttons[id_page_down] = std::make_unique<Newfile_button>(
-			this, &Newfile_gump::page_down, EXULT_FLX_SAV_DOWNDOWN_SHP,
-			btn_cols[4], btn_rows[4], SF_EXULT_FLX);
+		Audio* audio = Audio::get_ptr();
+		// Toggle Buttons
+		buttons[id_music]
+				= std::make_unique<CallbackToggleButton<Newfile_gump>>(
+						this, &Newfile_gump::toggle_audio_option,
+						old_btn_cols[0], old_btn_rows[1],
+						game->get_shape("gumps/musicbtn"),
+						!audio ? 0 : audio->is_music_enabled(), 2,
+						SF_GUMPS_VGA);
+		buttons[id_speech]
+				= std::make_unique<CallbackToggleButton<Newfile_gump>>(
+						this, &Newfile_gump::toggle_audio_option,
+						old_btn_cols[1], old_btn_rows[1],
+						game->get_shape("gumps/speechbtn"),
+						!audio ? 0 : audio->is_speech_enabled(), 2,
+						SF_GUMPS_VGA);
+		buttons[id_effects]
+				= std::make_unique<CallbackToggleButton<Newfile_gump>>(
+						this, &Newfile_gump::toggle_audio_option,
+						old_btn_cols[2], old_btn_rows[1],
+						game->get_shape("gumps/soundbtn"),
+						!audio ? 0 : audio->are_effects_enabled(), 2,
+						SF_GUMPS_VGA);
+
+		// QUIT
+		buttons[id_close] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+				this, &Newfile_gump::quit, Strings::QUIT(), old_btn_cols[2],
+				old_btn_rows[0], 60);
+
+		// Save
+		buttons[id_save] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+				this, &Newfile_gump::save, Strings::SAVE(), old_btn_cols[1],
+				old_btn_rows[0], 60);
+		// Load
+		buttons[id_load] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+				this, &Newfile_gump::load, Strings::LOAD(), old_btn_cols[0],
+				old_btn_rows[0], 60);
+
+		HorizontalArrangeWidgets(tcb::span(buttons.data() + id_load, 4), 9);
+
+		HorizontalArrangeWidgets(tcb::span(buttons.data() + id_music, 3), 9);
+
+	} else {
+		fieldcount = 14;
+		SetProceduralBackground(TileRect(0, 0, 320, 200), -1, false);
+
+		// Cancel
+		buttons[id_close] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+				this, &Newfile_gump::close, Strings::CANCEL(), btn_cols[3],
+				btn_rows[0]);
+		// Save
+		buttons[id_save] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+				this, &Newfile_gump::save, Strings::SAVE(), btn_cols[0],
+				btn_rows[0]);
+		// Load
+		buttons[id_load] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+				this, &Newfile_gump::load, Strings::LOAD(), btn_cols[1],
+				btn_rows[0]);
+		// Delete
+		buttons[id_delete] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+				this, &Newfile_gump::delete_file, Strings::DELETE(),
+				btn_cols[2], btn_rows[0]);
+
+		HorizontalArrangeWidgets(
+				tcb::span(buttons.data() + id_load, 4), 9, 217);
+	}
+
+	// Reposition the gump
+	auto area = get_usable_area();
+	x         = (gwin->get_width() + area.x - area.w) / 2;
+	y         = (gwin->get_height() + area.y - area.h) / 2;
+
+	scroll = std::make_unique<Scrollable_widget>(
+			this, fieldx, fieldy, fieldw,
+			fieldcount * (fieldh + fieldgap) - fieldgap, 0,
+			old_style_mode ? Scrollable_widget::ScrollbarType::None
+						   : Scrollable_widget::ScrollbarType::Always,
+			false, 0xff, 1);
+	scroll->add_child(std::make_shared<Slot_widget>(this));
+	scroll->set_line_height(fieldh + fieldgap, false);
 
 	LoadSaveGameDetails();
+	SelectSlot(NoSlot);
 	if (touchui != nullptr) {
 		touchui->hideGameControls();
 		touchui->hideButtonControls();
@@ -234,13 +357,13 @@ Newfile_gump::~Newfile_gump() {
 
 void Newfile_gump::load() {
 	// Shouldn't ever happen.
-	if (selected == -2 || selected == -3) {
+	if (selected_slot < GamedatSlot) {
 		return;
 	}
 
 	// Aborts if unsuccessful.
-	if (selected != -1) {
-		gwin->restore_gamedat((*games)[selected].num);
+	if (selected_slot >= SavegameSlots && selected_slot <= LastSlot()) {
+		gwin->restore_gamedat((*games)[selected_slot - SavegameSlots].num);
 	}
 
 	// Read Gamedat if not in restore mode
@@ -250,20 +373,10 @@ void Newfile_gump::load() {
 
 	// Set Done
 	done     = true;
-	restored = 1;
+	restored = true;
 
 	// Reset Selection
-	selected = -3;
-
-	buttons[id_load].reset();
-	buttons[id_save].reset();
-	buttons[id_delete].reset();
-
-	// Reread save game details (quick save gets overwritten)
-	// FreeSaveGameDetails();
-	// LoadSaveGameDetails();
-	// paint();
-	// gwin->set_painted();
+	SelectSlot(NoSlot);
 }
 
 /*
@@ -272,12 +385,13 @@ void Newfile_gump::load() {
 
 void Newfile_gump::save() {
 	// Shouldn't ever happen.
-	if (!strlen(newname) || selected == -3 || restore_mode) {
+	if ((!strlen(newname) && selected_slot != QuicksaveSlot)
+		|| selected_slot < FirstSlot() || restore_mode) {
 		return;
 	}
 
 	// Already a game in this slot? If so ask to delete
-	if (selected != -2) {
+	if (selected_slot >= SavegameSlots) {
 		if (!Yesno_gump::ask("Okay to write over existing saved game?")) {
 			return;
 		}
@@ -287,25 +401,23 @@ void Newfile_gump::save() {
 	gwin->write();
 
 	// Now write to savegame file
-	if (selected >= 0) {
-		gwin->save_gamedat((*games)[selected].num, newname);
-	} else if (selected == -2) {
+	if (selected_slot >= SavegameSlots && selected_slot <= LastSlot()) {
+		gwin->save_gamedat(
+				(*games)[selected_slot - SavegameSlots].num, newname);
+	} else if (selected_slot == EmptySlot) {
 		gwin->save_gamedat(newname, SaveInfo::REGULAR);
+	} else if (selected_slot == QuicksaveSlot) {
+		gwin->save_gamedat("", SaveInfo::QUICKSAVE);
 	}
 
-	cout << "Saved game #" << selected << " successfully." << endl;
+	cout << "Saved game #" << selected_slot << " successfully." << endl;
 
 	// Reset everything
-	selected = -3;
-
-	buttons[id_load].reset();
-	buttons[id_save].reset();
-	buttons[id_delete].reset();
-
 	FreeSaveGameDetails();
 	LoadSaveGameDetails();
 	gwin->set_all_dirty();
 	gwin->got_bad_feeling(4);
+	SelectSlot(NoSlot);
 }
 
 /*
@@ -314,7 +426,7 @@ void Newfile_gump::save() {
 
 void Newfile_gump::delete_file() {
 	// Shouldn't ever happen.
-	if (selected == -1 || selected == -2 || selected == -3) {
+	if (selected_slot <= SavegameSlots || selected_slot > LastSlot()) {
 		return;
 	}
 
@@ -323,107 +435,100 @@ void Newfile_gump::delete_file() {
 		return;
 	}
 
-	U7remove((*games)[selected].filename().c_str());
+	U7remove((*games)[selected_slot].filename().c_str());
 	filename    = nullptr;
 	is_readable = false;
 
-	cout << "Deleted Save game #" << selected << " ("
-		 << (*games)[selected].filename() << ") successfully." << endl;
+	cout << "Deleted Save game #" << selected_slot << " ("
+		 << (*games)[selected_slot].filename() << ") successfully." << endl;
 
 	// Reset everything
-	selected = -3;
-
-	buttons[id_load].reset();
-	buttons[id_save].reset();
-	buttons[id_delete].reset();
-
 	FreeSaveGameDetails();
 	LoadSaveGameDetails();
 	gwin->set_all_dirty();
+	SelectSlot(NoSlot);
 }
 
-/*
- *  Scroll Line
- */
+void Newfile_gump::Slot_widget::paint() {
+	int sx = 0, sy = 0;
 
-void Newfile_gump::scroll_line(int dir) {
-	list_position += dir;
+	local_to_screen(sx, sy);
+	Image_window8* iwin = gwin->get_win();
+	Image_buffer8* ibuf = iwin->get_ib8();
 
-	if (list_position > int((games ? games->size() : 0)) - fieldcount) {
-		list_position = (games ? games->size() : 0) - fieldcount;
-	}
+	auto     clipsave = ibuf->SaveClip();
+	TileRect newclip  = clipsave.Rect().intersect(get_rect());
+	ibuf->set_clip(newclip.x, newclip.y, newclip.w, newclip.h);
 
-	// When in mainmenu, we don't slot for a new savedgame
-	if (restore_mode && list_position < -1) {
-		list_position = -1;
-	} else if (list_position < -2) {
-		list_position = -2;
-	}
+	// Start at the first field that would be visible
+	for (int i = std::max(0, (newclip.y - sy) / (fieldh + fieldgap));
+		 i < nfg->NumSlots(); i++) {
+		const int actual_slot = nfg->FirstSlot() + i;
+		const int fx          = sx;
+		const int fy          = sy + i * (fieldh + fieldgap);
+		// if field y is beyond end of clip break out as no more fields will be
+		// visible
+		if (fy > (newclip.y + newclip.h)) {
+			break;
+		}
 
-#ifdef DEBUG
-	cout << "New list position " << list_position << endl;
-#endif
+		TileRect fieldrect(fx, fy, fieldw, fieldh);
 
-	gwin->set_all_dirty();
-}
+		// If field not visible, skip it
+		if (!newclip.intersects(fieldrect)) {
+			continue;
+		}
+		// Always paint the field background
+		ibuf->draw_beveled_box(
+				fx, fy, fieldw, fieldh, 1, 137, 144, 144, 140, 140, 142);
 
-/*
- *  Scroll Page
- */
+		const char* text;
 
-void Newfile_gump::scroll_page(int dir) {
-	scroll_line(dir * fieldcount);
-}
-
-void Newfile_gump::PaintSaveField(int line, Image_buffer8* ibuf) {
-	const int actual_game = line + list_position;
-
-	const int fx = x + fieldx;
-	const int fy = y + fieldy + line * (fieldh + fieldgap);
-	// Always paint the field background
-	ibuf->draw_beveled_box(
-			fx, fy, fieldw, fieldh, 1, 137, 144, 144, 140, 140, 142);
-
-	if (actual_game < -2 || actual_game >= int((games ? games->size() : 0))) {
-		return;
-	}
-
-	const char* text;
-
-	if (actual_game == -1) {
-		text = "Gamedat Directory";
-	} else if (actual_game == -2 && selected != -2) {
-		if (restore_mode) {
-			text = "";
+		if (actual_slot == QuicksaveSlot) {
+			text = Strings::NewQuickSave();
+		} else if (actual_slot == GamedatSlot) {
+			text = Strings::GamedatDirectory();
+		}
+		// The Slot being drawn is selected for saving
+		else if (actual_slot == nfg->selected_slot && !nfg->buttons[id_load]) {
+			text = nfg->newname;
+		} else if (actual_slot == EmptySlot) {
+			if (nfg->restore_mode) {
+				text = "";
+			} else {
+				text = Strings::EmptySlot();
+			}
+			// the slot being drawn is a savegame
+		} else if (
+				nfg->games && actual_slot >= SavegameSlots
+				&& actual_slot <= nfg->LastSlot()) {
+			text = (*nfg->games)[actual_slot - SavegameSlots].savename.c_str();
 		} else {
-			text = "Empty Slot";
-		}
-	} else if (actual_game != selected || buttons[id_load]) {
-		text = (*games)[actual_game].savename.c_str();
-	} else {
-		text = newname;
-	}
-
-	sman->paint_text(2, text, fx + textx, fy + texty);
-
-	// Being Edited? If so paint cursor
-	if (selected == actual_game && cursor != -1) {
-		gwin->get_win()->fill8(
-				0, 1, sman->get_text_height(2),
-				fx + textx + sman->get_text_width(2, text, cursor), fy + texty);
-	}
-
-	// If selected, show selected icon
-	if (selected == actual_game) {
-		int ix = iconx + fx;
-		int iy = icony + fy;
-
-		for (int l = 0; l < 4; l++) {
-			ibuf->draw_line8(142, ix + l, iy + l, ix + l, iy + 6 - l);
+			text = "";
 		}
 
-		ibuf->draw_line8(146, ix + 1, iy + 7, ix + 4, iy + 4);
-		ibuf->draw_line8(146, ix + 1, iy + 6, ix + 3, iy + 4);
+		sman->paint_text(2, text, fx + textx, fy + texty);
+
+		// Being Edited? If so paint cursor
+		if (nfg->selected_slot == actual_slot && nfg->cursor != -1) {
+			gwin->get_win()->fill8(
+					0, 1, sman->get_text_height(2),
+					fx + textx + sman->get_text_width(2, text, nfg->cursor),
+					fy + texty);
+		}
+
+		// If selected, show selected icon
+		if (nfg->selected_slot == actual_slot) {
+			int ix = iconx + fx;
+			int iy = icony + fy;
+
+			for (int l = 0; l < 4; l++) {
+				ibuf->draw_line8(142, ix + l, iy + l, ix + l, iy + 6 - l);
+			}
+
+			ibuf->draw_line8(146, ix + 1, iy + 7, ix + 4, iy + 4);
+			ibuf->draw_line8(146, ix + 1, iy + 6, ix + 3, iy + 4);
+		}
 	}
 }
 
@@ -437,72 +542,62 @@ void Newfile_gump::paint() {
 	Image_window8* iwin = gwin->get_win();
 	Image_buffer8* ibuf = iwin->get_ib8();
 
+	auto r = buttons[id_close]->get_rect();
 	// draw slider and button backgrounds
-	ibuf->draw_box(x + 212, y + 3, 7, 25, 0, 145, 142);
-	ibuf->draw_box(x + 212, y + 28, 7, 129, 0, 143, 142);
-	ibuf->draw_box(x + 212, y + 157, 7, 38, 0, 145, 142);
-	ibuf->draw_box(x + 3, y + 188, 209, 7, 0, 145, 142);
+	if (!old_style_mode) {
+		ibuf->draw_box(x + 212, y + 3, 7, 25, 0, 145, 142);
+		ibuf->draw_box(x + 212, y + 28, 7, 129, 0, 143, 142);
+		ibuf->draw_box(x + 212, y + 157, 7, 38, 0, 145, 142);
 
-	// Paint fields
-	int i;
+		int bbglimit = r.x + r.w - x;
+		if (bbglimit > 219) {
+			bbglimit = get_usable_area().w - 3;
+		} else {
+			bbglimit = 219;
+		}
 
-	for (i = 0; i < fieldcount; i++) {
-		PaintSaveField(i, ibuf);
+		ibuf->draw_box(x + 3, y + 188, bbglimit - 3, 7, 0, 145, 142);
+	} else {
+		ibuf->draw_box(x + 3, y + 134, get_usable_area().w - 4, 7, 0, 145, 142);
 	}
 
+	// Paint scroll widget, that paints the fields
+	scroll->paint();
+
 	// Paint Buttons
-	for (auto& btn : buttons) {
+	for (const auto& btn : buttons) {
 		if (btn) {
 			btn->paint();
 		}
 	}
 
-	// Paint scroller
-
-	// First thing, work out number of positions that the scroller can be in
-	int num_pos = (2 + (games ? games->size() : 0)) - fieldcount;
-	if (num_pos < 1) {
-		num_pos = 1;
+	// If in old style mode, don't paint the savegame details
+	if (old_style_mode) {
+		return;
 	}
 
-	// Now work out the position
-	const int pos = ((scrollh - sliderh) * (list_position + 2)) / num_pos;
+	// Paint the savegame details
 
-	ShapeID slider_shape(EXULT_FLX_SAV_SLIDER_SHP, 0, SF_EXULT_FLX);
-	slider_shape.paint_shape(x + scrollx, y + scrolly + pos);
-
-	// Now paint the savegame details
 	if (screenshot) {
 		sman->paint_shape(x + 222, y + 2, screenshot->get_frame(0));
 	} else {
 		// Paint No Screenshot background
 		ibuf->draw_box(x + 222, y + 2, 96, 60, 0, 143, 142);
 
-		int lines = 0;
-		for (lines = 0; lines <= 5; ++lines) {
-			auto msg = Strings::No_Screenshot(lines);
-			if (!msg || !*msg) {
-				break;
-			}
-		}
-		int tx = x + 270;
-		int ty = y + 30 - lines * 5;
-		while (lines--) {
-			auto msg = Strings::No_Screenshot(lines);
-			int  tw  = font->get_text_width(msg);
+		auto msg = Strings::No_Screenshot();
+		int  tw, th;
+		font->get_text_box_dims(msg, tw, th);
 
-			font->draw_text(ibuf, tx - tw / 2, ty + lines * 10, msg);
-		}
-		// font->draw_text_box(iwin,)
+		font->paint_text_box(
+				ibuf, msg, x + 270 - tw / 2, y + 30 - th / 2, tw, th, 0, false,
+				true);
 	}
 	// Draw details background
 	ibuf->draw_beveled_box(
-			x + 222, y + 63, 96, 79, 1, 137, 144, 145, 140, 139, 142);
+			x + 222, y + 63, 96, 68, 1, 137, 144, 145, 140, 139, 142);
 
 	if (details && party && party->size()) {
-		int i;
-
-		for (i = party->size() - 1; i >= 0; --i) {
+		for (int i = party->size() - 1; i >= 0; --i) {
 			int  shape_num  = (*party)[i].shape;
 			auto shape_file = ShapeFile((*party)[i].shape_file);
 
@@ -518,7 +613,7 @@ void Newfile_gump::paint() {
 				}
 			}
 			ShapeID shape(shape_num, 16, shape_file);
-			shape.paint_shape(x + 249 + (i & 3) * 23, y + 169 + i / 4 * 29);
+			shape.paint_shape(x + 249 + (i & 3) * 23, y + 157 + i / 4 * 27);
 		}
 
 		char info[320];
@@ -553,61 +648,96 @@ void Newfile_gump::paint() {
 
 		if (filename) {
 			size_t cursize = strlen(info);
-			int    offset  = strlen(filename);
 
-			while (offset--) {
-				if (filename[offset] == '/' || filename[offset] == '\\') {
-					offset++;
-					break;
+			if (cursize < std::size(info) - 2) {
+				auto             svfilename = get_filename_from_path(filename);
+				std::string_view svfile     = Strings::File();
+				info[cursize++]             = '\n';
+
+				cursize += svfile.copy(
+						info + cursize,
+						std::min(std::size(info) - cursize, svfile.size()));
+
+				info[cursize++] = ':';
+
+				if (cursize < std::size(info)) {
+					cursize += svfilename.copy(
+							info + cursize, std::min(
+													std::size(info) - cursize,
+													svfilename.size()));
 				}
+				info[std::min(cursize, std::size(info) - 1)] = 0;
 			}
-
-			snprintf(
-					info + cursize, std::size(info) - cursize - 1, "\n%s: %s",
-					Strings::File(), filename + offset);
-			info[std::size(info) - 1] = 0;
 		}
 
-		sman->paint_text_box(4, info, x + infox, y + infoy, infow, infoh);
+		// Draw text lines manually  so we can control line spacing
+		int   th   = tinyfont->get_text_height();
+		int   ty   = y + infoy;
+		int   tx   = x + infox;
+		char* text = info;
+		while (text && *text) {
+			char* eol = std::strchr(text, '\n');
+			if (eol) {
+				*eol = 0;
+			}
 
+			tinyfont->draw_text(ibuf, tx, ty, text);
+
+			//
+			// Emptylines with only a linebreak are only 2 pixels high
+			while (eol && *++eol == '\n') {
+				ty += 2;
+			}
+
+			text = eol;
+			ty += th;
+		}
 	} else {
 		if (filename) {
-			char info[64];
+			char info[64] = {0};
 
-			int offset = strlen(filename);
+			size_t cursize = 0;
 
-			while (offset--) {
-				if (filename[offset] == '/' || filename[offset] == '\\') {
-					offset++;
-					break;
+			if (cursize < std::size(info) - 2) {
+				auto             svfilename = get_filename_from_path(filename);
+				std::string_view svfile     = Strings::File();
+				info[cursize++]             = '\n';
+
+				cursize += svfile.copy(
+						info + cursize,
+						std::min(std::size(info) - cursize, svfile.size()));
+
+				info[cursize++] = ':';
+
+				if (cursize < std::size(info)) {
+					cursize += svfilename.copy(
+							info + cursize, std::min(
+													std::size(info) - cursize,
+													svfilename.size()));
 				}
+				info[std::min(cursize, std::size(info) - 1)] = 0;
 			}
-			snprintf(
-					info, std::size(info), "\n%s: %s", Strings::File(),
-					filename + offset);
-			info[std::size(info) - 1] = 0;
-			sman->paint_text_box(4, info, x + infox, y + infoy, infow, infoh);
+			tinyfont->paint_text_box(
+					ibuf, info, x + infox, y + infoy, infow, infoh,0,false,false);
 		}
 
-		if (!is_readable && !(restore_mode && selected == -3)) {
-			sman->paint_text(
-					2, "Unreadable",
-					x + infox
-							+ (infow - sman->get_text_width(2, "Unreadable"))
-									  / 2,
-					y + infoy + (infoh - 18) / 2);
-			sman->paint_text(
-					2, "Savegame",
-					x + infox
-							+ (infow - sman->get_text_width(2, "Savegame")) / 2,
-					y + infoy + (infoh) / 2);
+		if (!is_readable && !(restore_mode && selected_slot == NoSlot)) {
+			font->paint_text_box(
+					ibuf, Strings::Unreadable_Savegame(), x + infox,
+
+					y + infoy + (infoh - 18) / 2, infow, infoh, 0, false, true);
 		} else {
-			sman->paint_text(
-					4, "No Info",
-					x + infox
-							+ (infow - sman->get_text_width(4, "No Info")) / 2,
-					y + infoy + (infoh - sman->get_text_height(4)) / 2);
+			tinyfont->paint_text_box(
+					ibuf, Strings::NoInfo(), x + infox,
+
+					y + infoy + (infoh - 18) / 2, infow, infoh, 0, false, true);
 		}
+	}
+}
+
+void Newfile_gump::quit() {
+	if (gumpman->okay_to_quit()) {
+		done = true;
 	}
 }
 
@@ -618,16 +748,11 @@ void Newfile_gump::paint() {
 bool Newfile_gump::mouse_down(
 		int mx, int my, MouseButton button    // Position in window.
 ) {
-	if (button != MouseButton::Left) {
-		return false;
-	}
-
-	slide_start = -1;
 
 	pushed = Gump::on_button(mx, my);
 	// Try buttons at bottom.
 	if (!pushed) {
-		for (auto& btn : buttons) {
+		for (const auto& btn : buttons) {
 			if (btn && btn->on_button(mx, my)) {
 				pushed = btn.get();
 				break;
@@ -642,137 +767,37 @@ bool Newfile_gump::mouse_down(
 		return true;
 	}
 
-	const int gx = mx - x;
-	const int gy = my - y;
-
-	// Check for scroller
-	if (gx >= scrollx && gx < scrollx + sliderw && gy >= scrolly
-		&& gy < scrolly + scrollh) {
-		int num_pos = (2 + (games ? games->size() : 0)) - fieldcount;
-		if (num_pos < 1) {
-			num_pos = 1;
-		}
-
-		// Now work out the position
-		const int pos = ((scrollh - sliderh) * (list_position + 2)) / num_pos;
-
-		// Pressed above it
-		if (gy < pos + scrolly) {
-			scroll_page(-1);
-			gwin->set_all_dirty();
-			return true;
-		}
-		// Pressed below it
-		else if (gy >= pos + scrolly + sliderh) {
-			scroll_page(1);
-			gwin->set_all_dirty();
-			return true;
-		}
-		// Pressed on it
-		else {
-			slide_start = gy;
-			return true;
-		}
-	}
-
-	// Now check for text fields
-	if (gx < fieldx || gx >= fieldx + fieldw) {
-		return Modal_gump::mouse_down(mx, my, button);
-	}
-
-	int hit = -1;
-	int i;
-	for (i = 0; i < fieldcount; i++) {
-		const int fy = fieldy + i * (fieldh + fieldgap);
-		if (gy >= fy && gy < fy + fieldh) {
-			hit = i;
-			break;
-		}
-	}
-
-	if (hit == -1) {
-		return Modal_gump::mouse_down(mx, my, button);
-	}
-
-	last_selected = selected;
-	if (hit + list_position >= int((games ? games->size() : 0))
-		|| hit + list_position < -2 || selected == hit + list_position) {
-		return Modal_gump::mouse_down(mx, my, button);
-	}
-
-#ifdef DEBUG
-	cout << "Hit a save game field" << endl;
-#endif
-	selected = hit + list_position;
-
-	bool want_load   = true;
-	bool want_delete = true;
-	bool want_save   = true;
-
-	if (selected == -2) {
-		want_load   = false;
-		want_delete = false;
-		want_save   = false;
-		screenshot  = cur_shot.get();
-		details     = &cur_details;
-		party       = &cur_party;
-		newname[0]  = 0;
-		cursor      = 0;
-		is_readable = true;
-		filename    = nullptr;
-	} else if (selected == -1) {
-		want_delete = false;
-		screenshot  = gd_shot.get();
-		details     = &gd_details;
-		party       = &gd_party;
-		strcpy(newname, "Gamedat Directory");
-		cursor      = -1;    // No cursor
-		is_readable = true;
-		filename    = nullptr;
-	} else {
-		screenshot = (*games)[selected].screenshot.get();
-		details    = &((*games)[selected].details);
-		party      = &((*games)[selected].party);
-		strcpy(newname, (*games)[selected].savename.c_str());
-		cursor      = static_cast<int>(strlen(newname));
-		is_readable = want_load = (*games)[selected].readable;
-		filename                = (*games)[selected].filename().c_str();
-	}
-
-	if (restore_mode) {
-		// No cursor in restore mode because there is no saving so names can't
-		// be changed
-		cursor    = -1;
-		want_save = false;
-	}
-
-	if (!buttons[id_load] && want_load) {
-		buttons[id_load] = std::make_unique<Newfile_Textbutton>(
-				this, &Newfile_gump::load, Strings::LOAD(), btn_cols[1],
-				btn_rows[0], 39);
-	} else if (buttons[id_load] && !want_load) {
-		buttons[id_load].reset();
-	}
-
-	if (!buttons[id_save] && want_save) {
-		buttons[id_save] = std::make_unique<Newfile_Textbutton>(
-				this, &Newfile_gump::save, Strings::SAVE(), btn_cols[0],
-				btn_rows[0], 40);
-	} else if (buttons[id_save] && !want_save) {
-		buttons[id_save].reset();
-	}
-
-	if (!buttons[id_delete] && want_delete) {
-		buttons[id_delete] = std::make_unique<Newfile_Textbutton>(
-				this, &Newfile_gump::delete_file, Strings::DELETE(),
-				btn_cols[2], btn_rows[0], 59);
-	} else if (buttons[id_delete] && !want_delete) {
-		buttons[id_delete].reset();
-	}
-
 	gwin->set_all_dirty();    // Repaint.
-	return true;
+	return scroll->mouse_down(mx, my, button)
+		   || Modal_gump::mouse_down(mx, my, button);
 	// See if on text field.
+}
+
+bool Newfile_gump::Slot_widget::mouse_down(int mx, int my, MouseButton button) {
+	if (button != MouseButton::Left) {
+		return false;
+	}
+	screen_to_local(mx, my);
+
+	if (mx < 0 || mx >= get_width()) {
+		return false;
+	}
+	if (my < 0 || my >= get_height()) {
+		return false;
+	}
+	// Which field was hit?
+	int hit = my / (fieldh + fieldgap);
+	int fy  = hit * (fieldh + fieldgap);
+	// Make sure it was an actual hit
+	if (my >= fy && my < (fy + fieldh)) {
+#ifdef DEBUG
+		cout << "Hit a save game field" << endl;
+#endif
+		nfg->SelectSlot(hit + nfg->FirstSlot());
+		return true;
+	}
+
+	return false;
 }
 
 /*
@@ -782,13 +807,9 @@ bool Newfile_gump::mouse_down(
 bool Newfile_gump::mouse_up(
 		int mx, int my, MouseButton button    // Position in window.
 ) {
-	if (button != MouseButton::Left) {
-		return Modal_gump::mouse_up(mx, my, button);
-	}
 
-	slide_start = -1;
-	bool result = false;
-	;
+
+	bool result = scroll->mouse_up(mx, my, button);
 
 	if (pushed) {    // Pushing a button?
 		pushed->unpush(button);
@@ -796,40 +817,29 @@ bool Newfile_gump::mouse_up(
 			pushed->activate(button);
 		}
 		pushed = nullptr;
-		result = true;
+		result |= true;
 	}
 	if (touchui != nullptr
-		&& ((selected == -2 && last_selected != -4)
-			|| (selected >= 0 && selected == last_selected))) {
+		&& ((selected_slot == EmptySlot && last_selected != InvalidSlot)
+			|| (selected_slot >= 0 && selected_slot == last_selected))) {
 		touchui->promptForName(newname);
-		result = true;
+		result |= true;
 	}
 	// reset so the prompt doesn't pop up on closing
-	last_selected = -4;
+	last_selected = InvalidSlot;
 
 	return result || Modal_gump::mouse_up(mx, my, button);
 }
 
 bool Newfile_gump::mousewheel_up(int mx, int my) {
-	ignore_unused_variable_warning(mx, my);
-	const SDL_Keymod mod = SDL_GetModState();
-	if (mod & SDL_KMOD_ALT) {
-		scroll_page(-1);
-	} else {
-		scroll_line(-1);
-	}
-	return true;
+	return scroll->mousewheel_up(mx, my)
+		   || Modal_gump::mousewheel_up(mx, my);
 }
 
+
 bool Newfile_gump::mousewheel_down(int mx, int my) {
-	ignore_unused_variable_warning(mx, my);
-	const SDL_Keymod mod = SDL_GetModState();
-	if (mod & SDL_KMOD_ALT) {
-		scroll_page(1);
-	} else {
-		scroll_line(1);
-	}
-	return true;
+	return scroll->mousewheel_down(mx, my)
+		   || Modal_gump::mousewheel_down(mx, my);
 }
 
 /*
@@ -839,45 +849,7 @@ bool Newfile_gump::mousewheel_down(int mx, int my) {
 bool Newfile_gump::mouse_drag(
 		int mx, int my    // Where mouse is.
 ) {
-	// If not sliding don't do anything
-	if (slide_start == -1) {
-		return Modal_gump::mouse_drag(mx, my);
-	}
-
-	const int gx = mx - x;
-	const int gy = my - y;
-
-	// First if the position is too far away from the slider
-	// We'll put it back to the start
-	int sy = gy - scrolly;
-	if (gx < scrollx - 20 || gx > scrollx + sliderw + 20) {
-		sy = slide_start - scrolly;
-	}
-
-	if (sy < sliderh / 2) {
-		sy = sliderh / 2;
-	}
-	if (sy > scrollh - sliderh / 2) {
-		sy = scrollh - sliderh / 2;
-	}
-	sy -= sliderh / 2;
-
-	// Now work out the number of positions
-	const int num_pos = (2 + (games ? games->size() : 0)) - fieldcount;
-
-	// Can't scroll if there is less than 1 pos
-	if (num_pos < 1) {
-		return true;
-	}
-
-	// Now work out the closest position to here position
-	const int new_pos = ((sy * num_pos * 2) / (scrollh - sliderh) + 1) / 2 - 2;
-
-	if (new_pos != list_position) {
-		list_position = new_pos;
-		paint();
-	}
-	return true;
+	return scroll->mouse_drag(mx, my) || Modal_gump::mouse_drag(mx, my);
 }
 
 bool Newfile_gump::text_input(const char* text) {
@@ -888,22 +860,19 @@ bool Newfile_gump::text_input(const char* text) {
 	if (cursor == -1 || strlen(text) >= MAX_SAVEGAME_NAME_LEN - 1) {
 		return true;
 	}
-	if (strcmp(text, newname) == 0) {    // Not changed
-		return true;
-	}
+	// if (strcmp(text, newname) == 0) {    // Not changed
+	// return true;
+	//}
 
 	strcpy(newname, text);
 	cursor = static_cast<int>(strlen(text));
 
-	if (newname[id_load] && !buttons[id_save]) {
-		buttons[id_save] = std::make_unique<Newfile_Textbutton>(
-				this, &Newfile_gump::save, Strings::SAVE(), btn_cols[0],
-				btn_rows[0], 40);
-	}
+	// Show save button if newname is not empty
+	SetButtonEnabled(id_save, *newname != 0);
 
 	// Remove Load and Delete Button
-	buttons[id_load].reset();
-	buttons[id_delete].reset();
+	SetButtonEnabled(id_load, false);
+	SetButtonEnabled(id_delete, false);
 
 	screenshot = cur_shot.get();
 	details    = &cur_details;
@@ -922,11 +891,11 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 	int  repaint        = false;
 
 	// Are we selected on some text?
-	if (selected == -3) {
+	if (selected_slot == NoSlot) {
 		return false;
 	}
 
-	if (restore_mode) {
+	if (restore_mode && chr != SDLK_RETURN) {
 		return false;
 	}
 
@@ -939,6 +908,14 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 				gwin->show(true);
 				buttons[id_save]->activate(MouseButton::Left);
 			}
+		}    // If only 'Load', do it.
+		if (buttons[id_load] && !buttons[id_save]) {
+			if (buttons[id_load]->push(MouseButton::Left)) {
+				gwin->show(true);
+				buttons[id_load]->unpush(MouseButton::Left);
+				gwin->show(true);
+				buttons[id_load]->activate(MouseButton::Left);
+			}
 		}
 		update_details = true;
 		break;
@@ -946,13 +923,10 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 	case SDLK_BACKSPACE:
 		if (BackspacePressed()) {
 			// Can't restore/delete now.
-			buttons[id_load].reset();
-			buttons[id_delete].reset();
-
+			SetButtonEnabled(id_load, false);
+			SetButtonEnabled(id_delete, false);
 			// If no chars cant save either
-			if (!newname[0]) {
-				buttons[id_save].reset();
-			}
+			SetButtonEnabled(id_save, *newname != 0);
 			update_details = true;
 		}
 		break;
@@ -960,13 +934,12 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 	case SDLK_DELETE:
 		if (DeletePressed()) {
 			// Can't restore/delete now.
-			buttons[id_load].reset();
-			buttons[id_delete].reset();
-
+			SetButtonEnabled(id_load, false);
+			SetButtonEnabled(id_delete, false);
 			// If no chars cant save either
-			if (!newname[0]) {
-				buttons[id_save].reset();
-			}
+			SetButtonEnabled(id_save, *newname != 0);
+
+			repaint        = true;
 			update_details = true;
 		}
 		break;
@@ -996,19 +969,13 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 
 		if (unicode < 256 && isascii(unicode)) {
 			if (AddCharacter(unicode)) {
-				// Added first character?  Need 'Save' button.
-				if (newname[0] && !buttons[id_save]) {
-					buttons[id_save] = std::make_unique<Newfile_Textbutton>(
-							this, &Newfile_gump::save, Strings::SAVE(),
-							btn_cols[0], btn_rows[0], 40);
-					buttons[id_save]->paint();
-				}
+				// Can't restore/delete now.
+				SetButtonEnabled(id_load, false);
+				SetButtonEnabled(id_delete, false);
+				// If no chars cant save either
+				SetButtonEnabled(id_save, *newname != 0);
 
-				// Remove Load and Delete Button
-				if (buttons[id_load] || buttons[id_delete]) {
-					buttons[id_load].reset();
-					buttons[id_delete].reset();
-				}
+				repaint        = true;
 				update_details = true;
 			}
 		}
@@ -1070,20 +1037,97 @@ int Newfile_gump::AddCharacter(char c) {
 
 	char text[MAX_SAVEGAME_NAME_LEN];
 
-	strcpy(text, newname);
-	text[cursor + 1] = 0;
+	strncpy(text, newname, cursor);
 	text[cursor]     = c;
 	strncpy(text + cursor + 1, newname + cursor,
 			MAX_SAVEGAME_NAME_LEN - cursor - 1);
+	text[MAX_SAVEGAME_NAME_LEN - 1] = 0;
 
 	// Now check the width of the text
-	if (sman->get_text_width(2, text) >= textw) {
+	if (font->get_text_width(text) >= textw) {
 		return 0;
 	}
 
 	cursor++;
 	strcpy(newname, text);
 	return 1;
+}
+
+void Newfile_gump::SelectSlot(int slot) {
+	// Out of range slots are treated as NoSlot
+	if (slot < NoSlot || slot > LastSlot()) {
+		slot = NoSlot;
+	}
+	selected_slot    = slot;
+	bool want_load   = true;
+	bool want_delete = true;
+	bool want_save   = true;
+
+	if (selected_slot == EmptySlot) {
+		want_load   = false;
+		want_delete = false;
+		want_save   = false;
+		screenshot  = cur_shot.get();
+		details     = &cur_details;
+		party       = &cur_party;
+		newname[0]  = 0;
+		cursor      = 0;
+		is_readable = true;
+		filename    = nullptr;
+	} else if (selected_slot == GamedatSlot) {
+		want_delete = false;
+		screenshot  = gd_shot.get();
+		details     = &gd_details;
+		party       = &gd_party;
+		strcpy(newname, Strings::GamedatDirectory());
+		cursor      = -1;    // No cursor
+		is_readable = true;
+		filename    = nullptr;
+	} else if (selected_slot == QuicksaveSlot) {
+		want_delete = false;
+		want_load   = false;
+		screenshot  = cur_shot.get();
+		details     = &cur_details;
+		party       = &cur_party;
+		strcpy(newname, Strings::NewQuickSave());
+		cursor      = -1;    // No cursor
+		is_readable = true;
+		filename    = nullptr;
+	} else if (selected_slot >= SavegameSlots && selected_slot < NumSlots()) {
+		screenshot = (*games)[selected_slot].screenshot.get();
+		details    = &((*games)[selected_slot].details);
+		party      = &((*games)[selected_slot].party);
+		strcpy(newname, (*games)[selected_slot].savename.c_str());
+		cursor      = static_cast<int>(strlen(newname));
+		is_readable = want_load = (*games)[selected_slot].readable;
+		filename                = (*games)[selected_slot].filename().c_str();
+	} else {
+		// No slot Selected
+		want_load   = false;
+		want_delete = false;
+		want_save   = false;
+		// Show details of current game
+		screenshot  = cur_shot.get();
+		details     = &cur_details;
+		party       = &cur_party;
+		newname[0]  = 0;
+		cursor      = 0;
+		is_readable = false;
+		filename    = nullptr;
+	}
+
+	if (restore_mode) {
+		// No cursor in restore mode because there is no saving so names can't
+		// be changed
+		cursor    = -1;
+		want_save = false;
+	}
+
+	SetButtonEnabled(id_load, want_load);
+	SetButtonEnabled(id_save, want_save);
+	SetButtonEnabled(id_delete, want_delete);
+
+	gwin->set_all_dirty();    // Repaint.
 }
 
 void Newfile_gump::LoadSaveGameDetails() {
@@ -1127,10 +1171,11 @@ void Newfile_gump::LoadSaveGameDetails() {
 		for (auto npc : partyman->IterateWithMainActor) {
 			auto&       current = cur_party.emplace_back();
 			std::string namestr = npc->get_npc_name();
-			std::strncpy(current.name, namestr.c_str(), std::size(current.name) - 1);
-			current.name[std::size(current.name)-1]=0;
-			current.shape      = npc->get_shapenum();
-			current.shape_file = npc->get_shapefile();
+			std::strncpy(
+					current.name, namestr.c_str(), std::size(current.name) - 1);
+			current.name[std::size(current.name) - 1] = 0;
+			current.shape                             = npc->get_shapenum();
+			current.shape_file                        = npc->get_shapefile();
 
 			current.dext     = npc->get_property(Actor::dexterity);
 			current.str      = npc->get_property(Actor::strength);
@@ -1150,7 +1195,28 @@ void Newfile_gump::LoadSaveGameDetails() {
 		screenshot = cur_shot.get();
 		details    = &cur_details;
 	}
-	games = &gwin->GetSaveGameInfos();
+	if (!old_style_mode) {
+		games = &gwin->GetSaveGameInfos();
+	} else {
+		// Fill old_games slots
+		old_games.clear();
+		old_games.resize(fieldcount);
+		for (const auto& savegame : gwin->GetSaveGameInfos()) {
+			if (savegame.num >= 0 && savegame.num < fieldcount) {
+				old_games[savegame.num] = SaveInfo(savegame, {});
+			}
+		}
+
+		// Fill in any missing old_games slots
+		for (int i = 0; i < fieldcount; ++i) {
+			if (old_games[i].num != i) {
+				old_games[i] = SaveInfo(
+						gwin->get_save_filename(i, SaveInfo::REGULAR));
+			}
+		}
+
+		games = &old_games;
+	}
 
 	// We'll now output the info if debugging
 #ifdef DEBUG
@@ -1160,6 +1226,7 @@ void Newfile_gump::LoadSaveGameDetails() {
 			 << " : " << (*games)[i].savename << endl;
 	}
 #endif
+	scroll->run();
 }
 
 void Newfile_gump::FreeSaveGameDetails() {
@@ -1178,4 +1245,39 @@ void Newfile_gump::FreeSaveGameDetails() {
 	// The SaveInfo struct will delete everything that it's got allocated
 	// So we don't need to worry about that
 	games = nullptr;
+}
+
+void Newfile_gump::toggle_audio_option(Gump_widget* btn, int state) {
+	auto audio = Audio::get_ptr();
+	if (btn == buttons[id_music].get()) {    // Music?
+		if (audio) {
+			audio->set_music_enabled(state);
+			if (!state) {    // Stop what's playing.
+				audio->stop_music();
+			}
+		}
+		const string s = state ? "yes" : "no";
+		// Write option out.
+		config->set("config/audio/midi/enabled", s, true);
+	} else if (btn == buttons[id_speech].get()) {    // Speech?
+		if (audio) {
+			audio->set_speech_enabled(state);
+			if (!state) {
+				audio->stop_speech();
+			}
+		}
+		const string s = state ? "yes" : "no";
+		// Write option out.
+		config->set("config/audio/speech/enabled", s, true);
+	} else if (btn == buttons[id_effects].get()) {    // Sound effects?
+		if (audio) {
+			audio->set_effects_enabled(state);
+			if (!state) {    // Off?  Stop what's playing.
+				audio->stop_sound_effects();
+			}
+		}
+		const string s = state ? "yes" : "no";
+		// Write option out.
+		config->set("config/audio/effects/enabled", s, true);
+	}
 }

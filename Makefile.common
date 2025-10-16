@@ -151,7 +151,6 @@ GUMPS_OBJS:= \
 	gumps/Enabled_button.o \
 	gumps/Face_button.o \
 	gumps/Face_stats.o \
-	gumps/File_gump.o \
 	gumps/Gamemenu_gump.o \
 	gumps/GameDisplayOptions_gump.o \
 	gumps/Mixer_gump.o \
@@ -297,11 +296,6 @@ EXULT_FLX_OBJECTS := \
 	data/extras.shp \
 	data/notebook.shp \
 	data/stats_extra.shp \
-	data/sav_downdown.shp \
-	data/sav_down.shp \
-	data/sav_up.shp \
-	data/sav_upup.shp \
-	data/sav_slider.shp \
 	data/hp_bar.shp \
 	data/sfx_icon.shp \
 	data/mtgm.mid \
@@ -565,7 +559,7 @@ gumps/InputOptions_gump.o : gumps/InputOptions_gump.cc $(EXULT_FLX)
 
 gumps/Modal_gump.o : gumps/Modal_gump.cc $(EXULT_FLX)
 
-gumps/Newfile_gump.o : gumps/Newfile_gump.cc $(EXULT_FLX)
+gumps/Newfile_gump.o : gumps/Newfile_gump.cc 
 
 gumps/Notebook_gump.o : gumps/Notebook_gump.cc $(EXULT_FLX)
 

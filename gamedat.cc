@@ -178,7 +178,8 @@ string get_game_identity(const char* savename, const string& title);
  *  Output: Aborts if error.
  */
 
-void Game_window::restore_gamedat(const char* fname    // Name of savegame file.
+void Game_window::restore_gamedat(
+		const char* fname    // Name of savegame file.
 ) {
 	// Check IDENTITY.
 	string       id = get_game_identity(fname, Game::get_gametitle());
@@ -260,7 +261,8 @@ void Game_window::restore_gamedat(const char* fname    // Name of savegame file.
  *  Output: Aborts if error.
  */
 
-void Game_window::restore_gamedat(int num    // 0-9, currently.
+void Game_window::restore_gamedat(
+		int num    // 0-9, currently.
 ) {
 	char fname[50];    // Set up name.
 	snprintf(
@@ -457,10 +459,6 @@ void Game_window::save_gamedat(
 	std::string fname
 			= get_save_filename(num, SaveInfo::REGULAR);    // Set up name.
 	save_gamedat(fname.c_str(), savename);
-	if (num >= 0 && num < 10) {
-		// Update name
-		save_names[num] = savename;
-	}
 }
 
 void Game_window::save_gamedat(
@@ -484,16 +482,17 @@ void Game_window::read_save_infos() {
 			: GAME_SI ? "si"
 					  : "dev");
 	string save_mask = get_system_path(mask);
+
+
+	FileList filenames;
+	U7ListFiles(save_mask, filenames, true);
+
 	// If save_mask is the same and we've already read the save infos do nothing
-	if (save_mask == Globals::save_mask && !Globals::save_infos.empty()) {
+	if (save_mask == Globals::save_mask && Globals::save_infos.size() == filenames.size()) {
 		return;
 	}
 	Globals::save_mask = std::move(save_mask);
-
 	Globals::save_infos.clear();
-
-	FileList filenames;
-	U7ListFiles(Globals::save_mask, filenames);
 
 	// Sort filenames
 	if (filenames.size()) {
@@ -501,6 +500,7 @@ void Game_window::read_save_infos() {
 	}
 
 	// Setup basic details
+	Globals::save_infos.reserve(filenames.size());
 	for (auto& filename : filenames) {
 		Globals::save_infos.emplace_back(std::move(filename));
 	}
@@ -518,10 +518,6 @@ void Game_window::read_save_infos() {
 
 		// Handling of regular savegame with a savegame number
 		if (saveinfo.type != SaveInfo::UNKNOWN && saveinfo.num >= 0) {
-			if (size_t(saveinfo.num) < save_names.size()
-				&& saveinfo.type == SaveInfo::REGULAR) {
-				save_names[saveinfo.num] = saveinfo.savename;
-			}
 			// First free not yet found
 			if (Globals::first_free[saveinfo.type] == -1) {
 				// If the last save was not 1 before this there is a gap wer can
@@ -602,8 +598,7 @@ void Game_window::write_saveinfo(bool screenshot) {
 			out.write1(0);
 		}
 
-		for (auto npc : party_man->IterateWithMainActor) {			
-
+		for (auto npc : party_man->IterateWithMainActor) {
 			std::string name(npc->get_npc_name());
 			name.resize(sizeof(SaveGame_Party::name) - 1, '\0');
 			out.write(name.c_str(), sizeof(SaveGame_Party::name));
@@ -665,7 +660,6 @@ void Game_window::write_saveinfo(bool screenshot) {
 void Game_window::read_saveinfo(
 		IDataSource* in, SaveGame_Details& details,
 		std::vector<SaveGame_Party>& party) {
-
 	details = SaveGame_Details();
 	party.clear();
 
@@ -683,7 +677,7 @@ void Game_window::read_saveinfo(
 	details.game_day    = in->read2();
 
 	details.save_count = in->read2();
-	auto party_size     = in->read1();
+	auto party_size    = in->read1();
 
 	details.unused = in->read1();    // Unused
 
@@ -694,18 +688,18 @@ void Game_window::read_saveinfo(
 
 	party.reserve(party_size);
 	while (party_size--) {
-		auto &p = party.emplace_back();
+		auto& p = party.emplace_back();
 		in->read(p.name, sizeof(p.name));
 		// Make sure it's null terminated
-		p.name[sizeof(p.name)-1] = 0;
-		p.shape = in->read2();
+		p.name[sizeof(p.name) - 1] = 0;
+		p.shape                    = in->read2();
 
 		p.exp    = in->read4();
 		p.flags  = in->read4();
 		p.flags2 = in->read4();
 
-		p.food           = in->read1();
-		p.str            = in->read1();
+		p.food     = in->read1();
+		p.str      = in->read1();
 		p.combat   = in->read1();
 		p.dext     = in->read1();
 		p.intel    = in->read1();
@@ -724,8 +718,7 @@ void Game_window::read_saveinfo(
 
 bool Game_window::get_saveinfo(
 		const std::string& filename, std::string& name,
-		std::unique_ptr<Shape_file>&       map,
-		SaveGame_Details& details,
+		std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
 		std::vector<SaveGame_Party>& party) {
 	// First check for compressed save game
 #ifdef HAVE_ZIP_SUPPORT
@@ -795,8 +788,7 @@ bool Game_window::get_saveinfo(
 }
 
 void Game_window::get_saveinfo(
-		std::unique_ptr<Shape_file>&       map,
-		SaveGame_Details& details,
+		std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
 		std::vector<SaveGame_Party>& party) {
 	{
 		IFileDataSource ds(GSAVEINFO);
@@ -835,8 +827,7 @@ static const char* remove_dir(const char* fname) {
 
 bool Game_window::get_saveinfo_zip(
 		const char* fname, std::string& name, std::unique_ptr<Shape_file>& map,
-		SaveGame_Details& details,
-		std::vector<SaveGame_Party>& party) {
+		SaveGame_Details& details, std::vector<SaveGame_Party>& party) {
 	// If a flex, so can't read it
 	if (Flex::is_flex(fname)) {
 		return false;

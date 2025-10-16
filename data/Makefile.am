@@ -13,11 +13,6 @@ EXULT_FLX_OBJECTS = \
 	extras.shp		\
 	notebook.shp		\
 	stats_extra.shp		\
-	sav_downdown.shp	\
-	sav_down.shp		\
-	sav_up.shp			\
-	sav_upup.shp		\
-	sav_slider.shp		\
 	hp_bar.shp			\
 	sfx_icon.shp		\
 	mtgm.mid			\
@@ -37,8 +32,6 @@ EXULT_FLX_OBJECTS = \
 	exultmsg_de.txt \
 	exultmsg_es.txt \
 	exultmsg_fr.txt \
-	scroll_left.shp \
-	scroll_right.shp \
 	checkmark_background.shp \
 	mixer.shp \
 	fs_badges.shp
