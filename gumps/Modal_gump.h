@@ -168,7 +168,7 @@ public:
 		}
 		const int usable_width = procedural_background.w - 4;
 		int       max_x        = 0;
-		for (auto& widget : widgets) {
+		for (const auto& widget : widgets) {
 			if (widget) {
 				auto rect = widget->get_rect();
 				screen_to_local(rect.x, rect.y);
@@ -192,7 +192,7 @@ public:
 		}
 		const int x_origin     = procedural_background.x + 2;
 		const int usable_width = procedural_background.w - 4;
-		for (auto& widget : widgets) {
+		for (const auto& widget : widgets) {
 			if (widget) {
 				auto rect = widget->get_rect();
 				widget->set_pos(
@@ -209,37 +209,43 @@ public:
 	//! @tparam WidgetPointer
 	//! @param widgets collection of Widgets to resize the gump too
 	//! @param min_gap Minimum gap between the widgets/
-	//! @param margin Left and right margin
+	//! @param preferred_width constrain layout to this width if the widgets
+	//! would fit
 	template <typename WidgetPointer>
 	void HorizontalArrangeWidgets(
-			tcb::span<WidgetPointer> widgets, int min_gap = 8) {
+			tcb::span<WidgetPointer> widgets, int min_gap = 8,
+			int preferred_width = 0) {
 		if (!procedural_background) {
 			return;
 		}
+		int       count         = 0;
 		const int x_origin      = procedural_background.x + 2;
 		int       usable_width  = procedural_background.w - 4;
 		int       width_widgets = 0;
-		for (auto& widget : widgets) {
+		for (const auto& widget : widgets) {
 			if (widget) {
 				auto rect = widget->get_rect();
 				width_widgets += rect.w;
+				count++;
 			}
 		}
-		int min_width = width_widgets + (widgets.size()) * min_gap;
+		int min_width = width_widgets + (count)*min_gap;
+		if (preferred_width >= min_width && preferred_width < usable_width) {
+			usable_width = preferred_width;
+		}
 		if (min_width > usable_width) {
 			procedural_background.w += min_width - usable_width;
 			usable_width = min_width;
 			set_pos();
 		}
-		int gap = (usable_width - width_widgets) / (widgets.size());
+		int gap = (usable_width - width_widgets) / (count);
 
 		int new_x = gap / 2 + x_origin;
-		for (auto& widget : widgets) {
+		for (const auto& widget : widgets) {
 			if (widget) {
-				auto rect = widget->get_rect();
-				widget->set_pos(new_x, widget->get_y());
+				widget->set_pos(new_x + widget->get_xleft(), widget->get_y());
 
-				new_x += rect.w + gap;
+				new_x += widget->get_width() + gap;
 			}
 		}
 	}
