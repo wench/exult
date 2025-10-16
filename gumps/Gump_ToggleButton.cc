@@ -24,41 +24,29 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "gamewin.h"
 
-bool Gump_ToggleButton::activate(MouseButton button) {
-	int delta;
-	if (button == MouseButton::Left) {
-		delta = 2;
-	} else if (button == MouseButton::Right) {
-		delta = 2 * numselections - 2;
-	} else {
-		return false;
-	}
 
-	set_frame((get_framenum() + delta) % (2 * numselections));
-	toggle(get_framenum() / 2);
+void Gump_ToggleButton::setselection(int newsel) {
+	set_frame(newsel);
 	gwin->add_dirty(get_rect());
-	return true;
 }
 
-bool Gump_ToggleButton::push(MouseButton button) {
-	if (button == MouseButton::Left || button == MouseButton::Right) {
-		set_pushed(button);
-		gwin->add_dirty(get_rect());
-		return true;
-	}
-	return false;
+
+void Gump_ToggleTextButton::setselection(int selectionnum) {
+	set_frame(selectionnum);
+	text = selections[get_framenum()];
+	init();
+	gwin->add_dirty(get_rect());
 }
 
-void Gump_ToggleButton::unpush(MouseButton button) {
-	if (button == MouseButton::Left || button == MouseButton::Right) {
-		set_pushed(false);
-		gwin->add_dirty(get_rect());
-	}
+void Gump_ToggleButton::paint() {
+	// Paint using gump_widget instead of gump_button.
+	Gump_widget::paint();
 }
 
-bool Gump_ToggleTextButton::activate(MouseButton button) {
+
+template <typename base>
+bool Toggle_button<base>::activate(MouseButton button) {
 	int       delta;
-	const int numselections = selections.size();
 	if (button == MouseButton::Left) {
 		delta = 1;
 	} else if (button == MouseButton::Right) {
@@ -67,31 +55,85 @@ bool Gump_ToggleTextButton::activate(MouseButton button) {
 		return false;
 	}
 
-	set_frame((get_framenum() + delta) % numselections);
-	text = selections[get_framenum()];
-	init();
-	toggle(get_framenum());
-	gwin->add_dirty(get_rect());
+	this->setselection((base::get_framenum() + delta) % numselections);
+	toggle(base::get_framenum());
+	base::gwin->add_dirty(base::get_rect());
 	return true;
 }
 
-void Gump_ToggleTextButton::setselection(int selectionnum) {
-	set_frame(selectionnum);
-	gwin->add_dirty(get_rect());
-}
-
-bool Gump_ToggleTextButton::push(MouseButton button) {
+template <typename base>
+bool Toggle_button<base>::push(MouseButton button) 
+{
 	if (button == MouseButton::Left || button == MouseButton::Right) {
-		set_pushed(button);
-		gwin->add_dirty(get_rect());
+		this->set_pushed(button);
+		base::gwin->add_dirty(base::get_rect());
 		return true;
 	}
 	return false;
 }
 
-void Gump_ToggleTextButton::unpush(MouseButton button) {
+template <typename base>
+void Toggle_button<base>::unpush(MouseButton button) {
 	if (button == MouseButton::Left || button == MouseButton::Right) {
-		set_pushed(false);
-		gwin->add_dirty(get_rect());
+		this->set_pushed(false);
+		base::gwin->add_dirty(base::get_rect());
 	}
 }
+
+//
+// Constructors
+//
+// Constructors are last in the file so they correctly instatiate the templated virtual functions 
+//
+
+ Gump_ToggleButton::Gump_ToggleButton(
+		Gump* par, int px, int py, int shapenum, int selectionnum, int numsel,
+		ShapeFile shfile)
+		: Toggle_button(numsel,par, shapenum, px, py, shfile)  {
+	set_frame(selectionnum);
+}
+
+ Gump_ToggleTextButton::Gump_ToggleTextButton(
+		Gump_Base* par, const std::vector<std::string>& s, int selectionnum,
+		int px, int py, int width, int height)
+		: Toggle_button(s.size(), par, "", px, py, width, height), selections(s) {
+	set_frame(selectionnum);
+
+	// call init for all of the strings to ensure the widget is wide enough
+	// for all of them
+	for (auto& selection : selections) {
+		text = selection;
+		init();
+	}
+
+		// Set the text to the actual default selection
+	if (selectionnum >= 0 && size_t(selectionnum) < selections.size()) {
+		text = selections[selectionnum];
+	} else {
+		// If selection is out of range show no text
+		text.clear();
+	}
+	init();
+ }
+
+ Gump_ToggleTextButton::Gump_ToggleTextButton(
+		 Gump_Base* par, std::vector<std::string>&& s, int selectionnum, int px,
+		 int py, int width, int height)
+		 : Toggle_button(s.size(), par, "", px, py, width, height),
+		   selections(std::move(s)) {
+	 set_frame(selectionnum);
+	 // call init for all of the strings to ensure the widget is wide enough
+	 // for all of them
+	 for (auto& selection : selections) {
+		 text = selection;
+		 init();
+	 }
+	 // Set the text to the actual default selection
+	 if (selectionnum >= 0 && size_t(selectionnum) < selections.size()) {
+		 text = selections[selectionnum];
+	 } else {
+		 // If selection is out of range show no text
+		 text.clear();
+	 }
+	 init();
+ }

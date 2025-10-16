@@ -25,99 +25,96 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <string>
 #include <vector>
 
-/*
- * A button that toggles shape when pushed
- */
-
-class Gump_ToggleButton : public Gump_button {
+template<typename base>
+class Toggle_button : public base {
 public:
-	Gump_ToggleButton(
-			Gump* par, int px, int py, int shapenum, int selectionnum,
-			int numsel)
-			: Gump_button(par, shapenum, px, py, SF_EXULT_FLX),
-			  numselections(numsel) {
-		set_frame(2 * selectionnum);
-	}
+	using MouseButton = Gump_Base::MouseButton;
 
 	bool push(MouseButton button) override;
 	void unpush(MouseButton button) override;
 	bool activate(MouseButton button) override;
 
-	int getselection() const override {
-		return get_framenum() / 2;
+	int getselection() const final {
+		return this->get_framenum();
 	}
 
 	virtual void toggle(int state) = 0;
 
-private:
-	int numselections;
+protected:
+	template <typename... Ts>
+	Toggle_button(int numselections, Ts&&... args)
+			: base(std::forward<Ts>(args)...),
+					  numselections(numselections) {}
+	const int numselections;
+};
+
+/*
+ * A button that toggles shape when pushed
+ */
+
+class Gump_ToggleButton : public Toggle_button<Gump_button> {
+public:
+	Gump_ToggleButton(
+			Gump* par, int px, int py, int shapenum, int selectionnum,
+			int numsel, ShapeFile shfile = SF_EXULT_FLX);
+
+
+	void    setselection(int newsel) override;
+	void paint() override;
 };
 
 /*
  * A text button that toggles shape when pushed
  */
 
-class Gump_ToggleTextButton : public Text_button {
+class Gump_ToggleTextButton : public Toggle_button<Text_button> {
 public:
 	Gump_ToggleTextButton(
 			Gump_Base* par, const std::vector<std::string>& s, int selectionnum,
-			int px, int py, int width, int height = 0)
-			: Text_button(par, "", px, py, width, height),
-			  selections(s) {
-		set_frame(selectionnum);
-
-		// call init for all of the strings to ensure the widget is wide enough
-		// for all of them
-		for (auto& selection : selections) {
-			text = selection;
-			init();
-		}
-		// Set the text to the actual default selection
-		if (selectionnum >= 0 && size_t(selectionnum) < selections.size()) {
-			text = selections[selectionnum];
-		} else {
-			// If selection is out of range show no text
-			text.clear();
-		}
-		init();
-	}
+			int px, int py, int width, int height = 0);
 
 	Gump_ToggleTextButton(
 			Gump_Base* par, std::vector<std::string>&& s, int selectionnum,
-			int px, int py, int width, int height = 0)
-			: Text_button(par, "", px, py, width, height),
-			  selections(std::move(s)) {
-		set_frame(selectionnum);
-		// call init for all of the strings to ensure the widget is wide enough
-		// for all of them
-		for (auto& selection : selections) {
-			text = selection;
-			init();
-		}
-		// Set the text to the actual default selection
-		if (selectionnum >= 0 && size_t(selectionnum) < selections.size()) {
-			text = selections[selectionnum];
-		} else {
-			// If selection is out of range show no text
-			text.clear();
-		}
-		init();
-	}
-
-	bool push(MouseButton button) override;
-	void unpush(MouseButton button) override;
-	bool activate(MouseButton button) override;
-
-	int getselection() const override {
-		return get_framenum();
-	}
+			int px, int py, int width, int height = 0);
 
 	void setselection(int newsel) override;
 
-	virtual void toggle(int state) = 0;
 
 private:
-	std::vector<std::string> selections;
+	const std::vector<std::string> selections;
+};
+
+template <typename Parent>
+class CallbackToggleButton : public Gump_ToggleButton {
+public:
+	using CallbackType  = void (Parent::*)(int state);
+	using CallbackType2 = void (Parent::*)(Gump_widget*,int state);
+
+	template <typename... Ts>
+	CallbackToggleButton(Parent* par, CallbackType&& callback, Ts&&... args)
+			: Gump_ToggleButton(par, std::forward<Ts>(args)...),
+			  parent(par), on_toggle(std::forward<CallbackType>(callback)) {}
+
+	template <typename... Ts>
+	CallbackToggleButton(
+			Parent* par, CallbackType2&& callback, Ts&&... args)
+			: Gump_ToggleButton(par, std::forward<Ts>(args)...),
+			  parent(par), on_toggle2(std::forward<CallbackType2>(callback)) {}
+
+	void toggle(int state) override {
+		if (on_toggle) {
+			(parent->*on_toggle)(state);
+		}
+		if (on_toggle2) {
+			(parent->*on_toggle2)(this,state);
+		}
+		parent->paint();
+	}
+
+private:
+	Parent*       parent;
+	CallbackType  on_toggle  = nullptr;
+	CallbackType2 on_toggle2 = nullptr;
 };
 
 template <typename Parent>
