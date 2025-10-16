@@ -134,8 +134,6 @@ class Game_window {
 	int      scrolltx, scrollty;    // Top-left tile of screen.
 	TileRect scroll_bounds;         // Walking outside this scrolls.
 	TileRect dirty;                 // Dirty rectangle.
-	// Savegames:
-	std::array<std::string, 10> save_names;    // Names of saved games.
 	// Options:
 	bool mouse3rd;    // use third (middle) mouse button
 	bool fastmouse;
@@ -753,11 +751,6 @@ public:
 
 	void write_saveinfo(
 			bool screenshot = true);    // Write the save info to gamedat
-
-	// Get saved-game name.
-	inline const std::string& get_save_name(size_t i) const {
-		return save_names[i];
-	}
 
 	// Get the filename for savegame num of specified SaveInfo:Type
 	std::string get_save_filename(int num, int type);
