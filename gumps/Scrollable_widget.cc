@@ -34,18 +34,19 @@ public:
 };
 
 Scrollable_widget::Scrollable_widget(
-		Gump_Base* parent, int x, int y, int iw, int ih, int border_size, ScrollbarType type, bool nopagebuttons, int scrollbg)
+		Gump_Base* parent, int x, int y, int iw, int ih, int border_size, ScrollbarType type, bool nopagebuttons, int scrollbg,
+		int buttongap)
 		: Gump_widget(parent, -1, x, y), border_size(border_size), type(type), scrollbg(scrollbg) {
 	int scrollbutton_x = iw + 2 * border_size;
 	height             = ih + 2 * border_size;
 	children.resize(id_count);
 	// Scrolbar buttons.
-	int ypos = 0;
+	int ypos = buttongap;
 	if (!nopagebuttons) {
 		children[id_page_up] = std::make_shared<Scrollablebutton>(this, &Scrollable_widget::page_up, 0, 0, Arrow_Button::Up, true);
 		children[id_page_up]->set_pos(
 				scrollbutton_x + children[id_page_up]->get_xleft(), ypos + children[id_page_up]->get_yabove());
-		ypos += children[id_page_up]->get_height();
+		ypos += children[id_page_up]->get_height() + buttongap;
 	}
 	children[id_diamond] = std::make_shared<Slider_widget::Diamond>(this);
 	children[id_line_up]
@@ -59,14 +60,14 @@ Scrollable_widget::Scrollable_widget(
 	if (!nopagebuttons) {
 		children[id_page_down] = std::make_shared<Scrollablebutton>(
 				this, &Scrollable_widget::page_down, scrollbutton_x, height, Arrow_Button::Down, true);
-		ypos = ypos - children[id_page_down]->get_height();
+		ypos -= children[id_page_down]->get_height() + buttongap;
 		children[id_page_down]->set_pos(
 				scrollbutton_x + children[id_page_down]->get_xleft(), ypos + children[id_page_down]->get_yabove());
 	}
 
 	children[id_line_down] = std::make_shared<Scrollablebutton>(
 			this, &Scrollable_widget::line_down, scrollbutton_x, ypos, Arrow_Button::Down, false);
-	ypos = ypos - children[id_line_down]->get_height();
+	ypos -= children[id_line_down]->get_height() + buttongap;
 
 	children[id_line_down]->set_pos(scrollbutton_x + children[id_line_up]->get_xleft(), ypos + children[id_line_up]->get_yabove());
 	children[id_scrolling] = pane = std::make_shared<Scrolling_pane>(this, border_size, 0);
@@ -219,10 +220,10 @@ bool Scrollable_widget::mouse_drag(int mx, int my) {
 	if (sy > scrollrect.h) {
 		sy = scrollrect.h;
 	}
+	sy -= children[id_diamond]->get_height() / 2;
 
 	//
 	const int new_offset = sy * scroll_max / (scrollrect.h - children[id_diamond]->get_height());
-	const int pos        = ((scrollrect.h - children[id_diamond]->get_height()) * new_offset) / std::max(1, GetScrollMax());
 
 	if (new_offset != get_scroll_offset()) {
 		set_scroll_offset(new_offset);
