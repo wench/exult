@@ -65,7 +65,7 @@ public:
 	Scrollable_widget(
 			Gump_Base* parent, int x, int y, int inner_width, int inner_height,
 			int border_size, ScrollbarType type, bool nopagebuttons,
-			int scrollbg);
+			int scrollbg, int buttongap = 0);
 
 	TileRect get_rect() const override {
 		TileRect rect(0, 0, width, height);
