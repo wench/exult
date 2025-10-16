@@ -140,8 +140,6 @@ bool Scrollable_widget::run() {
 	;
 }
 
-std::vector<std::pair<int, int>> points={};
-
 bool Scrollable_widget::mouse_down(int mx, int my, MouseButton button) {
 	// only if in ourbounds
 	if (!get_rect().has_point(mx, my)) {
@@ -189,9 +187,7 @@ bool Scrollable_widget::mouse_down(int mx, int my, MouseButton button) {
 			gwin->set_all_dirty();
 			return true;
 		}
-		else {
 
-		}
 	}
 	return false;
 }
@@ -302,12 +298,6 @@ void Scrollable_widget::paint() {
 	auto new_clip = this->get_rect().intersect(clip);
 	ibuf->set_clip(new_clip.x, new_clip.y, new_clip.w, new_clip.h);
 
-	for (const auto& point : points)
-	{
-		int px = point.first, py = point.second;
-		//local_to_screen(px, py);
-		ibuf->put_pixel8(23, px, py);
-	}
 	if (scroll_enabled()) {
 		// paint scrollbar children
 		tcb::span<std::shared_ptr<Gump_widget>> sbchildren(
@@ -347,7 +337,7 @@ void Scrollable_widget::set_scroll_offset(int newpos, bool ignore_snap) {
 		return;
 	}
 
-	if (snap && !ignore_snap) {
+	if (snap && !ignore_snap && line_height>0) {
 		newpos = ((newpos + line_height / 2) / line_height) * line_height;
 	}
 	pane->scroll_offset = -std::max(0, std::min(newpos, GetScrollMax()));
