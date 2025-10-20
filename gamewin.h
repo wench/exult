@@ -160,7 +160,7 @@ class Game_window {
 	// Private methods:
 	void set_scrolls(Tile_coord cent);
 	void clear_world(bool restoremapedit);    // Clear out world's contents.
-	void read_save_infos();                   // Read in saved-game names.
+	void init_savegames();     
 	long check_time_stopped();
 
 	// Red plasma animation during game load
@@ -723,31 +723,19 @@ public:
 	void init_actors();                    // Place actors in the world.
 	void init_files(bool cycle = true);    // Load all files
 
-	// From Gamedat
+	// Current game or Gamedat
 	void get_saveinfo(
 			std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-			std::vector<SaveGame_Party>& party);
-	// From Savegame
-	bool get_saveinfo(
-			const std::string& filename, std::string& name,
-			std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-			std::vector<SaveGame_Party>& party);
-	void read_saveinfo(
-			IDataSource* in, SaveGame_Details& details,
-			std::vector<SaveGame_Party>& party);
+			std::vector<SaveGame_Party>& party, bool current);
+
 
 private:
-#ifdef HAVE_ZIP_SUPPORT
-	bool get_saveinfo_zip(
-			const char* fname, std::string& name,
-			std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-			std::vector<SaveGame_Party>& party);
-#endif
+int  save_count = 0;
 	void restore_flex_files(IDataSource& in, const char* basepath);
 
 public:
 	// Get Vector of all savegame info
-	const std::vector<SaveInfo>& GetSaveGameInfos();
+	const std::vector<SaveInfo>* GetSaveGameInfos(bool force);
 
 	void write_saveinfo(
 			bool screenshot = true);    // Write the save info to gamedat
