@@ -326,7 +326,7 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 	scroll->add_child(std::make_shared<Slot_widget>(this));
 	scroll->set_line_height(fieldh + fieldgap, false);
 
-	LoadSaveGameDetails();
+	LoadSaveGameDetails(false);
 	SelectSlot(NoSlot);
 	if (touchui != nullptr) {
 		touchui->hideGameControls();
@@ -390,20 +390,39 @@ void Newfile_gump::save() {
 		return;
 	}
 
+	size_t save_num = selected_slot - SavegameSlots;
+
 	// Already a game in this slot? If so ask to delete
-	if (selected_slot >= SavegameSlots) {
+	if (selected_slot >= SavegameSlots
+		&& games && games->size() > save_num
+			&& !(*games)[save_num].savename.empty()
+				   && (*games)[save_num].details) {
 		if (!Yesno_gump::ask("Okay to write over existing saved game?")) {
 			return;
 		}
 	}
 
+
+	// Use actual savegame num if overwriting existing game
+	if (games && games->size() > size_t(save_num)) {
+		save_num = (*games)[save_num].num;
+	}
+	// if not old stylemode and saving to empty slot, use unspecified num
+	else if (!old_style_mode)
+	{
+		save_num = -1;
+	}
 	// Write to gamedat
 	gwin->write();
 
 	// Now write to savegame file
 	if (selected_slot >= SavegameSlots && selected_slot <= LastSlot()) {
-		gwin->save_gamedat(
-				(*games)[selected_slot - SavegameSlots].num, newname);
+		if (save_num == -1) {
+		
+		gwin->save_gamedat(newname, SaveInfo::REGULAR);
+		} else {
+			gwin->save_gamedat(save_num, newname);
+		}
 	} else if (selected_slot == EmptySlot) {
 		gwin->save_gamedat(newname, SaveInfo::REGULAR);
 	} else if (selected_slot == QuicksaveSlot) {
@@ -414,7 +433,7 @@ void Newfile_gump::save() {
 
 	// Reset everything
 	FreeSaveGameDetails();
-	LoadSaveGameDetails();
+	LoadSaveGameDetails(true);
 	gwin->set_all_dirty();
 	gwin->got_bad_feeling(4);
 	SelectSlot(NoSlot);
@@ -426,7 +445,7 @@ void Newfile_gump::save() {
 
 void Newfile_gump::delete_file() {
 	// Shouldn't ever happen.
-	if (selected_slot <= SavegameSlots || selected_slot > LastSlot()) {
+	if (selected_slot < SavegameSlots || selected_slot > LastSlot()) {
 		return;
 	}
 
@@ -444,7 +463,7 @@ void Newfile_gump::delete_file() {
 
 	// Reset everything
 	FreeSaveGameDetails();
-	LoadSaveGameDetails();
+	LoadSaveGameDetails(true);
 	gwin->set_all_dirty();
 	SelectSlot(NoSlot);
 }
@@ -501,7 +520,8 @@ void Newfile_gump::Slot_widget::paint() {
 			// the slot being drawn is a savegame
 		} else if (
 				nfg->games && actual_slot >= SavegameSlots
-				&& actual_slot <= nfg->LastSlot()) {
+				&& actual_slot <= nfg->LastSlot()
+				&& nfg->games->size() > size_t(actual_slot - SavegameSlots)) {
 			text = (*nfg->games)[actual_slot - SavegameSlots].savename.c_str();
 		} else {
 			text = "";
@@ -1062,6 +1082,7 @@ void Newfile_gump::SelectSlot(int slot) {
 	bool want_load   = true;
 	bool want_delete = true;
 	bool want_save   = true;
+	size_t  savegame_index = selected_slot - SavegameSlots;
 
 	if (selected_slot == EmptySlot) {
 		want_load   = false;
@@ -1093,14 +1114,16 @@ void Newfile_gump::SelectSlot(int slot) {
 		cursor      = -1;    // No cursor
 		is_readable = true;
 		filename    = nullptr;
-	} else if (selected_slot >= SavegameSlots && selected_slot < NumSlots()) {
-		screenshot = (*games)[selected_slot].screenshot.get();
-		details    = &((*games)[selected_slot].details);
-		party      = &((*games)[selected_slot].party);
-		strcpy(newname, (*games)[selected_slot].savename.c_str());
+	} else if (
+			selected_slot >= SavegameSlots && selected_slot < NumSlots()
+			&& games && games->size() > savegame_index) {
+		screenshot = (*games)[savegame_index].screenshot.get();
+		details    = &((*games)[savegame_index].details);
+		party      = &((*games)[savegame_index].party);
+		strcpy(newname, (*games)[savegame_index].savename.c_str());
 		cursor      = static_cast<int>(strlen(newname));
-		is_readable = want_load = (*games)[selected_slot].readable;
-		filename                = (*games)[selected_slot].filename().c_str();
+		is_readable = want_load = (*games)[savegame_index].readable;
+		filename                = (*games)[savegame_index].filename().c_str();
 	} else {
 		// No slot Selected
 		want_load   = false;
@@ -1130,78 +1153,21 @@ void Newfile_gump::SelectSlot(int slot) {
 	gwin->set_all_dirty();    // Repaint.
 }
 
-void Newfile_gump::LoadSaveGameDetails() {
+void Newfile_gump::LoadSaveGameDetails(bool force) {
 	// Gamedat Details
-	gwin->get_saveinfo(gd_shot, gd_details, gd_party);
+	gwin->get_saveinfo(gd_shot, gd_details, gd_party,false);
 
 	if (!restore_mode) {
-		// Current screenshot
-		cur_shot = gwin->create_mini_screenshot();
-
-		// Current Details
-		cur_details = SaveGame_Details();
-
-		gwin->get_win()->put(back.get(), 0, 0);
-
-		if (gd_details) {
-			cur_details.save_count = gd_details.save_count;
-		} else {
-			cur_details.save_count = 0;
-		}
-
-		cur_details.game_day
-				= static_cast<short>(gclock->get_total_hours() / 24);
-		cur_details.game_hour   = gclock->get_hour();
-		cur_details.game_minute = gclock->get_minute();
-
-		const time_t t        = time(nullptr);
-		tm*          timeinfo = localtime(&t);
-
-		cur_details.real_day    = timeinfo->tm_mday;
-		cur_details.real_hour   = timeinfo->tm_hour;
-		cur_details.real_minute = timeinfo->tm_min;
-		cur_details.real_month  = timeinfo->tm_mon + 1;
-		cur_details.real_year   = timeinfo->tm_year + 1900;
-		cur_details.real_second = timeinfo->tm_sec;
-		cur_details.good        = true;
-		// Current Party
-		cur_party.clear();
-		cur_party.reserve(partyman->get_count() + 1);
-
-		for (auto npc : partyman->IterateWithMainActor) {
-			auto&       current = cur_party.emplace_back();
-			std::string namestr = npc->get_npc_name();
-			std::strncpy(
-					current.name, namestr.c_str(), std::size(current.name) - 1);
-			current.name[std::size(current.name) - 1] = 0;
-			current.shape                             = npc->get_shapenum();
-			current.shape_file                        = npc->get_shapefile();
-
-			current.dext     = npc->get_property(Actor::dexterity);
-			current.str      = npc->get_property(Actor::strength);
-			current.intel    = npc->get_property(Actor::intelligence);
-			current.health   = npc->get_property(Actor::health);
-			current.combat   = npc->get_property(Actor::combat);
-			current.mana     = npc->get_property(Actor::mana);
-			current.magic    = npc->get_property(Actor::magic);
-			current.training = npc->get_property(Actor::training);
-			current.exp      = npc->get_property(Actor::exp);
-			current.food     = npc->get_property(Actor::food_level);
-			current.flags    = npc->get_flags();
-			current.flags2   = npc->get_flags2();
-		}
-
-		party      = &cur_party;
-		screenshot = cur_shot.get();
-		details    = &cur_details;
+		gwin->get_saveinfo(cur_shot, cur_details, cur_party, true);
+		//gwin->get_win()->put(back.get(), 0, 0);
 	}
 	if (!old_style_mode) {
-		games = &gwin->GetSaveGameInfos();
+		games = gwin->GetSaveGameInfos(force);
 	} else {
 		// Fill old_games slots
 		old_games.clear();
 		old_games.resize(fieldcount);
-		for (const auto& savegame : gwin->GetSaveGameInfos()) {
+		for (const auto& savegame : *gwin->GetSaveGameInfos(force)) {
 			if (savegame.num >= 0 && savegame.num < fieldcount) {
 				old_games[savegame.num] = SaveInfo(savegame, {});
 			}
