@@ -27,6 +27,7 @@
 #include "SaveInfo.h"
 #include "Yesno_gump.h"
 #include "actors.h"
+#include "Configuration.h"
 #include "databuf.h"
 #include "exceptions.h"
 #include "exult.h"
@@ -49,6 +50,8 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <future>
+#include <mutex>
 #include <sstream>
 
 #ifdef _WIN32
@@ -83,14 +86,30 @@ using std::time;
 using std::time_t;
 using std::tm;
 
-// Save game compression level
-extern int save_compression;
-
 namespace Globals {
+	// Save game compression level
+	static int save_compression = 1;    // 1 is Default compression level
 	static std::vector<SaveInfo>                save_infos;
 	static std::array<int, SaveInfo::NUM_TYPES> first_free;
 	static std::string                          save_mask;
+	static std::shared_future<void>             saveinfo_future;
+	static std::mutex                           save_info_mutex;
 }    // namespace Globals
+
+static bool get_saveinfo(
+		const std::string& filename, std::string& name,
+		std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
+		std::vector<SaveGame_Party>& party);
+
+static void clear_saveinfos() {
+	std::lock_guard<std::mutex> lock(Globals::save_info_mutex);
+	Globals::save_infos.clear();
+	Globals::saveinfo_future = std::shared_future<void>();
+}
+
+static bool get_saveinfo_zip(
+		const char* fname, std::string& name, std::unique_ptr<Shape_file>& map,
+		SaveGame_Details& details, std::vector<SaveGame_Party>& party);
 
 /*
  *  Write files from flex assuming first 13 characters of
@@ -338,10 +357,11 @@ void Game_window::save_gamedat(
 	// First check for compressed save game
 
 	// Clear the save_infos
-	Globals::save_infos.clear();
+	clear_saveinfos();
 
 #ifdef HAVE_ZIP_SUPPORT
-	if (save_compression > 0 && save_gamedat_zip(fname, savename)) {
+	// Try to save as a zip file
+	if (Globals::save_compression > 0 && save_gamedat_zip(fname, savename)) {
 		return;
 	}
 #endif
@@ -474,7 +494,9 @@ void Game_window::save_gamedat(
 /*
  *  Read in the saved game names.
  */
-void Game_window::read_save_infos() {
+void read_save_infos() {
+	std::lock_guard<std::mutex> lock(Globals::save_info_mutex);
+
 	char mask[256];
 	snprintf(
 			mask, sizeof(mask), SAVENAME2,
@@ -483,12 +505,12 @@ void Game_window::read_save_infos() {
 					  : "dev");
 	string save_mask = get_system_path(mask);
 
-
 	FileList filenames;
 	U7ListFiles(save_mask, filenames, true);
 
 	// If save_mask is the same and we've already read the save infos do nothing
-	if (save_mask == Globals::save_mask && Globals::save_infos.size() == filenames.size()) {
+	if (save_mask == Globals::save_mask
+		&& Globals::save_infos.size() == filenames.size()) {
 		return;
 	}
 	Globals::save_mask = std::move(save_mask);
@@ -544,24 +566,46 @@ void Game_window::read_save_infos() {
 	}
 }
 
-const std::vector<SaveInfo>& Game_window::GetSaveGameInfos() {
-	// read save infos if needed
-	read_save_infos();
+static void read_save_infos_async() {
+	std::lock_guard<std::mutex> lock(Globals::save_info_mutex);
+	if ((!Globals::saveinfo_future.valid()
+		 || Globals::saveinfo_future.wait_for(std::chrono::seconds(0))
+					== std::future_status::ready)
+		&& Globals::save_infos.empty()) {
+		Globals::saveinfo_future = std::async(std::launch::async, []() {
+			try {
+				read_save_infos();
+			} catch (const std::exception& e) {
+				std::cerr << "Error reading save infos: " << e.what()
+						  << std::endl;
+			}
+		});
+	}
+}
 
-	return Globals::save_infos;
+static void wait_for_saveinfo_read() {
+	if (Globals::saveinfo_future.valid()) {
+		Globals::saveinfo_future.wait();
+	}
+}
+
+const std::vector<SaveInfo>* Game_window::GetSaveGameInfos(bool force) {
+	if (force) {
+		clear_saveinfos();
+	}
+
+	// read save infos if needed
+	read_save_infos_async();
+
+	// wait for read to finish
+	wait_for_saveinfo_read();
+
+	return &Globals::save_infos;
 }
 
 void Game_window::write_saveinfo(bool screenshot) {
-	int save_count = 1;
-
-	{
-		IFileDataSource ds(GSAVEINFO);
-		if (ds.good()) {
-			ds.skip(10);    // Skip 10 bytes.
-			save_count += ds.read2();
-		}
-	}
-
+	// Update save count
+	save_count++;
 	const int party_size = party_man->get_count() + 1;
 
 	{
@@ -657,12 +701,16 @@ void Game_window::write_saveinfo(bool screenshot) {
 	}
 }
 
-void Game_window::read_saveinfo(
+static bool read_saveinfo(
 		IDataSource* in, SaveGame_Details& details,
 		std::vector<SaveGame_Party>& party) {
 	details = SaveGame_Details();
 	party.clear();
 
+	if (in->getAvail() < sizeof(SaveGame_Details)) {
+		// Not enough data
+		return false;
+	}
 	// This order must match struct SaveGame_Details
 	// Time that the game was saved
 	details.real_minute = in->read1();
@@ -685,6 +733,15 @@ void Game_window::read_saveinfo(
 
 	// Packing for the rest of the structure
 	in->skip(sizeof(SaveGame_Details) - offsetof(SaveGame_Details, reserved0));
+
+	if (party_size > EXULT_PARTY_MAX || party_size == 0) {
+		// Corrupted savegame
+		return false;
+	}
+	if (in->getAvail() < party_size * sizeof(SaveGame_Party)) {
+		// Not enough data
+		return false;
+	}
 
 	party.reserve(party_size);
 	while (party_size--) {
@@ -714,9 +771,10 @@ void Game_window::read_saveinfo(
 		in->skip(sizeof(SaveGame_Party) - offsetof(SaveGame_Party, reserved1));
 	}
 	details.good = true;
+	return true;
 }
 
-bool Game_window::get_saveinfo(
+static bool get_saveinfo(
 		const std::string& filename, std::string& name,
 		std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
 		std::vector<SaveGame_Party>& party) {
@@ -789,23 +847,81 @@ bool Game_window::get_saveinfo(
 
 void Game_window::get_saveinfo(
 		std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-		std::vector<SaveGame_Party>& party) {
+		std::vector<SaveGame_Party>& party, bool current) {
 	{
-		IFileDataSource ds(GSAVEINFO);
-		if (ds.good()) {
-			read_saveinfo(&ds, details, party);
-		} else {
-			details = SaveGame_Details();
-			party.clear();
-		}
-	}
+		map.reset();
+		details = SaveGame_Details();
+		party.clear();
+		if (current) {
+			// Current screenshot
+			map = create_mini_screenshot();
 
-	{
-		IFileDataSource ds(GSCRNSHOT);
-		if (ds.good()) {
-			map = std::make_unique<Shape_file>(&ds);
+			// Current Details
+
+			details.save_count = save_count;
+
+			details.game_day
+					= static_cast<short>(clock->get_total_hours() / 24);
+			details.game_hour   = clock->get_hour();
+			details.game_minute = clock->get_minute();
+
+			const time_t t        = time(nullptr);
+			tm*          timeinfo = localtime(&t);
+
+			details.real_day    = timeinfo->tm_mday;
+			details.real_hour   = timeinfo->tm_hour;
+			details.real_minute = timeinfo->tm_min;
+			details.real_month  = timeinfo->tm_mon + 1;
+			details.real_year   = timeinfo->tm_year + 1900;
+			details.real_second = timeinfo->tm_sec;
+			details.good        = true;
+			// Current Party
+			party.clear();
+			party.reserve(party_man->get_count() + 1);
+
+			for (auto npc : party_man->IterateWithMainActor) {
+				auto&       sgp_current = party.emplace_back();
+				std::string namestr     = npc->get_npc_name();
+				std::strncpy(
+						sgp_current.name, namestr.c_str(),
+						std::size(sgp_current.name) - 1);
+				sgp_current.name[std::size(sgp_current.name) - 1] = 0;
+				sgp_current.shape      = npc->get_shapenum();
+				sgp_current.shape_file = npc->get_shapefile();
+
+				sgp_current.dext     = npc->get_property(Actor::dexterity);
+				sgp_current.str      = npc->get_property(Actor::strength);
+				sgp_current.intel    = npc->get_property(Actor::intelligence);
+				sgp_current.health   = npc->get_property(Actor::health);
+				sgp_current.combat   = npc->get_property(Actor::combat);
+				sgp_current.mana     = npc->get_property(Actor::mana);
+				sgp_current.magic    = npc->get_property(Actor::magic);
+				sgp_current.training = npc->get_property(Actor::training);
+				sgp_current.exp      = npc->get_property(Actor::exp);
+				sgp_current.food     = npc->get_property(Actor::food_level);
+				sgp_current.flags    = npc->get_flags();
+				sgp_current.flags2   = npc->get_flags2();
+			}
+
 		} else {
-			map.reset();
+			{
+				IFileDataSource ds(GSAVEINFO);
+				if (ds.good()) {
+					read_saveinfo(&ds, details, party);
+				} else {
+					details = SaveGame_Details();
+					party.clear();
+				}
+			}
+
+			{
+				IFileDataSource ds(GSCRNSHOT);
+				if (ds.good()) {
+					map = std::make_unique<Shape_file>(&ds);
+				} else {
+					map.reset();
+				}
+			}
 		}
 	}
 }
@@ -825,7 +941,7 @@ static const char* remove_dir(const char* fname) {
 	return fname;
 }
 
-bool Game_window::get_saveinfo_zip(
+bool get_saveinfo_zip(
 		const char* fname, std::string& name, std::unique_ptr<Shape_file>& map,
 		SaveGame_Details& details, std::vector<SaveGame_Party>& party) {
 	// If a flex, so can't read it
@@ -1219,7 +1335,7 @@ bool Game_window::save_gamedat_zip(
 ) {
 	char iname[128];
 	// If no compression return
-	if (save_compression < 1) {
+	if (Globals::save_compression < 1) {
 		return false;
 	}
 
@@ -1254,7 +1370,7 @@ bool Game_window::save_gamedat_zip(
 	Save_level1(zipfile, IDENTITY);
 
 	// Level 1 Compression
-	if (save_compression != 2) {
+	if (Globals::save_compression != 2) {
 		for (const auto* savefile : savefiles) {
 			Save_level1(zipfile, savefile);
 		}
@@ -1369,4 +1485,20 @@ void Game_window::MakeEmergencySave(const char* savename) {
 
 	// Put <GAMEDAT> back to how it was
 	add_system_path("<GAMEDAT>", gamedatpath);
+}
+
+void Game_window::init_savegames() {
+	// Save game compression level
+	config->value(
+			"config/disk/save_compression_level", Globals::save_compression,
+			Globals::save_compression);
+	if (Globals::save_compression < 0 || Globals::save_compression > 2) {
+		Globals::save_compression = 1;
+	}
+	config->set(
+			"config/disk/save_compression_level", Globals::save_compression,
+			false);
+
+	//
+	read_save_infos_async();    // Start reading save infos in background
 }
