@@ -143,7 +143,7 @@ protected:
 	int  AddCharacter(char c);
 	void SelectSlot(int slot);    // Select a given slot
 
-	void LoadSaveGameDetails();    // Loads (and sorts) all the savegame details
+	void LoadSaveGameDetails(bool force);    // Loads (and sorts) all the savegame details
 	void FreeSaveGameDetails();    // Frees all the savegame details
 
 public:
@@ -160,11 +160,6 @@ public:
 	void delete_file();    // 'Delete' was clicked.
 
 
-	// Get the last slot
-	sint64 LastSlot() const {
-		return SavegameSlots + (games ? games->size() - 1 : 0);
-	}
-
 	// Get the first slot
 	sint64 FirstSlot() const {
 		if (restore_mode) {
@@ -177,9 +172,16 @@ public:
 		}
 	}
 
+	// Get the last slot
+	sint64 LastSlot() const {
+		return std::max<sint64>(
+				fieldcount - (SavegameSlots - FirstSlot()),
+				SavegameSlots + (games ? games->size()  : 0));
+	}
+
 	// Get the total nuber of slots
 	sint64 NumSlots() const {
-		return LastSlot() + 1 - FirstSlot();
+		return LastSlot()  - FirstSlot();
 	}
 
 	bool restored_game() {    // true if user restored.

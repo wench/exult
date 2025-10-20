@@ -144,7 +144,6 @@ int  usecode_trace   = 0;        // Do we trace Usecode-instructions?
 bool combat_trace = false;    // show combat messages?
 
 // Save game compression level
-int  save_compression = 1;
 bool ignore_crc       = false;
 
 TouchUI* touchui = nullptr;
@@ -657,12 +656,7 @@ int exult_main(const char* runpath) {
 
 	config->value("config/debug/trace/combat", combat_trace);
 
-	// Save game compression level
-	config->value("config/disk/save_compression_level", save_compression, 1);
-	if (save_compression < 0 || save_compression > 2) {
-		save_compression = 1;
-	}
-	config->set("config/disk/save_compression_level", save_compression, false);
+
 #ifdef USECODE_DEBUGGER
 	// Enable usecode debugger
 	config->value("config/debug/debugger/enable", usecode_debugging);
