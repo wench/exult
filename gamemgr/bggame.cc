@@ -34,6 +34,7 @@
 #include "flic/playfli.h"
 #include "fnames.h"
 #include "font.h"
+#include "gamedat.h"
 #include "gamewin.h"
 #include "gump_utils.h"
 #include "imagewin/ArbScaler.h"
@@ -2513,7 +2514,7 @@ bool BG_Game::new_game(Vga_file& shapes) {
 		// Immediately restore the palette after clearing the screen incase
 		// init_gamedat errors and displays a yesno_gump
 		pal->fade_in(0);
-		ok = gwin->init_gamedat(true);
+		ok = GameDat::get()->start_game(true);
 	} else {
 		pal->load(INTROPAL_DAT, PATCH_INTROPAL, 6);
 		sman->paint_shape(topx, topy, shapes.get_shape(0x2, 0));

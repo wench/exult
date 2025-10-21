@@ -31,6 +31,7 @@
 #include "files/utils.h"
 #include "flic/playfli.h"
 #include "font.h"
+#include "gamedat.h"
 #include "gamewin.h"
 #include "gump_utils.h"
 #include "ignore_unused_variable_warning.h"
@@ -1717,7 +1718,7 @@ bool SI_Game::new_game(Vga_file& shapes) {
 		// Immediately restore the palette after clearing the screen incase
 		// init_gamedat errors and displays a yesno_gump
 		pal->fade_in(0);
-		ok = gwin->init_gamedat(true);
+		ok = GameDat::get()->start_game(true);
 	} else {
 		sman->paint_shape(topx, topy, shapes.get_shape(0x2, 0));
 	}

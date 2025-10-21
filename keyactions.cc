@@ -41,6 +41,7 @@
 #include "exult.h"
 #include "exult_constants.h"
 #include "game.h"
+#include "gamedat.h"
 #include "gamemap.h"
 #include "gamewin.h"
 #include "gump_utils.h"
@@ -113,7 +114,7 @@ void ActionQuicksave(const int* params) {
 	ignore_unused_variable_warning(params);
 	Game_window* gwin = Game_window::get_instance();
 	try {
-		gwin->write();
+		GameDat::get()->write();
 	} catch (exult_exception& /*e*/) {
 		gwin->get_effects()->center_text("Saving game failed!");
 		return;
@@ -127,7 +128,7 @@ void ActionQuickrestore(const int* params) {
 	ignore_unused_variable_warning(params);
 	Game_window* gwin = Game_window::get_instance();
 	try {
-		gwin->read();
+		GameDat::get()->read();
 	} catch (exult_exception& /*e*/) {
 		gwin->get_effects()->center_text("Restoring game failed!");
 		return;

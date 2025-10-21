@@ -458,7 +458,7 @@ bool Game::show_menu(bool skip) {
 		if (first) {
 			set_avname("Newbie");
 		}
-		return gwin->init_gamedat(first);
+		return gamedat->start_game(first);
 	}
 	IExultDataSource mouse_data(MAINSHP_FLX, PATCH_MAINSHP, 19);
 	Mouse            menu_mouse(gwin, mouse_data);
@@ -624,7 +624,7 @@ bool Game::show_menu(bool skip) {
 				}
 
 			}
-			created = gwin->init_gamedat(false);
+			created = gamedat->start_game(false);
 			if (!created) {
 				show_journey_failed();
 				gwin->clear_screen(true);

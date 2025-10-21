@@ -53,6 +53,7 @@
 #include "fnames.h"
 #include "font.h"
 #include "game.h"
+#include "gamedat.h"
 #include "gamemap.h"
 #include "gamemgr/modmgr.h"
 #include "gamewin.h"
@@ -504,7 +505,7 @@ int main(int argc, char* argv[]) {
 
 		// make an emergency save
 		if (gwin && gwin->get_main_actor()) {
-			gwin->MakeEmergencySave();
+			GameDat::get()->MakeEmergencySave();
 		}
 		result = e.get_errno();
 	}
@@ -1229,7 +1230,7 @@ static int Play() {
 		Handle_events();
 		if (quitting_time == QUIT_TIME_RESTART) {
 			Mouse::mouse()->hide();    // Turn off mouse.
-			gwin->read();              // Restart
+			GameDat::get()->read();    // Restart
 									   /////gwin->setup_game();
 			//// setup_game is already being called from inside
 			//// of gwin->read(), so no need to call it here, I hope...
@@ -1760,7 +1761,7 @@ static void Handle_event(SDL_Event& event) {
 	// when the app goes into background
 	case SDL_EVENT_WILL_ENTER_BACKGROUND: {
 		try {
-			gwin->write();
+			GameDat::get()->write();
 		} catch (exult_exception& /*e*/) {
 			break;
 		}

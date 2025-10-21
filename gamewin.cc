@@ -60,6 +60,7 @@
 #include "fnames.h"
 #include "game.h"
 #include "gameclk.h"
+#include "gamedat.h"
 #include "gamemap.h"
 #include "gamerend.h"
 #include "items.h"
@@ -316,6 +317,7 @@ Game_window::Game_window(
 			fillsclr);
 	win->set_title("Exult Ultima VII Engine");
 	pal = new Palette();
+	GameDat::init();
 	Game_singletons::init(this);    // Everything but 'usecode' exists.
 	Shape_frame::set_to_render(win->get_ib8());
 
@@ -1319,159 +1321,6 @@ void Game_window::init_actors() {
 	}
 }
 
-// In gamemgr/modmgr.cc because it is also needed by ES.
-string get_game_identity(const char* savename, const string& title);
-
-/*
- *  Create initial 'gamedat' directory if needed
- *
- */
-
-bool Game_window::init_gamedat(bool create) {
-	// Create gamedat files 1st time.
-	if (create) {
-		cout << "Creating 'gamedat' files." << endl;
-		if (is_system_path_defined("<PATCH>") && U7exists(PATCH_INITGAME)) {
-			restore_gamedat(PATCH_INITGAME);
-		} else {
-			// Flag that we're reading U7 file.
-			Game::set_new_game();
-			restore_gamedat(INITGAME);
-		}
-		// Editing, and no IDENTITY?
-		if (Game::is_editing() && !U7exists(IDENTITY)) {
-			auto pOut = U7open_out(IDENTITY);
-			if (!pOut) {
-				return false;
-			}
-			auto& out = *pOut;
-			out << Game::get_gametitle() << endl;
-		}
-
-		// log version of exult that was used to start this game
-		auto out = U7open_out(GNEWGAMEVER);
-		if (out) {
-			getVersionInfo(*out);
-		}
-	}
-	//++++Maybe just test for IDENTITY+++:
-	else if (
-			(U7exists(U7NBUF_DAT) || !U7exists(NPC_DAT))
-			&& !Game::is_editing()) {
-		return false;
-	} else {
-		auto pIdentity_file = U7open_in(IDENTITY);
-		if (!pIdentity_file) {
-			return false;
-		}
-		auto& identity_file = *pIdentity_file;
-		char  gamedat_identity[256];
-		identity_file.read(gamedat_identity, 256);
-		char* ptr = gamedat_identity;
-		for (; (*ptr != 0x1a && *ptr != 0x0d && *ptr != 0x0a); ptr++)
-			;
-		*ptr = 0;
-		cout << "Gamedat identity " << gamedat_identity << endl;
-		const string static_identity
-				= get_game_identity(INITGAME, Game::get_gametitle());
-		if (static_identity != gamedat_identity) {
-			return false;
-		}
-		// scroll coords.
-	}
-	init_savegames();
-
-	if (create) {
-		save_count = 0;
-	} else
-		{
-		// Preload savecount from GSAVEINFO if it exists
-		IFileDataSource ds(GSAVEINFO);
-		if (ds.good()) {
-			ds.skip(10);    // Skip 10 bytes.
-			save_count = ds.read2();
-		} else {
-			save_count = 0;
-		}
-	}
-	return true;
-}
-
-/*
- *  Save game by writing out to the 'gamedat' directory.
- *
- *  Output: 0 if error, already reported.
- */
-
-void Game_window::write(bool nopaint) {
-	// Lets just show a nice message on screen first
-
-	const int width       = get_width();
-	const int centre_x    = width / 2;
-	const int height      = get_height();
-	const int centre_y    = height / 2;
-	const int text_height = shape_man->get_text_height(0);
-	const int text_width  = shape_man->get_text_width(0, "Saving Game");
-
-	if (!nopaint) {
-		win->fill_translucent8(0, width, height, 0, 0, shape_man->get_xform(8));
-		shape_man->paint_text(
-				0, "Saving Game", centre_x - text_width / 2,
-				centre_y - text_height);
-		show(true);
-	}
-	for (auto* map : maps) {
-		if (map) {
-			map->write_ireg();    // Write ireg files.
-		}
-	}
-	write_npcs();              // Write out npc.dat.
-	usecode->write();          // Usecode.dat (party, global flags).
-	Notebook_gump::write();    // Write out journal.
-	write_gwin();              // Write our data.
-	write_saveinfo(!nopaint);
-}
-
-
-/*
- *  Restore game by reading in 'gamedat'.
- *
- *  Output: 0 if error, already reported.
- */
-
-void Game_window::read() {
-	Audio::get_ptr()->cancel_streams();
-	// Display red plasma during load...
-	setup_load_palette();
-
-	clear_world(true);    // Wipe clean.
-
-	// Re-add background noise to queue after clear_world() removed it
-	if (background_noise) {
-		tqueue->add(Game::get_ticks() + 5000, background_noise);
-	}
-
-	read_gwin();    // Read our data.
-	// DON'T do anything that might paint()
-	// before calling read_npcs!!
-	setup_game(cheat.in_map_editor());    // Read NPC's, usecode.
-	Mouse::mouse()->set_speed_cursor();
-
-	// Preload savecount from GSAVEINFO if it exists
-	{
-		IFileDataSource ds(GSAVEINFO);
-		if (ds.good()) {
-			ds.skip(10);    // Skip 10 bytes.
-			save_count = ds.read2();
-		} else
-			{
-			save_count = 0;
-		}
-	}
-
-
-}
-
 /*
  *  Write data for the game.
  *
@@ -1516,6 +1365,11 @@ void Game_window::write_gwin() {
 void Game_window::read_gwin() {
 	if (!clock->in_queue()) {    // Be sure clock is running.
 		tqueue->add(Game::get_ticks(), clock, this);
+
+	}
+	// Add background noise if needed
+	if (background_noise && !background_noise->in_queue()) {
+		tqueue->add(Game::get_ticks() + 5000, background_noise);
 	}
 
 	IFileDataSource gin(GWINDAT);
@@ -1558,6 +1412,7 @@ void Game_window::read_gwin() {
 			midi->set_egg_count(static_cast<uint16>(repeat >> 16));
 		}
 	}
+
 	armageddon = gin.read1() == 1;
 	if (!gin.good()) {
 		armageddon = false;
@@ -1610,8 +1465,9 @@ void Game_window::write_map() {
 			map->write_static();    // Write ifix, map files.
 		}
 	}
-	write();    // Write out to 'gamedat' too.
-	save_gamedat(PATCH_INITGAME, "Saved map");
+	GameDat* gamedat = GameDat::get();
+	gamedat->write();    // Write out to 'gamedat' too.
+	gamedat->save_gamedat(PATCH_INITGAME, "Saved map");
 }
 
 /*
@@ -1619,8 +1475,8 @@ void Game_window::write_map() {
  */
 
 void Game_window::read_map() {
-	init_gamedat(true);    // Unpack 'initgame.dat'.
-	read();                // This does the whole restore.
+	GameDat::get()->start_game(true);    // Unpack 'initgame.dat'.
+	GameDat::get()->read();                // This does the whole restore.
 }
 
 /*
