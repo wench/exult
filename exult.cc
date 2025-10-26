@@ -53,6 +53,7 @@
 #include "fnames.h"
 #include "font.h"
 #include "game.h"
+#include "gamedat.h"
 #include "gamemap.h"
 #include "gamemgr/modmgr.h"
 #include "gamewin.h"
@@ -504,7 +505,7 @@ int main(int argc, char* argv[]) {
 
 		// make an emergency save
 		if (gwin && gwin->get_main_actor()) {
-			gwin->MakeEmergencySave();
+			GameDat::get()->MakeEmergencySave();
 		}
 		result = e.get_errno();
 	}
