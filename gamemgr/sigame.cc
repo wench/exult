@@ -32,6 +32,7 @@
 #include "files/utils.h"
 #include "flic/playfli.h"
 #include "font.h"
+#include "gamedat.h"
 #include "gamewin.h"
 #include "gump_utils.h"
 #include "ignore_unused_variable_warning.h"

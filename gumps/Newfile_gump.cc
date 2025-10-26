@@ -363,7 +363,7 @@ void Newfile_gump::load() {
 
 	// Aborts if unsuccessful.
 	if (selected_slot >= SavegameSlots && selected_slot <= LastSlot()) {
-		gwin->restore_gamedat((*games)[selected_slot - SavegameSlots].num);
+		gamedat->restore_gamedat((*games)[selected_slot - SavegameSlots].filename().c_str());
 	}
 
 	// Read Gamedat if not in restore mode
@@ -419,14 +419,14 @@ void Newfile_gump::save() {
 	if (selected_slot >= SavegameSlots && selected_slot <= LastSlot()) {
 		if (save_num == -1) {
 		
-		gwin->save_gamedat(newname, SaveInfo::REGULAR);
+		gamedat->save_gamedat(newname, SaveInfo::REGULAR);
 		} else {
-			gwin->save_gamedat(save_num, newname);
+			gamedat->save_gamedat(save_num, newname);
 		}
 	} else if (selected_slot == EmptySlot) {
-		gwin->save_gamedat(newname, SaveInfo::REGULAR);
+		gamedat->save_gamedat(newname, SaveInfo::REGULAR);
 	} else if (selected_slot == QuicksaveSlot) {
-		gwin->save_gamedat("", SaveInfo::QUICKSAVE);
+		gamedat->save_gamedat("", SaveInfo::QUICKSAVE);
 	}
 
 	cout << "Saved game #" << selected_slot << " successfully." << endl;
@@ -1155,19 +1155,18 @@ void Newfile_gump::SelectSlot(int slot) {
 
 void Newfile_gump::LoadSaveGameDetails(bool force) {
 	// Gamedat Details
-	gwin->get_saveinfo(gd_shot, gd_details, gd_party,false);
+	gamedat->get_saveinfo(gd_shot, gd_details, gd_party,false);
 
 	if (!restore_mode) {
-		gwin->get_saveinfo(cur_shot, cur_details, cur_party, true);
-		//gwin->get_win()->put(back.get(), 0, 0);
+		gamedat->get_saveinfo(cur_shot, cur_details, cur_party, true);
 	}
 	if (!old_style_mode) {
-		games = gwin->GetSaveGameInfos(force);
+		games = gamedat->GetSaveGameInfos(force);
 	} else {
 		// Fill old_games slots
 		old_games.clear();
 		old_games.resize(fieldcount);
-		for (const auto& savegame : *gwin->GetSaveGameInfos(force)) {
+		for (const auto& savegame : *gamedat->GetSaveGameInfos(force)) {
 			if (savegame.num >= 0 && savegame.num < fieldcount) {
 				old_games[savegame.num] = SaveInfo(savegame, {});
 			}
@@ -1177,7 +1176,7 @@ void Newfile_gump::LoadSaveGameDetails(bool force) {
 		for (int i = 0; i < fieldcount; ++i) {
 			if (old_games[i].num != i) {
 				old_games[i] = SaveInfo(
-						gwin->get_save_filename(i, SaveInfo::REGULAR));
+						gamedat->get_save_filename(i, SaveInfo::REGULAR));
 			}
 		}
 

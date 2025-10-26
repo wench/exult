@@ -1489,8 +1489,8 @@
     <ClInclude Include="..\..\playscene.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\SaveInfo.h">
-      <Filter>gumps</Filter>
+    <ClInclude Include="..\..\gamedat.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

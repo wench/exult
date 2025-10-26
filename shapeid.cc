@@ -89,6 +89,7 @@ Game_clock*      Game_singletons::gclock    = nullptr;
 Palette*         Game_singletons::pal       = nullptr;
 Gump_manager*    Game_singletons::gumpman   = nullptr;
 Party_manager*   Game_singletons::partyman  = nullptr;
+GameDat*		 Game_singletons::gamedat   = nullptr;
 
 void Game_singletons::init(Game_window* g) {
 	gwin      = g;

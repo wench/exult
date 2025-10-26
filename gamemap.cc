@@ -416,7 +416,7 @@ void Game_map::set_chunk_terrain(
  *          "<GAMEDAT>/map03/ireg".
  */
 
-char* Game_map::get_mapped_name(const char* from, char* to) {
+char* Game_map::get_mapped_name(const char* from, char* to) const {
 	return Get_mapped_name(from, num, to);
 }
 
@@ -430,7 +430,7 @@ char* Game_map::get_schunk_file_name(
 		const char* prefix,    // "ireg" or "ifix".
 		int         schunk,    // Superchunk # (0-143).
 		char*       fname      // Name is stored here.
-) {
+) const {
 	get_mapped_name(prefix, fname);
 	const int                   len      = strlen(fname);
 	constexpr static const char hexLUT[] = "0123456789abcdef";

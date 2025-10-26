@@ -195,9 +195,9 @@ public:
 
 	// Set new terrain chunk.
 	void  set_chunk_terrain(int cx, int cy, int chunknum);
-	char* get_mapped_name(const char* from, char* to);
+	char* get_mapped_name(const char* from, char* to) const;
 	// Get ifixxxx/iregxx name.
-	char* get_schunk_file_name(const char* prefix, int schunk, char* fname);
+	char* get_schunk_file_name(const char* prefix, int schunk, char* fname) const;
 	static void write_chunk_terrains();
 	void        write_static();    // Write to 'static' directory.
 	// Write (static) map objects.

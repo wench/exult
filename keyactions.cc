@@ -41,6 +41,7 @@
 #include "exult.h"
 #include "exult_constants.h"
 #include "game.h"
+#include "gamedat.h"
 #include "gamemap.h"
 #include "gamerend.h"
 #include "gamewin.h"

@@ -60,6 +60,7 @@
 #include "fnames.h"
 #include "game.h"
 #include "gameclk.h"
+#include "gamedat.h"
 #include "gamemap.h"
 #include "gamerend.h"
 #include "items.h"
@@ -348,6 +349,7 @@ Game_window::Game_window(
 			fillsclr);
 	win->set_title("Exult Ultima VII Engine");
 	pal = new Palette();
+	GameDat::init();
 	Game_singletons::init(this);    // Everything but 'usecode' exists.
 	Shape_frame::set_to_render(win->get_ib8());
 
@@ -1362,14 +1364,15 @@ string get_game_identity(const char* savename, const string& title);
 
 bool Game_window::init_gamedat(bool create) {
 	// Create gamedat files 1st time.
+	auto gamedat = GameDat::get();
 	if (create) {
 		cout << "Creating 'gamedat' files." << endl;
 		if (is_system_path_defined("<PATCH>") && U7exists(PATCH_INITGAME)) {
-			restore_gamedat(PATCH_INITGAME);
+			gamedat->restore_gamedat(PATCH_INITGAME);
 		} else {
 			// Flag that we're reading U7 file.
 			Game::set_new_game();
-			restore_gamedat(INITGAME);
+			gamedat->restore_gamedat(INITGAME);
 		}
 		// Editing, and no IDENTITY?
 		if (Game::is_editing() && !U7exists(IDENTITY)) {
@@ -1412,21 +1415,10 @@ bool Game_window::init_gamedat(bool create) {
 		}
 		// scroll coords.
 	}
-	init_savegames();
-
-	if (create) {
-		save_count = 0;
-	} else
-		{
-		// Preload savecount from GSAVEINFO if it exists
-		IFileDataSource ds(GSAVEINFO);
-		if (ds.good()) {
-			ds.skip(10);    // Skip 10 bytes.
-			save_count = ds.read2();
-		} else {
-			save_count = 0;
-		}
-	}
+	// Read saveinfo from gamedat.
+	gamedat->read_saveinfo();
+	// Start forced async read of save infos from saved games.
+	gamedat->read_save_infos_async(true);
 	return true;
 }
 
@@ -1462,7 +1454,7 @@ void Game_window::write(bool nopaint) {
 	usecode->write();          // Usecode.dat (party, global flags).
 	Notebook_gump::write();    // Write out journal.
 	write_gwin();              // Write our data.
-	write_saveinfo(!nopaint);
+	GameDat::get()->write_saveinfo(!nopaint);
 }
 
 
@@ -1490,20 +1482,9 @@ void Game_window::read() {
 	setup_game(cheat.in_map_editor());    // Read NPC's, usecode.
 	Mouse::mouse()->set_speed_cursor();
 
-	// Preload savecount from GSAVEINFO if it exists
-	{
-		IFileDataSource ds(GSAVEINFO);
-		if (ds.good()) {
-			ds.skip(10);    // Skip 10 bytes.
-			save_count = ds.read2();
-		} else
-			{
-			save_count = 0;
-		}
-	}
-
-
+	GameDat::get()->read_saveinfo();
 }
+
 
 /*
  *  Write data for the game.
@@ -1644,7 +1625,7 @@ void Game_window::write_map() {
 		}
 	}
 	write();    // Write out to 'gamedat' too.
-	save_gamedat(PATCH_INITGAME, "Saved map");
+	GameDat::get()->save_gamedat(PATCH_INITGAME, "Saved map");
 }
 
 /*
