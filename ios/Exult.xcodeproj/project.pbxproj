@@ -405,7 +405,7 @@
 		8ADA28142E92E06900C1012D /* libfluidsynth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = libfluidsynth.xcodeproj; sourceTree = "<group>"; };
 		8ADFFDF425DE791000FC4D3A /* verify.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = verify.cc; path = ../verify.cc; sourceTree = "<group>"; };
 		8ADFFDF525DE791000FC4D3A /* verify.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = verify.h; path = ../verify.h; sourceTree = "<group>"; };
-		8ADFFDF725DE791000FC4D3A /* SaveInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SaveInfo.h; path = ../SaveInfo.h; sourceTree = "<group>"; };
+		8ADFFDF725DE791000FC4D3A /* gamedat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = gamedat.h; path = ../gamedat.h; sourceTree = "<group>"; };
 		8AE8B9BC2E400B4F0094DF3C /* SDL3.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = SDL3.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		8AF2AFD62016707F00696E08 /* joypad-glass-southwest.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "joypad-glass-southwest.png"; sourceTree = "<group>"; };
 		8AF2AFD72016708000696E08 /* joypad-glass-north.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "joypad-glass-north.png"; sourceTree = "<group>"; };
@@ -1091,7 +1091,7 @@
 			children = (
 				8ADFFDF425DE791000FC4D3A /* verify.cc */,
 				8ADFFDF525DE791000FC4D3A /* verify.h */,
-				8ADFFDF725DE791000FC4D3A /* SaveInfo.h */,
+				8ADFFDF725DE791000FC4D3A /* gamedat.h */,
 				E700DC341A6E30A7006C8BE4 /* actions.cc */,
 				E700DC351A6E30A7006C8BE4 /* actions.h */,
 				E700DC361A6E30A7006C8BE4 /* actorio.cc */,
