@@ -36,6 +36,7 @@ thart can be done
 #include "exceptions.h"
 #include "exult.h"
 #include "game.h"
+#include "gamedat.h"
 #include "gamewin.h"
 #include "listfiles.h"
 #include "modmgr.h"
@@ -249,7 +250,7 @@ static void HandlerWorkerThreadFunc() {
 	auto gwin = Game_window::get_instance();
 	// if there is no gwin or main actor we are not in a game So do nothing
 	if (gwin && gwin->get_main_actor()) {
-		gwin->MakeEmergencySave();
+		GameDat::get()->MakeEmergencySave();
 	}
 }
 

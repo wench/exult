@@ -1,4 +1,7 @@
 /*
+
+GAMEDAT Directiory and SaveGame Handling
+
 Copyright (C) 2025 The Exult Team
 
 This program is free software; you can redistribute it and/or
@@ -20,16 +23,30 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <ctype.h>
 
+#include <array>
 #include <algorithm>
 #include <cstdlib>
 #include <memory>
 #include <string>
 #include <vector>
+#include <future>
+#include <mutex>
+#include "singles.h"
 
+class IDataSource;
+class Flex_writer;
+class unzFile;
 class Shape_file;
+
+struct zip_internal;
+using zipFile = zip_internal*;
+
 
 #define MAX_SAVEGAME_NAME_LEN 0x50
 
+class GameDat : protected Game_singletons {
+
+public:
 struct SaveGame_Details {
 	bool good = false;
 
@@ -244,6 +261,102 @@ public:
 	bool operator<(const SaveInfo& other) const noexcept {
 		return compare(&other) < 0;
 	}
+};
+	int save_compression = 1;    // 1 is Default compression level
+	int save_count;
+
+	std::vector<SaveInfo>                save_infos;
+	std::array<int, SaveInfo::NUM_TYPES> first_free;
+	std::string                          save_mask;
+	std::shared_future<void>             saveinfo_future;
+	std::recursive_mutex                 save_info_mutex;
+
+	static void init(){
+	gamedat = new GameDat();
+
+	}
+
+public:
+	friend class Game_Window;
+	GameDat();
+
+	static GameDat* get() { return gamedat;}
+
+	void read_save_infos_async(bool force);
+	void get_saveinfo(
+			std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
+			std::vector<SaveGame_Party>& party, bool current);
+
+	// Get Vector of all savegame info
+	const std::vector<SaveInfo>* GetSaveGameInfos(bool force);
+
+	void wait_for_saveinfo_read();
+
+
+	// Get the filename for savegame num of specified SaveInfo:Type
+	std::string get_save_filename(int num, int type);
+
+	// Explode a savegame into "gamedat".
+	void restore_gamedat(const char* fname);
+	void restore_gamedat(int num);
+	// Save "gamedat".
+	void save_gamedat(const char* fname, const char* savename);
+	void save_gamedat(int num, const char* savename);
+	// Save gamedat to a new savegame of the specified SaveInfo:Type with the
+	// given name
+	void save_gamedat(const char* savename, int type);
+
+	// Emergency save Creates a new save in the next available index
+	// It preserves the existing GAMEDAT
+	// and it does not paint the saving game message on screen or create the
+	// miniscreenshot
+	void MakeEmergencySave(const char* savename = nullptr);
+
+	void write_saveinfo(
+			bool screenshot = true);    // Write the save info to gamedat
+
+	void read_saveinfo();    // Read the save info from gamedat
+private:
+
+	void restore_flex_files(IDataSource& in, const char* basepath);
+
+ 	bool get_saveinfo(
+		const std::string& filename, std::string& name,
+		std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
+		std::vector<SaveGame_Party>& party);
+
+	void clear_saveinfos();
+
+void SavefileFromDataSource(
+		Flex_writer& flex,
+		IDataSource& source,    // read from here
+		const char*  fname      // store data using this filename
+);
+void Savefile(
+		Flex_writer& flex,
+		const char*  fname    // Name of file to save.
+);
+void save_gamedat_chunks(Game_map* map, Flex_writer& flex);
+
+bool read_saveinfo(
+		IDataSource* in, SaveGame_Details& details,
+		std::vector<SaveGame_Party>& party);
+#ifdef HAVE_ZIP_SUPPORT
+private:
+	bool get_saveinfo_zip(
+			const char* fname, std::string& name,
+			std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
+			std::vector<SaveGame_Party>& party);
+	bool save_gamedat_zip(const char* fname, const char* savename);
+	bool Restore_level2(unzFile& unzipfile, const char* dirname, int dirlen);
+	bool restore_gamedat_zip(const char* fname);
+	bool Save_level2(zipFile zipfile, const char* fname);
+	bool Save_level1(zipFile zipfile, const char* fname);
+	bool Begin_level2(zipFile zipfile, int mapnum);
+	bool End_level2(zipFile zipfile);
+#endif	
+
+	void read_save_infos();
 };
 
 #endif    // SAVEINFO_H_INCLUDED
