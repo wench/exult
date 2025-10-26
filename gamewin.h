@@ -52,7 +52,6 @@ class Font;
 class Game_object;
 class Game_clock;
 class Time_sensitive;
-class SaveInfo;
 class Gump;
 class Gump_button;
 class Ireg_game_object;
@@ -66,8 +65,6 @@ class Time_queue;
 class Usecode_machine;
 class Deleted_objects;
 class Gump_manager;
-struct SaveGame_Details;
-struct SaveGame_Party;
 class Map_patch_collection;
 class Dragging_info;
 class Game_map;
@@ -77,7 +74,6 @@ class ShapeID;
 class Shape_info;
 class Game_render;
 class Effects_manager;
-class unzFile;
 using Actor_shared = std::shared_ptr<Actor>;
 
 struct Position2d {
@@ -160,7 +156,6 @@ class Game_window {
 	// Private methods:
 	void set_scrolls(Tile_coord cent);
 	void clear_world(bool restoremapedit);    // Clear out world's contents.
-	void init_savegames();     
 	long check_time_stopped();
 
 	// Red plasma animation during game load
@@ -169,6 +164,7 @@ class Game_window {
 
 public:
 	friend class Game_render;
+	friend class GameDat;
 	/*
 	 *  Public flags and gameplay options:
 	 */
@@ -723,25 +719,10 @@ public:
 	void init_actors();                    // Place actors in the world.
 	void init_files(bool cycle = true);    // Load all files
 
-	// Current game or Gamedat
-	void get_saveinfo(
-			std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-			std::vector<SaveGame_Party>& party, bool current);
-
 
 private:
-int  save_count = 0;
-	void restore_flex_files(IDataSource& in, const char* basepath);
 
 public:
-	// Get Vector of all savegame info
-	const std::vector<SaveInfo>* GetSaveGameInfos(bool force);
-
-	void write_saveinfo(
-			bool screenshot = true);    // Write the save info to gamedat
-
-	// Get the filename for savegame num of specified SaveInfo:Type
-	std::string get_save_filename(int num, int type);
 
 	void setup_game(bool map_editing);    // Prepare for game
 	void read_npcs();                     // Read in npc's.
@@ -749,31 +730,7 @@ public:
 	void read_schedules();                // Read npc's schedules.
 	void write_schedules();               // Write npc's schedules.
 	void revert_schedules(Actor*);        // Reset a npc's schedule.
-	// Explode a savegame into "gamedat".
-	void restore_gamedat(const char* fname);
-	void restore_gamedat(int num);
-	// Save "gamedat".
-	void save_gamedat(const char* fname, const char* savename);
-	void save_gamedat(int num, const char* savename);
-	// Save gamedat to a new savegame of the specified SaveInfo:Type with the
-	// given name
-	void save_gamedat(const char* savename, int type);
 	bool init_gamedat(bool create);    // Initialize gamedat directory
-
-	// Emergency save Creates a new save in the next available index
-	// It preserves the existing GAMEDAT
-	// and it does not paint the saving game message on screen or create the
-	// miniscreenshot
-	void MakeEmergencySave(const char* savename = nullptr);
-
-#ifdef HAVE_ZIP_SUPPORT
-private:
-	bool save_gamedat_zip(const char* fname, const char* savename);
-	bool Restore_level2(unzFile& unzipfile, const char* dirname, int dirlen);
-	bool restore_gamedat_zip(const char* fname);
-
-public:
-#endif
 	/*
 	 *  Game control:
 	 */
@@ -889,6 +846,10 @@ public:
 
 	Game_render* get_render() {
 		return render;
+	}
+
+	void load_finished() {
+		load_palette_timer = 0;
 	}
 };
 

@@ -28,6 +28,7 @@ class Game_clock;
 class Palette;
 class Gump_manager;
 class Party_manager;
+class GameDat;
 
 /*
  *  'Singletons' used throughout the code.
@@ -44,6 +45,7 @@ protected:
 	static Palette*         pal;
 	static Gump_manager*    gumpman;
 	static Party_manager*   partyman;
+	static GameDat*         gamedat;
 	friend Game_window;
 
 public:
