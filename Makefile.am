@@ -103,7 +103,7 @@ EXULTSOURCES =	\
 	playscene.h	\
 	readnpcs.cc	\
 	rect.h		\
-	SaveInfo.h  \
+	gamedat.h  \
 	schedule.cc	\
 	schedule.h	\
 	shapeid.cc	\
