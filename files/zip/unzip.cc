@@ -1353,7 +1353,7 @@ int ZEXPORT unzExtractAllToPath(unz_s* unzipfile, const char* destpath) {
 				std::unique_ptr<std::ostream> outfile;
 
 				try {
-					outfile = U7open_out(outpath.c_str());
+					outfile = U7open_out(outpath);
 				} catch (exult_exception&) {
 					std::cerr << "ExtractZip: exception trying open file \""
 							  << get_system_path(outpath) << "\" for writing"

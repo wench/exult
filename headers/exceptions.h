@@ -138,15 +138,15 @@ public:
 //
 // Macros to automatically set Sourcefile and line arguments
 //
-#define file_exception(what_arg)  file_exception(what_arg, __FILE__, __LINE__)
-#define file_open_exception(file) file_open_exception(file, __FILE__, __LINE__)
+#define file_exception(what_arg)  file_exception(std::string(what_arg), __FILE__, __LINE__)
+#define file_open_exception(file) file_open_exception(std::string(file), __FILE__, __LINE__)
 #define file_write_exception(file) \
-	file_write_exception(file, __FILE__, __LINE__)
+	file_write_exception(std::string(file), __FILE__, __LINE__)
 
-#define file_read_exception(file) file_read_exception(file, __FILE__, __LINE__)
+#define file_read_exception(file) file_read_exception(std::string(file), __FILE__, __LINE__)
 
 #define wrong_file_type_exception(file, type) \
-	wrong_file_type_exception(file, type, __FILE__, __LINE__)
+	wrong_file_type_exception(std::string(file), type, __FILE__, __LINE__)
 
 /*
  *  Exception that gets fired when the user aborts something
