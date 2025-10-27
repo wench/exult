@@ -1110,7 +1110,7 @@ int ModManager::InstallModZip(
 					std::unique_ptr<std::ostream> outfile;
 
 					try {
-						outfile = U7open_out(outpath.c_str());
+						outfile = U7open_out(outpath);
 					} catch (exult_exception&) {
 						std::cerr << "InstallMod: exception trying open file \""
 								  << get_system_path(outpath)

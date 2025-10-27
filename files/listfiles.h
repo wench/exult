@@ -22,8 +22,22 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <string>
 #include <vector>
 
-using FileList = std::vector<std::string>;
+namespace ListFiles {
+	template <template <typename> typename Allocator>
+	using TA_String
+			= std::basic_string<char, std::char_traits<char>, Allocator<char>>;
+
+	template <template <typename> typename Allocator>
+	using TA_FileList = std::vector<
+			TA_String<Allocator>, Allocator<TA_String<Allocator>>>;
+}
+
+using FileList = ListFiles::TA_FileList<std::allocator>;
 
 int U7ListFiles(const std::string& mask, FileList& files, bool quiet = false);
+
+
+int U7ListFiles(
+		const std::pmr::string& mask, ListFiles::TA_FileList<std::pmr::polymorphic_allocator>& files, bool quiet = false);
 
 #endif    // LISTFILES_H

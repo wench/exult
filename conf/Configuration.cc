@@ -232,7 +232,7 @@ bool Configuration::read_abs_config_file(
 
 	std::unique_ptr<std::istream> pIfile;
 	try {
-		pIfile = U7open_in(filename.c_str(), true);
+		pIfile = U7open_in(filename, true);
 	} catch (exult_exception&) {
 		// configuration file not found
 		return false;
@@ -279,7 +279,7 @@ void Configuration::write_back() {
 
 	std::unique_ptr<std::ostream> pOfile;
 	try {
-		pOfile = U7open_out(filename.c_str(), true);
+		pOfile = U7open_out(filename, true);
 	} catch (const file_open_exception&) {
 		perror("Failed to write configuration file");
 		return;
