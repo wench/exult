@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <iostream>
 #include <string>
 
-using std::string;
+using std::pmr::string;
 
 // TODO: If SDL ever adds directory traversal to rwops, update U7ListFiles() to
 //       use it.
@@ -36,107 +36,81 @@ using std::string;
 // System Specific Code for Windows
 #if defined(_WIN32)
 
-// Need this for _findfirst, _findnext, _findclose
-#	include <tchar.h>
+// Need this for FindFirstFileA, FindNextFileA, FindClose
 #	include <windows.h>
 
-int U7ListFiles(const std::string& mask, FileList& files, bool quiet) {
-	const string    path(get_system_path(mask));
-	const TCHAR*    lpszT;
-	WIN32_FIND_DATA fileinfo;
-	HANDLE          handle;
-	char*           stripped_path;
-	int             i;
-	int             nLen;
-	int             nLen2;
+int U7ListFilesImp(string& path, FileList& files, bool quiet) {
+	WIN32_FIND_DATAA fileinfo;
+	HANDLE           handle;
 
-#	ifdef UNICODE
-	const char* name = path.c_str();
-	nLen             = strlen(name) + 1;
-	LPTSTR lpszT2    = static_cast<LPTSTR>(_alloca(nLen * 2));
-	lpszT            = lpszT2;
-	MultiByteToWideChar(CP_ACP, 0, name, -1, lpszT2, nLen);
-#	else
-	lpszT = path.c_str();
-#	endif
-
-	handle = FindFirstFile(lpszT, &fileinfo);
-
-	stripped_path = new char[path.length() + 1];
-	strcpy(stripped_path, path.c_str());
-
-	for (i = strlen(stripped_path) - 1; i; i--) {
-		if (stripped_path[i] == '\\' || stripped_path[i] == '/') {
-			break;
-		}
-	}
-
-	if (stripped_path[i] == '\\' || stripped_path[i] == '/') {
-		stripped_path[i + 1] = 0;
-	}
-
-#	ifdef DEBUG
-	if (!quiet) {
-		std::cerr << "U7ListFiles: " << mask << " = " << path << std::endl;
-	}
-#	endif
-
-	// Now search the files
+	handle          = FindFirstFileA(path.c_str(), &fileinfo);
+	auto last_error = GetLastError();
+	// Now collect the filename
 	if (handle != INVALID_HANDLE_VALUE) {
-		do {
-			nLen           = std::strlen(stripped_path);
-			nLen2          = _tcslen(fileinfo.cFileName) + 1;
-			char* filename = new char[nLen + nLen2];
-			strcpy(filename, stripped_path);
-#	ifdef UNICODE
-			WideCharToMultiByte(
-					CP_ACP, 0, fileinfo.cFileName, -1, filename + nLen, nLen2,
-					nullptr, nullptr);
-#	else
-			std::strcat(filename, fileinfo.cFileName);
-#	endif
+		std::string_view path_prefix = get_directory_from_path(path, true);
 
-			files.push_back(filename);
+		do {
+			const size_t nLen = strnlen(fileinfo.cFileName, MAX_PATH - 1);
+			// Skip . and .. directories
+			if (fileinfo.cFileName[0] == '.'
+				&& (nLen == 1 || (nLen == 2 && fileinfo.cFileName[1] == '.'))
+				&& (fileinfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+				continue;
+			}
+			string filename;
+			filename.reserve(nLen + path_prefix.size());
+			filename = path_prefix;
+			filename += fileinfo.cFileName;
+
 #	ifdef DEBUG
 			if (!quiet) {
 				std::cerr << filename << std::endl;
 			}
 #	endif
-			delete[] filename;
-		} while (FindNextFile(handle, &fileinfo));
+			files.push_back(std::move(filename));
+
+		} while (FindNextFileA(handle, &fileinfo));
+		last_error = GetLastError();
+	} else if (last_error == ERROR_FILE_NOT_FOUND) {
+		// No files found is not an error treat it as no more files
+		last_error = ERROR_NO_MORE_FILES;
 	}
 
-	if (GetLastError() != ERROR_NO_MORE_FILES) {
-		LPTSTR lpMsgBuf;
-		char*  str;
-		FormatMessage(
-				FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM
-						| FORMAT_MESSAGE_IGNORE_INSERTS,
-				nullptr, GetLastError(),
-				MAKELANGID(
-						LANG_NEUTRAL, SUBLANG_DEFAULT),    // Default language
-				reinterpret_cast<LPTSTR>(&lpMsgBuf), 0, nullptr);
-#	ifdef UNICODE
-		nLen2 = _tcslen(lpMsgBuf) + 1;
-		str   = static_cast<char*>(_alloca(nLen));
-		WideCharToMultiByte(
-				CP_ACP, 0, lpMsgBuf, -1, str, nLen2, nullptr, nullptr);
-#	else
-		str = lpMsgBuf;
-#	endif
-		if (!quiet) {
-			std::cerr << "Error while listing files: " << str << std::endl;
+	bool failed = last_error != ERROR_NO_MORE_FILES;
+	if (failed && !quiet) {
+		std::cerr << "U7ListFiles: Error listing files for mask " << path
+				  << ", error code " << last_error << std::endl;
+		LPSTR lpMsgBuf;
+		if (FormatMessageA(
+					FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM
+							| FORMAT_MESSAGE_IGNORE_INSERTS,
+					nullptr, last_error,
+					MAKELANGID(
+							LANG_NEUTRAL,
+							SUBLANG_DEFAULT),    // Default language
+					reinterpret_cast<LPSTR>(&lpMsgBuf), 0, nullptr)
+			!= 0) {
+			std::cerr << lpMsgBuf << std::endl;
+			LocalFree(lpMsgBuf);
+		} else {
+			auto fm_last_error = GetLastError();
+			std::cerr << "FormatMessage failed with error " << fm_last_error
+					  << " while trying to get error message when "
+						 "listing files"
+					  << std::endl;
 		}
-		LocalFree(lpMsgBuf);
 	}
 
 #	ifdef DEBUG
-	std::cerr << files.size() << " filenames" << std::endl;
+	if (!quiet) {
+		std::cerr << files.size() << " filenames" << std::endl;
+	}
 #	endif
 
-	delete[] stripped_path;
-	FindClose(handle);
-	return 0;
+	if (handle != INVALID_HANDLE_VALUE) {
+		FindClose(handle);
+	}
+	return failed ? last_error : 0;
 }
 
 #else    // This system has glob.h
@@ -158,8 +132,7 @@ int U7ListFiles(const std::string& mask, FileList& files, bool quiet) {
 #		endif    // __GNUC__
 #	endif
 
-static int U7ListFilesImp(
-		const std::string& path, FileList& files, bool quiet) {
+static int U7ListFilesImp(const string& path, FileList& files, bool quiet) {
 	glob_t globres;
 	int    err = glob(path.c_str(), GLOB_NOSORT, nullptr, &globres);
 
@@ -179,11 +152,11 @@ static int U7ListFilesImp(
 		return err;
 	}
 }
-
-int U7ListFiles(const std::string& mask, FileList& files, bool quiet) {
+#endif
+int U7ListFiles(std::string_view mask, FileList& files, bool quiet) {
 	string path(get_system_path(mask));
 	int    result = U7ListFilesImp(path, files, quiet);
-#	ifdef ANDROID
+#ifdef ANDROID
 	// TODO: If SDL ever adds directory traversal to rwops use it instead of
 	// glob() so that we pick up platform-specific paths and behaviors like
 	// this.
@@ -192,8 +165,6 @@ int U7ListFiles(const std::string& mask, FileList& files, bool quiet) {
 				SDL_GetAndroidInternalStoragePath() + ("/" + path), files,
 				quiet);
 	}
-#	endif
+#endif
 	return result;
 }
-
-#endif

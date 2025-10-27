@@ -431,7 +431,7 @@ ModManager::ModManager(
 
 		// <path> setting: default is "$gameprefix".
 		config_path = base_cfg_path + "/path";
-		default_dir = get_system_path("<GAMEHOME>") + "/" + cfgname;
+		default_dir = std::string(lookup_system_path("<GAMEHOME>")) + "/" + cfgname;
 		config->value(config_path.c_str(), game_path, default_dir.c_str());
 
 		// <static_path> setting: default is "$game_path/static".
@@ -699,14 +699,14 @@ void ModManager::gather_mods() {
 			std::filesystem::path modcfg(filenames[i]);
 			auto modtitle = modcfg.stem();
 #else
-			const auto& filename = filenames[i];
+			const std::string filename(filenames[i]);
 			auto        pathend  = filename.find_last_of("/\\") + 1;
 			auto        modtitle = filename.substr(
                     pathend, filename.length() - pathend - strlen(".cfg"));
 #endif
 			modlist.emplace_back(
 					type, language, cfgname, modtitle, path_prefix, expansion,
-					sibeta, editing, filenames[i]);
+					sibeta, editing, filename);
 		}
 	}
 }
@@ -993,7 +993,7 @@ int ModManager::InstallModZip(
 		std::unordered_map<std::string, std::string> lowercase_map;
 		for (auto filename : filelist) {
 			filename          = get_filename_from_path(filename);
-			std::string lower = filename;
+			std::string lower(filename);
 			for (char& c : lower) {
 				c = std::tolower(c);
 			}
@@ -1107,10 +1107,10 @@ int ModManager::InstallModZip(
 						return -16;
 					}
 					// Write out the buffer
-					std::unique_ptr<std::ostream> outfile;
+					std::shared_ptr<std::ostream> outfile;
 
 					try {
-						outfile = U7open_out(outpath.c_str());
+						outfile = U7open_out(outpath);
 					} catch (exult_exception&) {
 						std::cerr << "InstallMod: exception trying open file \""
 								  << get_system_path(outpath)
@@ -1196,7 +1196,7 @@ ModInfo* ModManager::get_mod(const string& name, bool checkversion) {
  *  game is selected.
  */
 void ModManager::get_game_paths(const string& game_path) {
-	string       saveprefix(get_system_path("<SAVEHOME>") + "/" + cfgname);
+	string       saveprefix= std::string(get_system_path("<SAVEHOME>")) + "/" + cfgname;
 	string       default_dir;
 	string       config_path;
 	string       gamedat_dir;

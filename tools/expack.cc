@@ -131,7 +131,7 @@ long get_file_size(string& fname) {
 	}
 
 	try {
-		auto pFin = U7open_in(fname.c_str(), is_text_file(fname));
+		auto pFin = U7open_in(fname, is_text_file(fname));
 		if (!pFin) {
 			cerr << "Failed to open " << fname << endl;
 			return 0;
@@ -201,14 +201,14 @@ int main(int argc, char** argv) {
 			case 'i': {
 				string path_prefix;
 
-				std::unique_ptr<std::istream> pRespfile;
+				std::shared_ptr<std::istream> pRespfile;
 				const size_t                  slash = fname.rfind('/');
 				if (slash != string::npos) {
 					path_prefix = fname.substr(0, slash + 1);
 				}
 				set_mode(mode, RESPONSE);
 				try {
-					pRespfile = U7open_in(fname.c_str(), true);
+					pRespfile = U7open_in(fname, true);
 				} catch (const file_open_exception& e) {
 					cerr << e.what() << endl;
 					exit(1);
@@ -337,7 +337,7 @@ int main(int argc, char** argv) {
 		try {
 			OFileDataSource flex(fname.c_str());
 
-			std::unique_ptr<std::ostream> pHeader;
+			std::shared_ptr<std::ostream> pHeader;
 			if (hname.empty()) {    // Need header name.
 				hprefix = fname;
 				make_header_name(hprefix);
@@ -346,7 +346,7 @@ int main(int argc, char** argv) {
 				make_uppercase(hprefix);
 			}
 			try {
-				pHeader = U7open_out(hname.c_str(), true);
+				pHeader = U7open_out(hname, true);
 			} catch (const file_open_exception& e) {
 				cerr << e.what() << endl;
 				exit(1);

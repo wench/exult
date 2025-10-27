@@ -193,7 +193,7 @@ Usecode_browser::Usecode_browser() {
 	ExultStudio* studio = ExultStudio::get_instance();
 	win                 = studio->get_widget("usecodes_dialog");
 	g_object_set_data(G_OBJECT(win), "user_data", this);
-	string ucname = get_system_path("<PATCH>/usecode");
+	auto ucname = get_system_path("<PATCH>/usecode");
 	if (!U7exists(ucname.c_str())) {
 		ucname = get_system_path("<STATIC>/usecode");
 		if (!U7exists(ucname.c_str())) {
