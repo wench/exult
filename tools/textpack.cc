@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
 			exit(1);
 		}
 		if (argc >= 4) {    // Text file given?
-			std::unique_ptr<std::ostream> pOut;
+			std::shared_ptr<std::ostream> pOut;
 			try {
 				pOut = U7open_out(argv[3], true);
 			} catch (exult_exception& e) {

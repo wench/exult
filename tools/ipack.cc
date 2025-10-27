@@ -827,7 +827,7 @@ int main(int argc, char** argv) {
 	char*                         imagename  = nullptr;
 	char*                         palname    = nullptr;
 	Shape_specs                   specs;    // Shape specs. stored here.
-	std::unique_ptr<std::istream> pSpecin;
+	std::shared_ptr<std::istream> pSpecin;
 	try {
 		pSpecin = U7open_in(scriptname, true);
 	} catch (exult_exception& e) {

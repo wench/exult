@@ -29,6 +29,7 @@
 #include "fnames.h"
 #include "ignore_unused_variable_warning.h"
 #include "listfiles.h"
+
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -75,8 +76,12 @@
 #	endif    // __GNUC__
 #endif
 
+#undef file_open_exception
+#define file_open_exception(file) \
+	file_open_exception(file, __FILE__, __LINE__)
+
 using std::ios;
-using std::string;
+using std::pmr::string;
 
 // Function prototypes
 
@@ -84,20 +89,26 @@ static void switch_slashes(string& name);
 static bool base_to_uppercase(string& str, int count);
 
 // Global factories for instantiating file streams
-static U7IstreamFactory istream_factory
-		= [](const char* s, std::ios_base::openmode mode) {
-			  return std::make_unique<std::ifstream>(s, mode);
-		  };
+static U7IstreamFactory istream_factory = [](const char*             s,
+											 std::ios_base::openmode mode) {
+	return std::allocate_shared<std::ifstream>(
+			std::pmr::polymorphic_allocator<std::ifstream>(), s, mode);
+};
 
-static U7OstreamFactory ostream_factory
-		= [](const char* s, std::ios_base::openmode mode) {
-			  return std::make_unique<std::ofstream>(s, mode);
-		  };
+static U7OstreamFactory ostream_factory = [](const char*             s,
+											 std::ios_base::openmode mode) {
+	return std::allocate_shared<std::ofstream>(
+			std::pmr::polymorphic_allocator<std::ofstream>(), s, mode);
+};
 
 // Ugly hack for supporting different paths
 
-static std::map<string, string> path_map;
-static std::map<string, string> stored_path_map;
+static std::map<
+		std::string, std::string,
+		MakeTransparentClass<std::less<std::string_view>>>
+		path_map;
+// Use exact same type as path_map
+static decltype(path_map) stored_path_map;
 
 void store_system_paths() {
 	stored_path_map = path_map;
@@ -115,8 +126,8 @@ static bool is_path_separator(char cc) {
 #endif
 }
 
-static string remove_trailing_slash(const string& value) {
-	string new_path = value;
+static std::string remove_trailing_slash(const std::string_view value) {
+	std::string new_path{value};
 	if (is_path_separator(new_path.back())) {
 #ifdef EXTRA_DEBUG
 		std::cerr << "Warning, trailing slash in path: \"" << new_path << "\""
@@ -128,7 +139,7 @@ static string remove_trailing_slash(const string& value) {
 	return new_path;
 }
 
-void add_system_path(const string& key, const string& value) {
+void add_system_path(const std::string_view key, const std::string_view value) {
 	if (!value.empty()) {
 		if (value.find(key) != string::npos) {
 			std::cerr << "Error: system path '" << key
@@ -136,22 +147,24 @@ void add_system_path(const string& key, const string& value) {
 					  << "'." << std::endl;
 			exit(1);
 		} else {
-			path_map[key] = remove_trailing_slash(value);
+			path_map[std::string{key}] = remove_trailing_slash(value);
 		}
 	} else {
 		clear_system_path(key);
 	}
 }
 
-void clone_system_path(const string& new_key, const string& old_key) {
-	if (is_system_path_defined(old_key)) {
-		path_map[new_key] = path_map[old_key];
+void clone_system_path(
+		const std::string_view new_key, const std::string_view old_key) {
+	auto iter = path_map.find(old_key);
+	if (iter != path_map.end()) {
+		path_map[std::string{new_key}] = iter->second;
 	} else {
 		clear_system_path(new_key);
 	}
 }
 
-void clear_system_path(const string& key) {
+void clear_system_path(const std::string_view key) {
 	auto iter = path_map.find(key);
 	if (iter != path_map.end()) {
 		path_map.erase(iter);
@@ -161,18 +174,32 @@ void clear_system_path(const string& key) {
 /*
  *  Has a path been entered?
  */
-bool is_system_path_defined(const string& path) {
+bool is_system_path_defined(std::string_view path) {
 	return path_map.find(path) != path_map.end();
+}
+
+std::string_view lookup_system_path(std::string_view path)
+{
+	auto iter = path_map.find(path);
+	if (iter != path_map.end()) {
+		return iter->second;
+	}
+	return path;
 }
 
 /*
  *  Convert an exult path (e.g. "<DATA>/exult.flx") into a system path
  */
 
-string get_system_path(const string& path) {
-	string            new_path = path;
+string get_system_path(std::string_view path) {
+	string            new_path{path};
 	string::size_type pos;
 	string::size_type pos2;
+
+		// Empty path returns an empty string
+	if (path.empty()) {
+		return {};
+	}
 
 	pos  = new_path.find('>');
 	pos2 = new_path.find('<');
@@ -181,10 +208,14 @@ string get_system_path(const string& path) {
 	while (pos != string::npos && pos2 == 0 && cnt-- > 0) {
 		pos += 1;
 		// See if we can translate this prefix
-		const string syspath = new_path.substr(0, pos);
-		if (is_system_path_defined(syspath)) {
-			string new_prefix = path_map[syspath];
-			new_prefix += new_path.substr(pos);
+		std::string_view syspath = std::string_view(new_path).substr(0, pos);
+
+		auto it = path_map.find(syspath);
+		if (it != path_map.end()) {
+			string new_prefix;
+			new_prefix.reserve(it->second.size() + new_path.size() - pos);
+			new_prefix = it->second;
+			new_prefix += std::string_view(new_path).substr(pos);
 			new_path.swap(new_prefix);
 			pos  = new_path.find('>');
 			pos2 = new_path.find('<');
@@ -242,14 +273,14 @@ string get_system_path(const string& path) {
  *  Output: ->original buffer, changed to upper case.
  */
 
-void to_uppercase(string& str) {
+void to_uppercase(std::string& str) {
 	for (auto& chr : str) {
 		chr = static_cast<char>(std::toupper(static_cast<unsigned char>(chr)));
 	}
 }
 
-string to_uppercase(const string& str) {
-	string s(str);
+std::string to_uppercase(const std::string& str) {
+	std::string s(str);
 	to_uppercase(s);
 	return s;
 }
@@ -315,9 +346,9 @@ void U7set_ostream_factory(U7OstreamFactory factory) {
  *  Output: 0 if couldn't open.
  */
 
-std::unique_ptr<std::istream> U7open_in(
-		const char* fname,     // May be converted to upper-case.
-		bool        is_text    // Should the file be opened in text mode
+std::shared_ptr<std::istream> U7open_in(
+		std::string_view fname,     // May be converted to upper-case.
+		bool             is_text    // Should the file be opened in text mode
 ) {
 	std::ios_base::openmode mode = std::ios::in;
 	if (!is_text) {
@@ -325,7 +356,7 @@ std::unique_ptr<std::istream> U7open_in(
 	}
 	string                        name           = get_system_path(fname);
 	int                           uppercasecount = 0;
-	std::unique_ptr<std::istream> in;
+	std::shared_ptr<std::istream> in;
 	do {
 		try {
 			// std::cout << "trying: " << name << std::endl;
@@ -351,9 +382,9 @@ std::unique_ptr<std::istream> U7open_in(
  *  Output: 0 if couldn't open.
  */
 
-std::unique_ptr<std::ostream> U7open_out(
-		const char* fname,     // May be converted to upper-case.
-		bool        is_text    // Should the file be opened in text mode
+std::shared_ptr<std::ostream> U7open_out(
+		std::string_view fname,     // May be converted to upper-case.
+		bool             is_text    // Should the file be opened in text mode
 ) {
 	std::ios_base::openmode mode = std::ios::out | std::ios::trunc;
 	if (!is_text) {
@@ -361,7 +392,7 @@ std::unique_ptr<std::ostream> U7open_out(
 	}
 	string name = get_system_path(fname);
 
-	std::unique_ptr<std::ostream> out;
+	std::shared_ptr<std::ostream> out;
 
 	int uppercasecount = 0;
 	do {
@@ -376,7 +407,8 @@ std::unique_ptr<std::ostream> U7open_out(
 	return nullptr;
 }
 
-DIR* U7opendir(const char* fname    // May be converted to upper-case.
+DIR* U7opendir(
+		std::string_view fname    // May be converted to upper-case.
 ) {
 	string name           = get_system_path(fname);
 	int    uppercasecount = 0;
@@ -404,21 +436,14 @@ DIR* U7opendir(const char* fname    // May be converted to upper-case.
  *
  */
 
-void U7remove(const char* fname    // May be converted to upper-case.
+void U7remove(
+		std::string_view fname    // May be converted to upper-case.
 ) {
 	string name = get_system_path(fname);
 
-#if defined(_WIN32) && defined(UNICODE)
-	const char* n     = name.c_str();
-	int         nLen  = std::strlen(n) + 1;
-	LPTSTR      lpszT = (LPTSTR)alloca(nLen * 2);
-	MultiByteToWideChar(CP_ACP, 0, n, -1, lpszT, nLen);
-	DeleteFile(lpszT);
-#else
-
 	int uppercasecount = 0;
 	do {
-		std::unique_ptr<std::istream> in;
+		std::shared_ptr<std::istream> in;
 		try {
 			if (istream_factory) {
 				in = istream_factory(name.c_str(), std::ios_base::in);
@@ -434,7 +459,6 @@ void U7remove(const char* fname    // May be converted to upper-case.
 		}
 	} while (base_to_uppercase(name, ++uppercasecount));
 	std::remove(name.c_str());
-#endif
 }
 
 /*
@@ -443,13 +467,14 @@ void U7remove(const char* fname    // May be converted to upper-case.
  *  Output: 0 if couldn't open. We do NOT throw exceptions.
  */
 
-std::unique_ptr<std::istream> U7open_static(
-		const char* fname,     // May be converted to upper-case.
-		bool        is_text    // Should file be opened in text mode
+std::shared_ptr<std::istream> U7open_static(
+		std::string_view fname,     // May be converted to upper-case.
+		bool             is_text    // Should file be opened in text mode
 ) {
 	string name;
-
-	name = string("<PATCH>/") + fname;
+	name.reserve(fname.size() + 9);
+	name = "<PATCH>/";
+	name += fname;
 	try {
 		auto in = U7open_in(name.c_str(), is_text);
 		if (in) {
@@ -457,7 +482,8 @@ std::unique_ptr<std::istream> U7open_static(
 		}
 	} catch (std::exception&) {
 	}
-	name = string("<STATIC>/") + fname;
+	name = "<STATIC>/";
+	name += fname;
 	try {
 		auto in = U7open_in(name.c_str(), is_text);
 		if (in) {
@@ -472,7 +498,8 @@ std::unique_ptr<std::istream> U7open_static(
  *  See if a file exists.
  */
 
-bool U7exists(const char* fname    // May be converted to upper-case.
+bool U7exists(
+		std::string_view fname    // May be converted to upper-case.
 ) {
 	try {
 		// First check if we can open it as a file.
@@ -498,53 +525,43 @@ bool U7exists(const char* fname    // May be converted to upper-case.
  */
 
 int U7mkdir(
-		const char* dirname,    // May be converted to upper-case.
-		int         mode,
-		bool        parents) {
+		std::string_view dirname,    // May be converted to upper-case.
+		int mode, bool parents) {
 	string name = get_system_path(dirname);
 	// remove any trailing slashes
-	const string::size_type pos = name.find_last_not_of('/');
+	const auto pos = name.find_last_not_of('/');
 	if (pos != string::npos) {
 		name.resize(pos + 1);
 	}
-	if (parents)
-	{
-		std::string parent(get_directory_from_path(name));
-		if (!parent.empty() )U7mkdir(parent.c_str(), mode, true);
+	if (parents) {
+		auto parent = get_directory_from_path(name);
+		if (!parent.empty()) {
+			U7mkdir(parent, mode, true);
+		}
 	}
-#if defined(_WIN32) && defined(UNICODE)
-	const char* n     = name.c_str();
-	int         nLen  = std::strlen(n) + 1;
-	LPTSTR      lpszT = (LPTSTR)alloca(nLen * 2);
-	MultiByteToWideChar(CP_ACP, 0, n, -1, lpszT, nLen);
-	ignore_unused_variable_warning(mode);
-	return CreateDirectory(lpszT, nullptr);
-#elif defined(_WIN32)
-	ignore_unused_variable_warning(mode);
+#ifdef _WIN32
 	return mkdir(name.c_str());
 #else
 	return mkdir(name.c_str(), mode);    // Create dir. if not already there.
 #endif
 }
 
-int U7rmdir(const char* dirname, bool recursive) {
+int U7rmdir(std::string_view dirname, bool recursive) {
 	string name = get_system_path(dirname);
 
-	if (recursive)
-	{
+	if (recursive) {
 		// Get contents if recrusive
 		FileList files;
 		U7ListFiles(name + "/*", files, true);
 
 		for (const auto& filename : files) {
 			// Get filename
-			std::string_view fn    = get_filename_from_path(filename);
+			std::string_view fn = get_filename_from_path(filename);
 
 			// skip . and .. directory entries
 			if (fn == "." || fn == "..") {
 				continue;
 			}
-
 
 			// is it a directory? if so rmdir it recursively
 			auto* dir = U7opendir(filename.c_str());
@@ -649,15 +666,15 @@ public:
 };
 
 #	ifdef USE_CONSOLE
-void redirect_output(const char* prefix) {
+void redirect_output(std::string_view prefix) {
 	ignore_unused_variable_warning(prefix);
 }
 
-void cleanup_output(const char* prefix) {
+void cleanup_output(std::string_view prefix) {
 	ignore_unused_variable_warning(prefix);
 }
 #	else
-static std::string Get_home();
+static std::string_view Get_home();
 
 struct unsynch_from_stdio {
 	const bool old_synch_status = std::ostream::sync_with_stdio(false);
@@ -671,7 +688,7 @@ bool stdout_redirected = false;
 bool stderr_redirected = false;
 
 // Pulled from exult_studio.cc.
-void redirect_output(const char* prefix) {
+void redirect_output(std::string_view prefix) {
 	HANDLE stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
 	HANDLE stderr_handle = GetStdHandle(STD_ERROR_HANDLE);
 	DWORD  stdout_type   = GetFileType(stdout_handle);
@@ -745,27 +762,39 @@ void redirect_output(const char* prefix) {
 
 	// Starting from GUI, or from cmd.exe, we will need to redirect the output.
 	// Paths to the output files.
-	const string folderPath = Get_home() + "/" + prefix;
+	auto   home = Get_home();
+	string folderPath;
+	folderPath.reserve(home.size() + prefix.size() + 1);
+	folderPath = home;
+	folderPath += "/";
+	folderPath += prefix;
+
 	const string stdoutPath = folderPath + "out.txt";
 	stdout_redirected       = redirect_stdout(stdoutPath.c_str());
 	const string stderrPath = folderPath + "err.txt";
 	stderr_redirected       = redirect_stderr(stderrPath.c_str());
 }
 
-void cleanup_output(const char* prefix) {
-	const string folderPath           = Get_home() + "/" + prefix;
-	auto         clear_empty_redirect = [&](FILE* stream, const char* suffix) {
-        // Get the Win32 HANDLE Of the stream
-        HANDLE handle
-                = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(stream)));
-        fflush(stream);
-        // Only try to delete the stream if it is an actual file
-        if (handle != INVALID_HANDLE_VALUE
-            && GetFileType(handle) == FILE_TYPE_DISK && ftell(stream) == 0) {
-            fclose(stream);
-            const string stream_path = folderPath + suffix;
-            remove(stream_path.c_str());
-        }
+void cleanup_output(std::string_view prefix) {
+	std::string_view home = Get_home();
+	string             folderPath;
+	folderPath.reserve(home.size() + prefix.size() + 1);
+	folderPath = home;
+	folderPath += "/";
+	folderPath += prefix;
+
+	auto clear_empty_redirect = [&](FILE* stream, const char* suffix) {
+		// Get the Win32 HANDLE Of the stream
+		HANDLE handle
+				= reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(stream)));
+		fflush(stream);
+		// Only try to delete the stream if it is an actual file
+		if (handle != INVALID_HANDLE_VALUE
+			&& GetFileType(handle) == FILE_TYPE_DISK && ftell(stream) == 0) {
+			fclose(stream);
+			const string stream_path = folderPath + suffix;
+			remove(stream_path.c_str());
+		}
 	};
 	if (stdout_redirected) {
 		clear_empty_redirect(stdout, "out.txt");
@@ -786,7 +815,7 @@ void U7set_home(std::string home) {
 	home_directory = std::move(home);
 }
 
-string Get_home() {
+std::string_view Get_home() {
 	if (!home_directory.empty()) {
 		return home_directory;
 	}
@@ -866,7 +895,7 @@ void setup_data_dir(const std::string& data_path, const char* runpath) {
 	// Can we try from the bundle?
 	setup_app_bundle_resource();
 	if (is_system_path_defined("<APP_BUNDLE_RES>")) {
-		std::string path = get_system_path("<APP_BUNDLE_RES>");
+		string path(get_system_path("<APP_BUNDLE_RES>"));
 		path += "/data";
 		add_system_path("<BUNDLE>", path);
 		if (!U7exists(BUNDLE_EXULT_FLX)) {
@@ -1044,8 +1073,7 @@ void setup_program_paths() {
  *  Change the current directory
  */
 
-int U7chdir(const char* dirname    // May be converted to upper-case.
-) {
+int U7chdir(const char* dirname) {
 	return chdir(dirname);
 }
 
@@ -1053,8 +1081,8 @@ int U7chdir(const char* dirname    // May be converted to upper-case.
  *  Copy a file. May throw an exception.
  */
 void U7copy(const char* src, const char* dest) {
-	std::unique_ptr<std::istream> pIn;
-	std::unique_ptr<std::ostream> pOut;
+	std::shared_ptr<std::istream> pIn;
+	std::shared_ptr<std::ostream> pOut;
 	try {
 		pIn  = U7open_in(src);
 		pOut = U7open_out(dest);
@@ -1141,7 +1169,7 @@ char* newstrdup(const char* s) {
  *          "<GAMEDAT>/map03/ireg".
  */
 
-char* Get_mapped_name(const char* from, int num, char* to) {
+char* Get_mapped_name(const char* from, int num, char (&to)[128]) {
 	if (num == 0) {
 		strcpy(to, from);    // Default map.
 	} else {
@@ -1180,10 +1208,9 @@ int Find_next_map(
 	return -1;
 }
 
-std::string_view get_filename_from_path(std::string_view path)
-{
+std::string_view get_filename_from_path(std::string_view path) {
 	// find last slash or backslash
-	auto             slash = path.find_last_of("\\/");
+	auto slash = path.find_last_of("\\/");
 	if (slash != std::string_view::npos) {
 		// return the substring after the slash
 		return path.substr(slash + 1);
@@ -1192,11 +1219,15 @@ std::string_view get_filename_from_path(std::string_view path)
 	return path;
 }
 
-std::string_view get_directory_from_path(std::string_view path) {
+std::string_view get_directory_from_path(
+		std::string_view path, bool keepslash) {
 	// find last slash or backslash
 	auto slash = path.find_last_of("\\/");
 	if (slash != std::string_view::npos) {
-		// return the substring before the slash
+		// return the substring up to (and possibly including) the slash
+		if (keepslash) {
+			slash++;
+		}
 		path = path.substr(0, slash);
 #ifdef _WIN32
 		// Do not return drive letters as the top level directory

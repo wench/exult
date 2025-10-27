@@ -509,7 +509,7 @@ void ExultStudio::export_preset() {
 
 	// Set default folder to patch directory
 	if (is_system_path_defined("<PATCH>")) {
-		const std::string patchdir = get_system_path("<PATCH>");
+		const auto patchdir = get_system_path("<PATCH>");
 		gtk_file_chooser_set_current_folder(
 				GTK_FILE_CHOOSER(dialog), patchdir.c_str());
 	}
@@ -560,7 +560,7 @@ void ExultStudio::import_presets() {
 
 	// Set default folder to patch directory
 	if (is_system_path_defined("<PATCH>")) {
-		const std::string patchdir = get_system_path("<PATCH>");
+		const auto patchdir = get_system_path("<PATCH>");
 		gtk_file_chooser_set_current_folder(
 				GTK_FILE_CHOOSER(dialog), patchdir.c_str());
 	}

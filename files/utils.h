@@ -126,9 +126,9 @@ inline size_t get_file_size(std::istream& in) {
 // Sets factories for creating istreams/ostreams.  Intended to be called once
 // during initialization before using any U7open...() calls and is not
 // guaranteed to be thread-safe.
-using U7IstreamFactory = std::function<std::unique_ptr<std::istream>(
+using U7IstreamFactory = std::function<std::shared_ptr<std::istream>(
 		const char* s, std::ios_base::openmode mode)>;
-using U7OstreamFactory = std::function<std::unique_ptr<std::ostream>(
+using U7OstreamFactory = std::function<std::shared_ptr<std::ostream>(
 		const char* s, std::ios_base::openmode mode)>;
 void U7set_istream_factory(U7IstreamFactory factory);
 void U7set_ostream_factory(U7OstreamFactory factory);
@@ -138,37 +138,35 @@ void U7set_ostream_factory(U7OstreamFactory factory);
 // U7open...() calls and is not guaranteed to be thread-safe.
 void U7set_home(std::string home);
 
-std::unique_ptr<std::istream> U7open_in(
-		const char* fname,             // May be converted to upper-case.
+std::shared_ptr<std::istream> U7open_in(
+		std::string_view fname,             // May be converted to upper-case.
 		bool        is_text = false    // Should the file be opened in text mode
 );
 
-std::unique_ptr<std::ostream> U7open_out(
-		const char* fname,             // May be converted to upper-case.
+std::shared_ptr<std::ostream> U7open_out(
+		std::string_view fname,    // May be converted to upper-case.
 		bool        is_text = false    // Should the file be opened in text mode
 );
 
-std::unique_ptr<std::istream> U7open_static(
-		const char* fname,     // May be converted to upper-case.
+std::shared_ptr<std::istream> U7open_static(
+		std::string_view fname,     // May be converted to upper-case.
 		bool        is_text    // Should file be opened in text mode
 );
-DIR* U7opendir(const char* fname    // May be converted to upper-case.
+DIR* U7opendir(std::string_view fname    // May be converted to upper-case.
 );
-void U7remove(const char* fname);
+void U7remove(std::string_view fname);
 
-bool U7exists(const char* fname);
+bool U7exists(std::string_view fname);
 
-inline bool U7exists(const std::string& fname) {
-	return U7exists(fname.c_str());
-}
 
-int U7mkdir(const char* dirname, int mode=0755, bool parents=false);
+int U7mkdir(
+		std::string_view dirname, int mode = 0755, bool parents = false);
 
-int U7rmdir(const char* dirname, bool recursive);
+int U7rmdir(std::string_view dirname, bool recursive);
 
 #ifdef _WIN32
-void redirect_output(const char* prefix = "std");
-void cleanup_output(const char* prefix = "std");
+void redirect_output(std::string_view prefix = "std");
+void cleanup_output(std::string_view prefix = "std");
 #endif
 void setup_data_dir(const std::string& data_path, const char* runpath);
 void setup_program_paths();
@@ -180,13 +178,14 @@ int U7chdir(const char* dirname);
 
 void U7copy(const char* src, const char* dest);
 
-bool is_system_path_defined(const std::string& path);
+bool is_system_path_defined(std::string_view path);
 void store_system_paths();
 void reset_system_paths();
-void clear_system_path(const std::string& key);
-void add_system_path(const std::string& key, const std::string& value);
-void clone_system_path(const std::string& new_key, const std::string& old_key);
-std::string get_system_path(const std::string& path);
+void clear_system_path(const std::string_view key);
+void add_system_path(const std::string_view key, const std::string_view value);
+void clone_system_path(const std::string_view new_key, const std::string_view old_key);
+std::pmr::string get_system_path(std::string_view path);
+std::string_view lookup_system_path(std::string_view path);
 
 #define BUNDLE_CHECK(x, y) \
 	((is_system_path_defined("<BUNDLE>") && U7exists((x))) ? (x) : (y))
@@ -199,10 +198,18 @@ uint32 msb32(uint32 x);
 int    fgepow2(uint32 n);
 
 char* newstrdup(const char* s);
-char* Get_mapped_name(const char* from, int num, char* to);
+char* Get_mapped_name(const char* from, int num,char (&to)[128]);
 int   Find_next_map(int start, int maxtry);
 
 std::string_view get_filename_from_path(std::string_view path);
-std::string_view get_directory_from_path(std::string_view path);
+std::string_view get_directory_from_path(
+		std::string_view path, bool keepslash = false);
+
+template <typename Base>
+class MakeTransparentClass : public Base {
+public:
+	using Base::Base;
+	using is_transparent = void;
+};
 
 #endif /* _UTILS_H_ */

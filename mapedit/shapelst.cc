@@ -806,7 +806,7 @@ void Shape_chooser::edit_shape(
 	filestr += "/itmp";                    // "Image tmp" directory.
 	U7mkdir(filestr.c_str(), 0755);        // Create if not already there.
 	// Lookup <SAVEGAME> and get the base directory for security checks.
-	const string base_dir = get_system_path(filestr);
+	const auto base_dir = get_system_path(filestr);
 	filestr               = base_dir;
 
 	// Check if user wants SHP or PNG format

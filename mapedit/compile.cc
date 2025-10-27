@@ -104,7 +104,7 @@ void ExultStudio::compile(bool if_needed    // Means check timestamps.
 	const string srcdir(get_system_path("<SOURCE>"));
 	const string source(srcdir + "/usecode.uc");
 	const string incdir("-I" + srcdir);
-	const string obj = get_system_path("<PATCH>/usecode");
+	const auto  obj = get_system_path("<PATCH>/usecode");
 	if (!U7exists(source)) {
 		if (!if_needed) {
 			EStudio::Alert("Source '%s' doesn't exist", source.c_str());

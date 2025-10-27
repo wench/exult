@@ -29,16 +29,22 @@
  */
 
 class exult_exception : public std::exception {
-	std::string what_;
+	std::pmr::string what_;
 	int         errno_;
 	const char* sourcefile_;
 	int         line_;
 
 public:
 	explicit exult_exception(
-			std::string what_arg, const char* sourcefile = nullptr,
+			std::pmr::string &what_arg, const char* sourcefile = nullptr,
 			int line = 0)
 			: what_(std::move(what_arg)), errno_(errno),
+			  sourcefile_(sourcefile), line_(line) {}
+
+	explicit exult_exception(
+			std::string_view what_arg, const char* sourcefile = nullptr,
+			int line = 0)
+			: what_(what_arg), errno_(errno),
 			  sourcefile_(sourcefile), line_(line) {}
 
 	const char* what() const noexcept override {
@@ -92,35 +98,35 @@ protected:
 class file_exception : public exult_exception {
 public:
 	explicit file_exception(
-			std::string what_arg, const char* sourcefile, int line)
+			std::pmr::string what_arg, const char* sourcefile, int line)
 			: exult_exception(std::move(what_arg), sourcefile, line) {}
 };
 
 class file_open_exception : public file_exception {
-	static const std::string prefix_;
+	static const std::pmr::string prefix_;
 
 public:
 	explicit file_open_exception(
-			const std::string& file, const char* sourcefile, int line)
+			const std::pmr::string& file, const char* sourcefile, int line)
 			: file_exception("Error opening file " + file, sourcefile, line) {}
 };
 
 class file_write_exception : public file_exception {
-	static const std::string prefix_;
+	static const std::pmr::string prefix_;
 
 public:
 	explicit file_write_exception(
-			const std::string& file, const char* sourcefile, int line)
+			const std::pmr::string& file, const char* sourcefile, int line)
 			: file_exception(
 					  "Error writing to file " + file, sourcefile, line) {}
 };
 
 class file_read_exception : public file_exception {
-	static const std::string prefix_;
+	static const std::pmr::string prefix_;
 
 public:
 	explicit file_read_exception(
-			const std::string& file, const char* sourcefile, int line)
+			const std::pmr::string& file, const char* sourcefile, int line)
 			: file_exception(
 					  "Error reading from file " + file, sourcefile, line) {}
 };
@@ -128,7 +134,7 @@ public:
 class wrong_file_type_exception : public file_exception {
 public:
 	explicit wrong_file_type_exception(
-			const std::string& file, const std::string& type,
+			const std::pmr::string& file, const std::pmr::string& type,
 			const char* sourcefile, int line)
 			: file_exception(
 					  "File " + file + " is not of type " + type, sourcefile,
@@ -138,15 +144,15 @@ public:
 //
 // Macros to automatically set Sourcefile and line arguments
 //
-#define file_exception(what_arg)  file_exception(what_arg, __FILE__, __LINE__)
-#define file_open_exception(file) file_open_exception(file, __FILE__, __LINE__)
+#define file_exception(what_arg)  file_exception(std::pmr::string(what_arg), __FILE__, __LINE__)
+#define file_open_exception(file) file_open_exception(std::pmr::string(file), __FILE__, __LINE__)
 #define file_write_exception(file) \
-	file_write_exception(file, __FILE__, __LINE__)
+	file_write_exception(std::pmr::string(file), __FILE__, __LINE__)
 
-#define file_read_exception(file) file_read_exception(file, __FILE__, __LINE__)
+#define file_read_exception(file) file_read_exception(std::pmr::string(file), __FILE__, __LINE__)
 
 #define wrong_file_type_exception(file, type) \
-	wrong_file_type_exception(file, type, __FILE__, __LINE__)
+	wrong_file_type_exception(std::pmr::string(file), type, __FILE__, __LINE__)
 
 /*
  *  Exception that gets fired when the user aborts something
