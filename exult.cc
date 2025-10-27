@@ -254,21 +254,29 @@ int main(int argc, char* argv[]) {
 	// dependency.
 	U7set_istream_factory(
 			[](const char*             s,
-			   std::ios_base::openmode mode) -> std::unique_ptr<std::istream> {
-				auto file = std::make_unique<std::ifstream>(s, mode);
+			   std::ios_base::openmode mode) -> std::shared_ptr<std::istream> {
+				auto file = std::allocate_shared<std::ifstream>(
+						std::pmr::polymorphic_allocator<std::ifstream>(), s,
+						mode);
 				if (file->good()) {
 					return file;
 				}
-				return std::make_unique<SdlRwopsIstream>(s, mode);
+				return std::allocate_shared<SdlRwopsIstream>(
+						std::pmr::polymorphic_allocator<SdlRwopsIstream>(), s,
+						mode);
 			});
 	U7set_ostream_factory(
 			[](const char*             s,
-			   std::ios_base::openmode mode) -> std::unique_ptr<std::ostream> {
-				auto file = std::make_unique<std::ofstream>(s, mode);
+			   std::ios_base::openmode mode) -> std::shared_ptr<std::ostream> {
+				auto file = std::allocate_shared<std::ofstream>(
+						std::pmr::polymorphic_allocator<std::ostream>(), s,
+						mode);
 				if (file->good()) {
 					return file;
 				}
-				return std::make_unique<SdlRwopsOstream>(s, mode);
+				return std::allocate_shared<SdlRwopsOstream>(
+						std::pmr::polymorphic_allocator<SdlRwopsOstream>(), s,
+						mode);
 			});
 #ifdef SDL_PLATFORM_IOS
 	const char* launchFlag = iOS_GetLaunchGameFlag();
@@ -573,7 +581,7 @@ int exult_main(const char* runpath) {
 	config->value("config/disk/data_path", data_path, EXULT_DATADIR);
 	setup_data_dir(data_path, runpath);
 
-	const std::string default_music = get_system_path("<DATA>/music");
+	const auto default_music = get_system_path("<DATA>/music");
 	config->value("config/disk/music_path", music_path, default_music.c_str());
 
 	add_system_path("<MUSIC>", music_path);
@@ -2961,7 +2969,7 @@ void set_scaleval(int new_scaleval) {
 
 void make_screenshot(bool silent) {
 	// TODO: Maybe some form of "My Pictures" on Windows.
-	const string     savegamepath = get_system_path("<SAVEGAME>");
+	const auto     savegamepath = get_system_path("<SAVEGAME>");
 	const size_t     strsize      = savegamepath.size() + 20;
 	char*            fn           = new char[strsize];
 	bool             namefound    = false;
@@ -3073,7 +3081,7 @@ void BuildGameMap(BaseGameInfo* game, int mapnum) {
 		gwin->get_map()->init();    // +++++Got to clean this up.
 		gwin->set_map(mapnum);
 		gwin->get_pal()->set(0);
-		const string savegamepath = get_system_path("<SAVEGAME>");
+		const auto savegamepath = get_system_path("<SAVEGAME>");
 		for (int x = 0; x < c_num_chunks / c_chunks_per_schunk; x++) {
 			for (int y = 0; y < c_num_chunks / c_chunks_per_schunk; y++) {
 				gwin->paint_map_at_tile(

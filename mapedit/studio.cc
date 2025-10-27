@@ -1702,7 +1702,7 @@ void ExultStudio::set_game_path(const string& gamename, const string& modname) {
 	}
 	// Set up path to static.
 	static_path             = g_strdup(get_system_path("<STATIC>").c_str());
-	const string patch_path = get_system_path("<PATCH>");
+	const auto patch_path(get_system_path("<PATCH>"));
 	if (!U7exists(patch_path)) {    // Create patch if not there.
 		U7mkdir(patch_path.c_str(), 0755);
 	}
@@ -1788,7 +1788,7 @@ void ExultStudio::set_game_path(const string& gamename, const string& modname) {
 	// Load or create presets file for this game
 	delete presets_file;
 	presets_file             = nullptr;
-	const string preset_path = get_system_path("<PATCH>") + "/"
+	const auto preset_path = get_system_path("<PATCH>") + "/"
 							   + Shape_preset_file::get_default_filename();
 	if (U7exists(preset_path)) {
 		presets_file = Shape_preset_file::read_file(preset_path.c_str());
@@ -1800,7 +1800,7 @@ void ExultStudio::set_game_path(const string& gamename, const string& modname) {
 	// Load or create NPC presets file for this game
 	delete npc_presets_file;
 	npc_presets_file             = nullptr;
-	const string npc_preset_path = get_system_path("<PATCH>") + "/"
+	const auto npc_preset_path = get_system_path("<PATCH>") + "/"
 								   + Npc_preset_file::get_default_filename();
 	if (U7exists(npc_preset_path)) {
 		npc_presets_file = Npc_preset_file::read_file(npc_preset_path.c_str());
@@ -2365,8 +2365,8 @@ void ExultStudio::write_shape_info(bool force    // If set, always write.
 		auto* svga = static_cast<Shapes_vga_file*>(vgafile->get_ifile());
 
 		// Check if shape info files exist before trying to read them
-		const string patch_path  = get_system_path("<PATCH>");
-		const string tfa_file    = patch_path + "/tfa.dat";
+		const auto patch_path  = get_system_path("<PATCH>");
+		const auto tfa_file    = patch_path + "/tfa.dat";
 		const bool   files_exist = U7exists(tfa_file);
 
 		if (files_exist) {
@@ -3456,7 +3456,7 @@ bool ExultStudio::connect_to_server() {
 	// Use <GAMEDAT>/exultserver.
 	// Use stat() instead of U7exists which no longer supports sockets.
 	struct stat       fs;
-	const std::string servename = get_system_path(EXULT_SERVER);
+	const auto servename = get_system_path(EXULT_SERVER);
 	if (!U7exists(GAMEDAT) || (stat(servename.c_str(), &fs)) != 0) {
 		if (!gamedat_socket_error_reported) {
 			cout << "Can't find gamedat for socket" << endl;

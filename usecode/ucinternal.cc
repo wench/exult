@@ -3333,7 +3333,7 @@ void Usecode_internal::read() {
 
 	clear_usevars();    // first clear all statics
 	read_usevars();
-	std::unique_ptr<std::istream> pIn;
+	std::shared_ptr<std::istream> pIn;
 	try {
 		pIn = U7open_in(USEDAT);
 	} catch (exult_exception& /*e*/) {

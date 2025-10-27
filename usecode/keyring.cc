@@ -33,7 +33,7 @@ using std::ifstream;
 using std::ofstream;
 
 void Keyring::read() {
-	std::unique_ptr<std::istream> pIn;
+	std::shared_ptr<std::istream> pIn;
 
 	// clear keyring first
 	keys.clear();

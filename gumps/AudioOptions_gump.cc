@@ -684,7 +684,7 @@ void AudioOptions_gump::save_settings() {
 	// Check if mod forces digital music but user is trying to disable it
 	if (midi_ogg_enabled == 0) {
 		if (!Game::get_modtitle().empty()) {
-			std::string mod_cfg_path = get_system_path("<MODS>") + "/"
+			std::string mod_cfg_path = std::string(lookup_system_path("<MODS>")) + "/"
 									   + Game::get_modtitle() + ".cfg";
 			if (U7exists(mod_cfg_path)) {
 				Configuration modconfig(mod_cfg_path, "modinfo");

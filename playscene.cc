@@ -137,7 +137,7 @@ bool ScenePlayer::scene_available() const {
 }
 
 bool ScenePlayer::parse_info_file() {
-	std::unique_ptr<std::istream> file = U7open_in(info_path.c_str());
+	std::shared_ptr<std::istream> file = U7open_in(info_path);
 	if (!file || !file->good()) {
 		return false;
 	}

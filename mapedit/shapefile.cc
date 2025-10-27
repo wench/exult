@@ -535,7 +535,7 @@ static bool Create_file(
 			return true;
 		} else if (strcasecmp(".pal", basename + namelen - 4) == 0) {
 			// Empty 1-palette file.
-			U7open_out(pathname.c_str());    // May throw exception.
+			U7open_out(pathname);    // May throw exception.
 			return true;
 		} else if (strcasecmp("npcs", basename) == 0) {
 			return true;    // Don't need file.

@@ -59,7 +59,7 @@ class Game_map {
 	int num;    // Map #.  Index in gwin->maps.
 	// Flat chunk areas:
 	static std::vector<Chunk_terrain*>*  chunk_terrains;
-	static std::unique_ptr<std::istream> chunks;       // "u7chunks" file.
+	static std::shared_ptr<std::istream> chunks;       // "u7chunks" file.
 	static bool                          v2_chunks;    // True if 3 bytes/entry.
 	static bool read_all_terrain;    // True if we've read them all.
 	static bool chunk_terrains_modified;
@@ -195,9 +195,10 @@ public:
 
 	// Set new terrain chunk.
 	void  set_chunk_terrain(int cx, int cy, int chunknum);
-	char* get_mapped_name(const char* from, char* to) const;
+	char* get_mapped_name(const char* from, char (&to)[128]) const;
 	// Get ifixxxx/iregxx name.
-	char* get_schunk_file_name(const char* prefix, int schunk, char* fname) const;
+	char* get_schunk_file_name(
+			const char* prefix, int schunk, char (&fname)[128]) const;
 	static void write_chunk_terrains();
 	void        write_static();    // Write to 'static' directory.
 	// Write (static) map objects.

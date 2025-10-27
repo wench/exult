@@ -200,13 +200,13 @@ public:
  */
 
 class IFileDataSource : public IStreamDataSource {
-	std::unique_ptr<std::istream> pFin;
+	std::shared_ptr<std::istream> pFin;
 
 public:
 	explicit IFileDataSource(const File_spec& spec, bool is_text = false)
 			: IStreamDataSource(nullptr) {
 		if (U7exists(spec.name)) {
-			pFin = U7open_in(spec.name.c_str(), is_text);
+			pFin = U7open_in(spec.name, is_text);
 		} else {
 			// Set fail bit
 			pFin      = std::make_unique<std::ifstream>();
@@ -216,6 +216,16 @@ public:
 		in = pFin.get();
 		if (in) {
 			size = get_file_size(*in);
+		}
+	}
+
+	explicit IFileDataSource(std::shared_ptr<std::istream>&& shared)
+			: IStreamDataSource(nullptr),pFin(std::move(shared)) {
+		if (pFin) {
+			in = pFin.get();
+			if (in && in->good()) {
+				size = get_file_size(*in);
+			}
 		}
 	}
 };
@@ -524,13 +534,19 @@ public:
  * File-based output data source which owns the stream.
  */
 class OFileDataSource : public OStreamDataSource {
-	std::unique_ptr<std::ostream> fout;
+	std::shared_ptr<std::ostream> fout;
 
 public:
 	explicit OFileDataSource(const File_spec& spec, bool is_text = false)
 			: OStreamDataSource(nullptr) {
-		fout = U7open_out(spec.name.c_str(), is_text);
+		fout = U7open_out(spec.name, is_text);
 		out  = fout.get();
+	}
+	explicit OFileDataSource(std::shared_ptr<std::ostream>&& shared)
+			: OStreamDataSource(nullptr), fout(std::move(shared)) {
+		if (fout) {
+			out = fout.get();
+		}
 	}
 };
 

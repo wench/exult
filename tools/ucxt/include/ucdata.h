@@ -83,7 +83,7 @@ private:
 		_file.seekg(0, std::ios::end);
 	}
 
-	std::unique_ptr<std::istream> _pFile;
+	std::shared_ptr<std::istream> _pFile;
 
 	std::string _output_redirect;
 	std::string _input_usecode_file;

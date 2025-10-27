@@ -380,7 +380,7 @@ void Cheat::toggle_map_editor() {
 				cmnd += " -m ";
 				cmnd += modnamestr;
 			}
-			const std::string alt_cfg = get_system_path("<alt_cfg>");
+			const auto alt_cfg = get_system_path("<alt_cfg>");
 			if (alt_cfg != "<alt_cfg>") {
 				cmnd += " -c ";
 				cmnd += alt_cfg;

@@ -165,7 +165,7 @@ void Create_file_selection(
 	}
 	if (path != nullptr && is_system_path_defined(path)) {
 		// Default to a writable location.
-		const std::string startdir = get_system_path(path);
+		const auto startdir = get_system_path(path);
 		gtk_file_chooser_set_current_folder(fsel, startdir.c_str());
 	}
 	if (!filters.empty()) {

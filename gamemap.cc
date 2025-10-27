@@ -77,7 +77,7 @@ using std::string;
 using std::vector;
 
 vector<Chunk_terrain*>*       Game_map::chunk_terrains = nullptr;
-std::unique_ptr<std::istream> Game_map::chunks;
+std::shared_ptr<std::istream> Game_map::chunks;
 bool                          Game_map::v2_chunks               = false;
 bool                          Game_map::read_all_terrain        = false;
 bool                          Game_map::chunk_terrains_modified = false;
@@ -209,7 +209,7 @@ void Game_map::init() {
 		init_chunks();
 	}
 	map_modified = false;
-	std::unique_ptr<std::istream> pU7map;    // Read in map.
+	std::shared_ptr<std::istream> pU7map;    // Read in map.
 	bool                          nomap = false;
 	if (is_system_path_defined("<PATCH>")
 		&& U7exists(get_mapped_name(PATCH_U7MAP, fname))) {
@@ -416,7 +416,7 @@ void Game_map::set_chunk_terrain(
  *          "<GAMEDAT>/map03/ireg".
  */
 
-char* Game_map::get_mapped_name(const char* from, char* to) const {
+char* Game_map::get_mapped_name(const char* from, char (&to)[128]) const {
 	return Get_mapped_name(from, num, to);
 }
 
@@ -429,7 +429,7 @@ char* Game_map::get_mapped_name(const char* from, char* to) const {
 char* Game_map::get_schunk_file_name(
 		const char* prefix,    // "ireg" or "ifix".
 		int         schunk,    // Superchunk # (0-143).
-		char*       fname      // Name is stored here.
+		char (&fname)[128]    // Name is stored here.
 ) const {
 	get_mapped_name(prefix, fname);
 	const int                   len      = strlen(fname);

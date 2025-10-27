@@ -152,7 +152,7 @@ inline void Set_highest_fd() {
 
 void Server_init() {
 	// Get location of socket file.
-	const std::string servename = get_system_path(EXULT_SERVER);
+	const std::string servename(get_system_path(EXULT_SERVER));
 #	ifndef _WIN32
 	// Make sure it isn't there.
 	unlink(servename.c_str());
@@ -234,9 +234,10 @@ void Server_close() {
 	listen_socket = client_socket = -1;
 #	else
 	// unlink socket file+++++++
-	std::string servename = get_system_path(EXULT_SERVER);
+	auto servename = get_system_path(EXULT_SERVER);
 	unlink(servename.c_str());
 #	endif
+
 }
 
 /*
@@ -938,7 +939,7 @@ void Server_delay(Message_handler handle_message) {
 			return;
 		}
 
-		const std::string servename = get_system_path("<GAMEDAT>");
+		const std::string servename(lookup_system_path("<GAMEDAT>"));
 		if (!Exult_server::try_connect_to_client(servename.c_str())) {
 			return;
 		} else {
