@@ -507,7 +507,7 @@ void GameDat::read_save_infos() {
 	// Setup basic details
 	save_infos.reserve(filenames.size());
 	for (auto& filename : filenames) {
-		save_infos.emplace_back(std::move(filename));
+		save_infos.emplace_back(std::string(filename));
 	}
 
 	first_free.fill(-1);
@@ -1204,7 +1204,7 @@ bool GameDat::restore_gamedat_zip(
 		}
 
 		// now write it out.
-		auto pOut = U7open_out(oname.c_str());
+		auto pOut = U7open_out(oname);
 		if (!pOut) {
 			gwin->abort("Error opening '%s'.", oname.c_str());
 		}
@@ -1355,7 +1355,7 @@ bool GameDat::save_gamedat_zip(
 		}
 	}
 
-	const std::string filestr = get_system_path(fname);
+	const auto  filestr = get_system_path(fname);
 	zipFile           zipfile = zipOpen(filestr.c_str(), 1);
 
 	// We need to explicitly save these as they are no longer included in
@@ -1446,8 +1446,8 @@ void GameDat::MakeEmergencySave(const char* savename) {
 			  << "\"" << std::endl;
 
 	// Get the gamedat path and the crashtemp path
-	auto gamedatpath   = get_system_path("<GAMEDAT>");
-	auto crashtemppath = get_system_path("<GAMEDAT>.crashtemp");
+	std::string gamedatpath(get_system_path("<GAMEDAT>"));
+	std::string crashtemppath(get_system_path("<GAMEDAT>.crashtemp"));
 
 	// change <GAMEDAT> to point to crashtemp
 	add_system_path("<GAMEDAT>", crashtemppath);

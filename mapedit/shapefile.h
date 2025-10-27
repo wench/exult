@@ -137,11 +137,11 @@ public:
  *  Chunks file:
  */
 class Chunks_file_info : public Shape_file_info {
-	std::unique_ptr<std::istream> file;    // For 'chunks'; ifile is nullptr.
+	std::shared_ptr<std::istream> file;    // For 'chunks'; ifile is nullptr.
 public:
 	// We will own file.
 	Chunks_file_info(
-			const char* bnm, const char* pnm, std::unique_ptr<std::istream> f,
+			const char* bnm, const char* pnm, std::shared_ptr<std::istream> f,
 			Shape_group_file* g)
 			: Shape_file_info(bnm, pnm, g), file(std::move(f)) {}
 

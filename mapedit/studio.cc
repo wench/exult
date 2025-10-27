@@ -1577,7 +1577,7 @@ void ExultStudio::set_game_path(const string& gamename, const string& modname) {
 	}
 	// Set up path to static.
 	static_path             = g_strdup(get_system_path("<STATIC>").c_str());
-	const string patch_path = get_system_path("<PATCH>");
+	const auto patch_path(get_system_path("<PATCH>"));
 	if (!U7exists(patch_path)) {    // Create patch if not there.
 		U7mkdir(patch_path.c_str(), 0755);
 	}
@@ -3004,7 +3004,7 @@ bool ExultStudio::connect_to_server() {
 	// Use <GAMEDAT>/exultserver.
 	// Use stat() instead of U7exists which no longer supports sockets.
 	struct stat       fs;
-	const std::string servename = get_system_path(EXULT_SERVER);
+	const auto servename = get_system_path(EXULT_SERVER);
 	if (!U7exists(GAMEDAT) || (stat(servename.c_str(), &fs)) != 0) {
 		cout << "Can't find gamedat for socket" << endl;
 		return false;

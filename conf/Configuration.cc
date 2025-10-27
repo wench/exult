@@ -145,16 +145,16 @@ bool Configuration::read_config_string(const string& s) {
 	return true;
 }
 
-static inline bool is_path_absolute(const string& path) {
+static inline bool is_path_absolute(std::string_view path) {
 #ifdef _WIN32
-	const auto is_win32_abs_path = [](const string& path) {
+	const auto is_win32_abs_path = [](std::string_view path) {
 		return (path.find(".\\") == 0) || (path.find("..\\") == 0)
 			   || (path[0] == '\\')
 			   || (std::isalpha(path[0]) && path[1] == ':'
 				   && (path[2] == '/' || path[2] == '\\'));
 	};
 #else
-	const auto is_win32_abs_path = [](const string& path) {
+	const auto is_win32_abs_path = [](std::string_view path) {
 		ignore_unused_variable_warning(path);
 		return false;
 	};
@@ -230,9 +230,9 @@ bool Configuration::read_abs_config_file(
 
 	is_file = true;    // set to file, even if file not found
 
-	std::unique_ptr<std::istream> pIfile;
+	std::shared_ptr<std::istream> pIfile;
 	try {
-		pIfile = U7open_in(filename.c_str(), true);
+		pIfile = U7open_in(filename, true);
 	} catch (exult_exception&) {
 		// configuration file not found
 		return false;
@@ -277,9 +277,9 @@ void Configuration::write_back() {
 		return;    // Don't write back if not from a file
 	}
 
-	std::unique_ptr<std::ostream> pOfile;
+	std::shared_ptr<std::ostream> pOfile;
 	try {
-		pOfile = U7open_out(filename.c_str(), true);
+		pOfile = U7open_out(filename, true);
 	} catch (const file_open_exception&) {
 		perror("Failed to write configuration file");
 		return;

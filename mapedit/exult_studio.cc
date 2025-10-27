@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
 	// setting up environment for Exult Studio in an app bundle
 	setup_app_bundle_resource();
 	if (is_system_path_defined("<APP_BUNDLE_RES>")) {
-		std::string bundle_res = get_system_path("<APP_BUNDLE_RES>");
+		const auto  bundle_res = get_system_path("<APP_BUNDLE_RES>");
 		if (U7exists(bundle_res)) {
 			std::string bundle_share;
 			std::string bundle_pixbuf;

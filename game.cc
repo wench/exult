@@ -396,7 +396,7 @@ const str_int_pair& Game::get_resource(const char* name) {
  *  Write out game resources/shapes to "patch/exultgame.xml".
  */
 void Game::write_game_xml() {
-	const string name = get_system_path("<PATCH>/exultgame.xml");
+	const string name(get_system_path("<PATCH>/exultgame.xml"));
 
 	U7mkdir("<PATCH>", 0755);    // Create dir. if not already there.
 	if (U7exists(name)) {
@@ -443,7 +443,7 @@ bool Game::read_game_xml(const char* name1) {
 		}
 	}
 	xml                  = new Configuration;
-	const string namestr = get_system_path(nm);
+	const string namestr(get_system_path(nm));
 	xml->read_abs_config_file(namestr);
 	std::cout << "Reading game configuration from '" << namestr.c_str() << "'."
 			  << std::endl;
