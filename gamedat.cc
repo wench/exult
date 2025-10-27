@@ -1204,7 +1204,7 @@ bool GameDat::restore_gamedat_zip(
 		}
 
 		// now write it out.
-		auto pOut = U7open_out(oname.c_str());
+		auto pOut = U7open_out(oname);
 		if (!pOut) {
 			gwin->abort("Error opening '%s'.", oname.c_str());
 		}

@@ -29,6 +29,7 @@
 #include "fnames.h"
 #include "ignore_unused_variable_warning.h"
 #include "listfiles.h"
+
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -78,10 +79,15 @@
 using std::ios;
 using std::string;
 
+template <typename Allocator>
+using TA_String = std::basic_string<char, std::char_traits<char>, Allocator>;
+
 // Function prototypes
 
 static void switch_slashes(string& name);
-static bool base_to_uppercase(string& str, int count);
+static void switch_slashes(std::pmr::string& name);
+static bool base_to_uppercase(std::string& str, int count);
+static bool base_to_uppercase(std::pmr::string& str, int count);
 
 // Global factories for instantiating file streams
 static U7IstreamFactory istream_factory
@@ -94,10 +100,15 @@ static U7OstreamFactory ostream_factory
 			  return std::make_unique<std::ofstream>(s, mode);
 		  };
 
+
 // Ugly hack for supporting different paths
 
-static std::map<string, string> path_map;
-static std::map<string, string> stored_path_map;
+static std::map<
+		std::string, std::string,
+		MakeTransparentClass<std::less<std::string_view>>>
+		path_map;
+// Use exact same type as path_map
+static decltype(path_map) stored_path_map;
 
 void store_system_paths() {
 	stored_path_map = path_map;
@@ -161,7 +172,7 @@ void clear_system_path(const string& key) {
 /*
  *  Has a path been entered?
  */
-bool is_system_path_defined(const string& path) {
+bool is_system_path_defined(std::string_view path) {
 	return path_map.find(path) != path_map.end();
 }
 
@@ -169,10 +180,13 @@ bool is_system_path_defined(const string& path) {
  *  Convert an exult path (e.g. "<DATA>/exult.flx") into a system path
  */
 
-string get_system_path(const string& path) {
-	string            new_path = path;
-	string::size_type pos;
-	string::size_type pos2;
+template <typename Allocator>
+TA_String<Allocator> T_get_system_path(const TA_String<Allocator>& path) {
+	Allocator            alloc = path.get_allocator();
+	TA_String<Allocator> new_path(path, alloc);
+	using size_type = typename string::size_type;
+	size_type pos;
+	size_type pos2;
 
 	pos  = new_path.find('>');
 	pos2 = new_path.find('<');
@@ -181,11 +195,15 @@ string get_system_path(const string& path) {
 	while (pos != string::npos && pos2 == 0 && cnt-- > 0) {
 		pos += 1;
 		// See if we can translate this prefix
-		const string syspath = new_path.substr(0, pos);
-		if (is_system_path_defined(syspath)) {
-			string new_prefix = path_map[syspath];
-			new_prefix += new_path.substr(pos);
-			new_path.swap(new_prefix);
+		std::string_view syspath = std::string_view(new_path).substr(0, pos);
+
+		auto it = path_map.find(syspath);
+		if (it != path_map.end()) {
+			TA_String<Allocator> new_path2(alloc);
+			new_path2.reserve(it->second.size() + new_path.size() - pos);
+			new_path2 = it->second;
+			new_path2 += std::string_view(new_path).substr(pos);
+			new_path.swap(new_path2);
 			pos  = new_path.find('>');
 			pos2 = new_path.find('<');
 		} else {
@@ -236,6 +254,14 @@ string get_system_path(const string& path) {
 	return new_path;
 }
 
+std::string get_system_path(const std::string& path) {
+	return T_get_system_path(path);
+}
+
+std::pmr::string get_system_path(const std::pmr::string& path) {
+	return T_get_system_path(path);
+}
+
 /*
  *  Convert a buffer to upper-case.
  *
@@ -259,14 +285,15 @@ string to_uppercase(const string& str) {
  *  returns false if there are less than 'count' parts
  */
 
-static bool base_to_uppercase(string& str, int count) {
+template <typename Allocator>
+static bool T_base_to_uppercase(TA_String<Allocator>& str, int count) {
 	if (count <= 0) {
 		return true;
 	}
 
 	int todo = count;
 	// Go backwards.
-	string::reverse_iterator X;
+	typename TA_String<Allocator>::reverse_iterator X;
 	for (X = str.rbegin(); X != str.rend(); ++X) {
 		// Stop at separator.
 		if (*X == '/' || *X == '\\' || *X == ':') {
@@ -286,7 +313,16 @@ static bool base_to_uppercase(string& str, int count) {
 	return todo <= 0;
 }
 
-static void switch_slashes(string& name) {
+static bool base_to_uppercase(std::string& str, int count) {
+	return T_base_to_uppercase(str, count);
+}
+
+static bool base_to_uppercase(std::pmr::string& str, int count) {
+	return T_base_to_uppercase(str, count);
+}
+
+template <typename Allocator>
+static void T_switch_slashes(TA_String<Allocator>& name) {
 #ifdef _WIN32
 	for (char& X : name) {
 		if (X == '/') {
@@ -297,6 +333,14 @@ static void switch_slashes(string& name) {
 	ignore_unused_variable_warning(name);
 	// do nothing
 #endif
+}
+
+static void switch_slashes(std::string& name) {
+	T_switch_slashes(name);
+}
+
+static void switch_slashes(std::pmr::string& name) {
+	T_switch_slashes(name);
 }
 
 void U7set_istream_factory(U7IstreamFactory factory) {
@@ -314,18 +358,18 @@ void U7set_ostream_factory(U7OstreamFactory factory) {
  *
  *  Output: 0 if couldn't open.
  */
-
-std::unique_ptr<std::istream> U7open_in(
-		const char* fname,     // May be converted to upper-case.
-		bool        is_text    // Should the file be opened in text mode
-) {
+template <typename streampointer, typename Allocator>
+streampointer T_U7open_in(
+		const TA_String<Allocator>& fname,    // May be converted to upper-case.
+		bool is_text,    // Should the file be opened in text mode
+		TU7streamFactory<streampointer>& istream_factory) {
 	std::ios_base::openmode mode = std::ios::in;
 	if (!is_text) {
 		mode |= std::ios::binary;
 	}
-	string                        name           = get_system_path(fname);
-	int                           uppercasecount = 0;
-	std::unique_ptr<std::istream> in;
+	TA_String<Allocator> name           = get_system_path(fname);
+	int                  uppercasecount = 0;
+	streampointer        in;
 	do {
 		try {
 			// std::cout << "trying: " << name << std::endl;
@@ -343,6 +387,26 @@ std::unique_ptr<std::istream> U7open_in(
 	return nullptr;
 }
 
+std::unique_ptr<std::istream> U7open_in(
+		const std::string& fname,     // May be converted to upper-case.
+		bool               is_text    // Should the file be opened in text mode
+) {
+	return T_U7open_in(fname, is_text, istream_factory);
+}
+
+std::shared_ptr<std::istream> U7open_in(
+		const std::pmr::string& fname,    // May be converted to upper-case.
+		bool is_text    // Should the file be opened in text mode
+) {
+	TU7streamFactory<std::shared_ptr<std::istream>> factory
+			= [&fname](const char* s, std::ios_base::openmode mode) {
+				  return std::allocate_shared<std::ifstream>(
+						  fname.get_allocator(), s, mode);
+			  };
+
+	return T_U7open_in(fname, is_text, factory);
+}
+
 /*
  *  Open a file for output,
  *  trying the original name (lower case), and the upper case version
@@ -351,17 +415,18 @@ std::unique_ptr<std::istream> U7open_in(
  *  Output: 0 if couldn't open.
  */
 
-std::unique_ptr<std::ostream> U7open_out(
-		const char* fname,     // May be converted to upper-case.
-		bool        is_text    // Should the file be opened in text mode
-) {
+template <typename streampointer, typename Allocator>
+streampointer T_U7open_out(
+		const TA_String<Allocator>& fname,    // May be converted to upper-case.
+		bool is_text,    // Should the file be opened in text mode
+		TU7streamFactory<streampointer>& ostream_factory) {
 	std::ios_base::openmode mode = std::ios::out | std::ios::trunc;
 	if (!is_text) {
 		mode |= std::ios::binary;
 	}
-	string name = get_system_path(fname);
+	TA_String<Allocator> name = get_system_path(fname);
 
-	std::unique_ptr<std::ostream> out;
+	streampointer out;
 
 	int uppercasecount = 0;
 	do {
@@ -376,10 +441,26 @@ std::unique_ptr<std::ostream> U7open_out(
 	return nullptr;
 }
 
-DIR* U7opendir(const char* fname    // May be converted to upper-case.
-) {
-	string name           = get_system_path(fname);
-	int    uppercasecount = 0;
+std::unique_ptr<std::ostream> U7open_out(
+		const std::string& fname, bool is_text) {
+	return T_U7open_out(fname, is_text, ostream_factory);
+}
+
+std::shared_ptr<std::ostream> U7open_out(
+		const std::pmr::string& fname, bool is_text) {
+	TU7streamFactory<std::shared_ptr<std::ostream>> factory
+			= [&fname](const char* s, std::ios_base::openmode mode) {
+				  return std::allocate_shared<std::ofstream>(
+						  fname.get_allocator(), s, mode);
+			  };
+
+	return T_U7open_out(fname, is_text, factory);
+}
+
+template <typename Allocator>
+DIR* T_U7opendir(const TA_String<Allocator>& fname) {
+	auto name           = get_system_path(fname);
+	int  uppercasecount = 0;
 
 	do {
 		DIR* dir = opendir(name.c_str());    // Try to open
@@ -387,7 +468,7 @@ DIR* U7opendir(const char* fname    // May be converted to upper-case.
 		// TODO: If SDL ever adds directories to rwops use it instead
 
 		if (!dir) {
-			string internalpath
+			auto internalpath
 					= SDL_GetAndroidInternalStoragePath() + ("/" + name);
 			dir = opendir(internalpath.c_str());
 		}
@@ -399,42 +480,48 @@ DIR* U7opendir(const char* fname    // May be converted to upper-case.
 	return nullptr;
 }
 
+DIR* U7opendir(const std::pmr::string& fname) {
+	return T_U7opendir(fname);
+}
+
+DIR* U7opendir(const std::string& fname) {
+	return T_U7opendir(fname);
+}
+
 /*
  *  Remove a file taking care of paths etc.
  *
  */
 
-void U7remove(const char* fname    // May be converted to upper-case.
+template <typename Allocator>
+void T_U7remove(
+		const TA_String<Allocator>& fname    // May be converted to upper-case.
 ) {
-	string name = get_system_path(fname);
-
-#if defined(_WIN32) && defined(UNICODE)
-	const char* n     = name.c_str();
-	int         nLen  = std::strlen(n) + 1;
-	LPTSTR      lpszT = (LPTSTR)alloca(nLen * 2);
-	MultiByteToWideChar(CP_ACP, 0, n, -1, lpszT, nLen);
-	DeleteFile(lpszT);
-#else
+	TA_String<Allocator> name = get_system_path(fname);
 
 	int uppercasecount = 0;
 	do {
-		std::unique_ptr<std::istream> in;
+		std::ifstream in;
 		try {
-			if (istream_factory) {
-				in = istream_factory(name.c_str(), std::ios_base::in);
-			} else {
-				in = std::make_unique<std::ifstream>(
-						name.c_str(), std::ios_base::in);
-			}
+			in.open(name.c_str(), std::ios_base::in);
 		} catch (std::exception&) {
+			// set the fail bit	just in case
+			in.setstate(std::ios::failbit);
 		}
-		if (in && in->good() && !in->fail()) {
-			in.reset();
+		if (in.good() && !in.fail()) {
+			in.close();
 			std::remove(name.c_str());
 		}
 	} while (base_to_uppercase(name, ++uppercasecount));
 	std::remove(name.c_str());
-#endif
+}
+
+void U7remove(const std::string& fname) {
+	T_U7remove(fname);
+}
+
+void U7remove(const std::pmr::string& fname) {
+	T_U7remove(fname);
 }
 
 /*
@@ -451,7 +538,7 @@ std::unique_ptr<std::istream> U7open_static(
 
 	name = string("<PATCH>/") + fname;
 	try {
-		auto in = U7open_in(name.c_str(), is_text);
+		auto in = U7open_in(name, is_text);
 		if (in) {
 			return in;
 		}
@@ -459,7 +546,7 @@ std::unique_ptr<std::istream> U7open_static(
 	}
 	name = string("<STATIC>/") + fname;
 	try {
-		auto in = U7open_in(name.c_str(), is_text);
+		auto in = U7open_in(name, is_text);
 		if (in) {
 			return in;
 		}
@@ -472,11 +559,13 @@ std::unique_ptr<std::istream> U7open_static(
  *  See if a file exists.
  */
 
-bool U7exists(const char* fname    // May be converted to upper-case.
+template <typename Allocator>
+bool T_U7exists(
+		const TA_String<Allocator>& fname    // May be converted to upper-case.
 ) {
 	try {
 		// First check if we can open it as a file.
-		if (U7open_in(fname)) {
+		if (U7open_in(fname, false)) {
 			return true;
 		}
 	} catch (std::exception&) {
@@ -493,62 +582,71 @@ bool U7exists(const char* fname    // May be converted to upper-case.
 	return false;
 }
 
+bool U7exists(const std::string& fname) {
+	return T_U7exists(fname);
+}
+
+bool U7exists(const std::pmr::string& fname) {
+	return T_U7exists(fname);
+}
+
 /*
  *  Create a directory
  */
-
-int U7mkdir(
-		const char* dirname,    // May be converted to upper-case.
-		int         mode,
-		bool        parents) {
-	string name = get_system_path(dirname);
+template <typename Allocator>
+int T_U7mkdir(const TA_String<Allocator>& dirname, int mode, bool parents) {
+	ignore_unused_variable_warning(mode);
+	TA_String<Allocator> name  = T_get_system_path(dirname);
+	Allocator            alloc = dirname.get_allocator();
 	// remove any trailing slashes
-	const string::size_type pos = name.find_last_not_of('/');
-	if (pos != string::npos) {
+	const typename TA_String<Allocator>::size_type pos
+			= name.find_last_not_of('/');
+	if (pos != TA_String<Allocator>::npos) {
 		name.resize(pos + 1);
 	}
-	if (parents)
-	{
-		std::string parent(get_directory_from_path(name));
-		if (!parent.empty() )U7mkdir(parent.c_str(), mode, true);
+	if (parents) {
+		TA_String<Allocator> parent(get_directory_from_path(name), alloc);
+		if (!parent.empty()) {
+			T_U7mkdir(parent, mode, true);
+		}
 	}
-#if defined(_WIN32) && defined(UNICODE)
-	const char* n     = name.c_str();
-	int         nLen  = std::strlen(n) + 1;
-	LPTSTR      lpszT = (LPTSTR)alloca(nLen * 2);
-	MultiByteToWideChar(CP_ACP, 0, n, -1, lpszT, nLen);
-	ignore_unused_variable_warning(mode);
-	return CreateDirectory(lpszT, nullptr);
-#elif defined(_WIN32)
-	ignore_unused_variable_warning(mode);
+#ifdef _WIN32
 	return mkdir(name.c_str());
 #else
 	return mkdir(name.c_str(), mode);    // Create dir. if not already there.
 #endif
 }
 
-int U7rmdir(const char* dirname, bool recursive) {
-	string name = get_system_path(dirname);
+int U7mkdir(const std::string& dirname, int mode, bool parents) {
+	return T_U7mkdir(dirname, mode, parents);
+}
 
-	if (recursive)
-	{
+int U7mkdir(const std::pmr::string& dirname, int mode, bool parents) {
+	return T_U7mkdir(dirname, mode, parents);
+}
+
+template <template <typename> typename Allocator>
+int T_U7rmdir(const TA_String<Allocator<char>>& dirname, bool recursive) {
+	using string = TA_String<Allocator<char>>;
+	string name  = get_system_path(dirname);
+
+	if (recursive) {
 		// Get contents if recrusive
-		FileList files;
+		ListFiles::TA_FileList<Allocator> files(dirname.get_allocator());
 		U7ListFiles(name + "/*", files, true);
 
-		for (auto filename : files)
-		{
+		for (auto filename : files) {
 			// Get filename
-			std::string_view fn    = get_filename_from_path(filename);
+			std::string_view fn = get_filename_from_path(filename);
 
 			// skip . and .. directory entries
 			if (fn == "." || fn == "..") {
 				continue;
 			}
 
-
 			// is it a directory? if so rmdir it recursively
-			auto* dir = U7opendir(filename.c_str());
+			string subname(filename, dirname.get_allocator());
+			auto*  dir = U7opendir(subname);
 			if (dir) {
 				closedir(dir);
 				if (U7rmdir(filename.c_str(), true)) {
@@ -561,6 +659,14 @@ int U7rmdir(const char* dirname, bool recursive) {
 	}
 
 	return rmdir(name.c_str());
+}
+
+int U7rmdir(const std::pmr::string& dirname, bool recursive) {
+	return T_U7rmdir(dirname, recursive);
+}
+
+int U7rmdir(const std::string& dirname, bool recursive) {
+	return T_U7rmdir(dirname, recursive);
 }
 
 #ifdef _WIN32
@@ -696,14 +802,14 @@ void redirect_output(const char* prefix) {
 #		endif
 	};
 	auto redirect_stream = [](FILE* stream, const char* device, HANDLE handle,
-							  DWORD& type, int mode, size_t size) {
+							  DWORD& type, int mode, size_t count) {
 		// Only redirect if the stream is not already being redirected.
 		if (handle != INVALID_HANDLE_VALUE && type == FILE_TYPE_UNKNOWN) {
 			// Flush the output in case anything is queued
 			fflush(stream);
 			FILE* new_stream = freopen(device, "w", stream);
 			if (new_stream != nullptr) {
-				setvbuf(stream, nullptr, mode, size);
+				setvbuf(stream, nullptr, mode, count);
 				return true;
 			}
 			type = GetFileType(handle);
@@ -1042,7 +1148,8 @@ void setup_program_paths() {
  *  Change the current directory
  */
 
-int U7chdir(const char* dirname    // May be converted to upper-case.
+int U7chdir(
+		const char* dirname    // May be converted to upper-case.
 ) {
 	return chdir(dirname);
 }
@@ -1178,10 +1285,9 @@ int Find_next_map(
 	return -1;
 }
 
-std::string_view get_filename_from_path(std::string_view path)
-{
+std::string_view get_filename_from_path(std::string_view path) {
 	// find last slash or backslash
-	auto             slash = path.find_last_of("\\/");
+	auto slash = path.find_last_of("\\/");
 	if (slash != std::string_view::npos) {
 		// return the substring after the slash
 		return path.substr(slash + 1);
@@ -1190,11 +1296,15 @@ std::string_view get_filename_from_path(std::string_view path)
 	return path;
 }
 
-std::string_view get_directory_from_path(std::string_view path) {
+std::string_view get_directory_from_path(
+		std::string_view path, bool keepslash) {
 	// find last slash or backslash
 	auto slash = path.find_last_of("\\/");
 	if (slash != std::string_view::npos) {
-		// return the substring before the slash
+		// return the substring up to (and possibly including) the slash
+		if (keepslash) {
+			slash++;
+		}
 		path = path.substr(0, slash);
 #ifdef _WIN32
 		// Do not return drive letters as the top level directory

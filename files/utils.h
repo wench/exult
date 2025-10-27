@@ -126,10 +126,14 @@ inline size_t get_file_size(std::istream& in) {
 // Sets factories for creating istreams/ostreams.  Intended to be called once
 // during initialization before using any U7open...() calls and is not
 // guaranteed to be thread-safe.
-using U7IstreamFactory = std::function<std::unique_ptr<std::istream>(
+template <typename streampointer>
+using TU7streamFactory = std::function<streampointer(
 		const char* s, std::ios_base::openmode mode)>;
-using U7OstreamFactory = std::function<std::unique_ptr<std::ostream>(
-		const char* s, std::ios_base::openmode mode)>;
+
+using U7IstreamFactory = TU7streamFactory<std::unique_ptr<std::istream>>;
+
+using U7OstreamFactory = TU7streamFactory<std::unique_ptr<std::ostream>>;
+
 void U7set_istream_factory(U7IstreamFactory factory);
 void U7set_ostream_factory(U7OstreamFactory factory);
 
@@ -139,32 +143,75 @@ void U7set_ostream_factory(U7OstreamFactory factory);
 void U7set_home(std::string home);
 
 std::unique_ptr<std::istream> U7open_in(
-		const char* fname,             // May be converted to upper-case.
+		const std::string& fname,
+		bool is_text = false    // Should the file be opened in text mode
+);
+
+inline std::unique_ptr<std::istream> U7open_in(
+		const char* fname,
 		bool        is_text = false    // Should the file be opened in text mode
-);
-
-std::unique_ptr<std::ostream> U7open_out(
-		const char* fname,             // May be converted to upper-case.
-		bool        is_text = false    // Should the file be opened in text mode
-);
-
-std::unique_ptr<std::istream> U7open_static(
-		const char* fname,     // May be converted to upper-case.
-		bool        is_text    // Should file be opened in text mode
-);
-DIR* U7opendir(const char* fname    // May be converted to upper-case.
-);
-void U7remove(const char* fname);
-
-bool U7exists(const char* fname);
-
-inline bool U7exists(const std::string& fname) {
-	return U7exists(fname.c_str());
+) {
+	// forward to std::string version
+	return U7open_in(std::string(fname), is_text);
 }
 
-int U7mkdir(const char* dirname, int mode=0755, bool parents=false);
+std::shared_ptr<std::istream> U7open_in(
+		const std::pmr::string& fname,
+		bool is_text = false    // Should the file be opened in text mode
+);
+std::unique_ptr<std::ostream> U7open_out(
+		const std::string& fname,
+		bool is_text = false    // Should the file be opened in text mode
+);
+std::shared_ptr<std::ostream> U7open_out(
+		const std::pmr::string& fname,
+		bool is_text = false    // Should the file be opened in text mode
+);
 
-int U7rmdir(const char* dirname, bool recursive);
+inline std::unique_ptr<std::ostream> U7open_out(
+		const char* fname,
+		bool        is_text = false    // Should the file be opened in text mode
+) {
+	// forward to std::string version
+	return U7open_out(std::string(fname), is_text);
+}
+
+std::unique_ptr<std::istream> U7open_static(const char* fname, bool is_text);
+DIR*                          U7opendir(const std::pmr::string& fname);
+DIR*                          U7opendir(const std::string& fname);
+
+inline DIR* U7opendir(const char* fname) {
+	return U7opendir(std::string(fname));
+}
+
+void U7remove(const std::string& fname);
+void U7remove(const std::pmr::string& fname);
+
+inline void U7remove(const char* fname) {
+	return U7remove(std::string(fname));
+}
+
+bool U7exists(const std::string& fname);
+bool U7exists(const std::pmr::string& fname);
+
+inline bool U7exists(const char* fname) {
+	return U7exists(std::string(fname));
+}
+
+int U7mkdir(const std::string& dirname, int mode = 0755, bool parents = false);
+int U7mkdir(
+		const std::pmr::string& dirname, int mode = 0755, bool parents = false);
+
+inline int U7mkdir(const char* dirname, int mode = 0755, bool parents = false) {
+	return U7mkdir(std::string(dirname), mode, parents);
+}
+
+int U7rmdir(const std::pmr::string& dirname, bool recursive);
+int U7rmdir(const std::string& dirname, bool recursive);
+
+inline int U7rmdir(const char* dirname, bool recursive) {
+	return U7rmdir(std::string(dirname), recursive);
+}
 
 #ifdef _WIN32
 void redirect_output(const char* prefix = "std");
@@ -180,13 +227,19 @@ int U7chdir(const char* dirname);
 
 void U7copy(const char* src, const char* dest);
 
-bool is_system_path_defined(const std::string& path);
+bool is_system_path_defined(std::string_view path);
 void store_system_paths();
 void reset_system_paths();
 void clear_system_path(const std::string& key);
 void add_system_path(const std::string& key, const std::string& value);
 void clone_system_path(const std::string& new_key, const std::string& old_key);
-std::string get_system_path(const std::string& path);
+std::string      get_system_path(const std::string& path);
+std::pmr::string get_system_path(const std::pmr::string& path);
+
+inline std::string get_system_path(const char* path) {
+	std::string sp(path);
+	return get_system_path(sp);
+}
 
 #define BUNDLE_CHECK(x, y) \
 	((is_system_path_defined("<BUNDLE>") && U7exists((x))) ? (x) : (y))
@@ -203,6 +256,14 @@ char* Get_mapped_name(const char* from, int num, char* to);
 int   Find_next_map(int start, int maxtry);
 
 std::string_view get_filename_from_path(std::string_view path);
-std::string_view get_directory_from_path(std::string_view path);
+std::string_view get_directory_from_path(
+		std::string_view path, bool keepslash = false);
+
+template <typename Base>
+class MakeTransparentClass : public Base {
+public:
+	using Base::Base;
+	using is_transparent = void;
+};
 
 #endif /* _UTILS_H_ */
