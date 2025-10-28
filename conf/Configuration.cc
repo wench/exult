@@ -50,32 +50,38 @@ using std::isspace;
 #	define CTRACE(X)
 #endif
 
-void Configuration::value(
+bool Configuration::value(
 		const string& key, string& ret, const std::string& defaultvalue) const {
 	const XMLnode* sub = xmltree->subtree(key);
 	if (sub) {
 		ret = sub->value();
+		return true;
 	} else {
 		ret = defaultvalue;
+		return false;
 	}
 }
 
-void Configuration::value(
+bool Configuration::value(
 		const string& key, bool& ret, bool defaultvalue) const {
 	const XMLnode* sub = xmltree->subtree(key);
 	if (sub) {
 		ret = (to_uppercase(sub->value()) == "YES");
+		return true;
 	} else {
 		ret = defaultvalue;
+		return false;
 	}
 }
 
-void Configuration::value(const string& key, int& ret, int defaultvalue) const {
+bool Configuration::value(const string& key, int& ret, int defaultvalue) const {
 	const XMLnode* sub = xmltree->subtree(key);
 	if (sub) {
 		ret = atoi(sub->value().c_str());
+		return true;
 	} else {
 		ret = defaultvalue;
+		return false;
 	}
 }
 
