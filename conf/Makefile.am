@@ -10,6 +10,8 @@ noinst_LTLIBRARIES = libconf.la
 libconf_la_SOURCES =	\
 	Configuration.cc	\
 	Configuration.h		\
+	Settings.cc         \
+	Settings.h          \
 	XMLEntity.cc		\
 	XMLEntity.h
 
