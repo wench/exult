@@ -41,13 +41,9 @@ public:
 
 	class Diamond : public Gump_widget {
 	public:
-		Diamond(Gump_Base* parent, int px=0, int py=0,
-				std::optional<ShapeID> sidDiamond= std::nullopt)
-				: Gump_widget(
-						  parent, -1, px, py,
-						  -1,
-						  SF_OTHER)
-		{
+		Diamond(Gump_Base* parent, int px = 0, int py = 0,
+				std::optional<ShapeID> sidDiamond = std::nullopt)
+				: Gump_widget(parent, -1, px, py, -1, SF_OTHER) {
 			if (sidDiamond) {
 				auto sid = sidDiamond.value_or(ShapeID(-1, -1, SF_OTHER));
 				set_shape(sid.get_shapenum());
@@ -76,7 +72,7 @@ public:
 			return r;
 		}
 
-	// Is a given point on the widget?
+		// Is a given point on the widget?
 		bool on_widget(int mx, int my) const override;
 
 		void paint() override;
@@ -91,8 +87,9 @@ public:
 	Slider_widget(
 			Gump_Base* par, int px, int py, std::optional<ShapeID> sidLeft,
 			std::optional<ShapeID> sidRight, std::optional<ShapeID> sidDiamond,
-			int mival, int mxval, int step, int defval,
-			int width = 64, bool logarithmic = false);
+			int mival, int mxval, int step, int defval, int width = 64,
+			std::shared_ptr<Font> font = {}, int digits_width = 0,
+			bool logarithmic = false);
 
 	// By default the callback is set to par by the construcor if par implements
 	// ISlider_widget_callback but if not the callback can be set here
@@ -113,6 +110,8 @@ private:
 
 	std::unique_ptr<Diamond>     diamond;
 	std::unique_ptr<Gump_button> left, right;
+	std::shared_ptr<Font>        font;
+	int                          max_digits_width = 0;
 
 	Gump_button* pushed;
 
