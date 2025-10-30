@@ -214,14 +214,14 @@ Mixer_gump::Mixer_gump() : Modal_gump(nullptr, -1) {
 				this,
 				label_margin + font->get_text_width(Strings::MIDIMusic_()),
 				yForRow(0) - 13, std::nullopt, std::nullopt, std::nullopt, 0, 100, 1,
-				initial_music_midi, slider_width);
+				initial_music_midi, slider_width,font,24);
 	}
 	if (initial_music_ogg != -1) {
 		oggslider = std::make_shared<Slider_widget>(
 				this, label_margin + font->get_text_width(Strings::OGGMusic_()),
 				yForRow(num_sliders - 3) - 13, std::nullopt, std::nullopt,
 				std::nullopt,
-				0, 100, 1, initial_music_ogg, slider_width);
+				0, 100, 1, initial_music_ogg, slider_width,font,24);
 	}
 
 	if (initial_sfx != -1) {
@@ -229,14 +229,14 @@ Mixer_gump::Mixer_gump() : Modal_gump(nullptr, -1) {
 				this, label_margin + font->get_text_width(Strings::SFX_()),
 				yForRow(num_sliders - 2) - 13, std::nullopt, std::nullopt,
 				std::nullopt,
-				0, 100, 1, initial_sfx, slider_width);
+				0, 100, 1, initial_sfx, slider_width,font,24);
 	}
 	if (initial_speech != -1) {
 		speechslider = std::make_shared<Slider_widget>(
 				this, label_margin + font->get_text_width(Strings::Speech_()),
 				yForRow(num_sliders - 1) - 13, std::nullopt, std::nullopt,
 				std::nullopt,
-				0, 100, 1, initial_speech, slider_width);
+				0, 100, 1, initial_speech, slider_width,font,24);
 	}
 	// Ok
 	buttons[id_ok] = std::make_unique<Mixer_Textbutton>(
@@ -253,9 +253,9 @@ Mixer_gump::Mixer_gump() : Modal_gump(nullptr, -1) {
 			yForRow(num_sliders), 50);
 
 	// resize gump and reposition widgets
-	ResizeWidthToFitWidgets(tcb::span(&midislider, 4), 28);
+	ResizeWidthToFitWidgets(tcb::span(&midislider, 4), 4);
 	HorizontalArrangeWidgets(tcb::span(buttons.data() + id_ok, 3));
-	RightAlignWidgets(tcb::span(&midislider, 4), 28);
+	RightAlignWidgets(tcb::span(&midislider, 4), 4);
 }
 
 Mixer_gump::~Mixer_gump() {
@@ -310,8 +310,6 @@ void Mixer_gump::PaintSlider(
 
 	slider->paint();
 
-	gumpman->paint_num(
-			slider->getselection(), rect.x + rect.w + 24, rect.y + 2, font);
 }
 
 void Mixer_gump::paint() {
