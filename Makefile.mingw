@@ -548,7 +548,7 @@ OBJECTS:=$(OBJS) $(TOOL_OBJS) $(ES_OBJS) tools/gimp_plugin/u7shp.o tools/aseprit
 MISC_OBJS:=exultstudioico.o
 
 ES_OBJS:=$(MAPEDIT_OBJS) $(ES_FILES_OBJS) $(ES_GAMEMGR_OBJS) $(ES_IMAGEWIN_OBJS) $(ES_SHAPES_OBJS) \
-	$(ES_SERVER_OBJS) $(CONF_OBJS) $(MISC_OBJS) $(ZIP_OBJS)
+	$(ES_SERVER_OBJS) $(CONF_OBJS) $(MISC_OBJS) $(ZIP_OBJS) istring.o
 
 # Gather together at the end the SDL3_image dependent executables
 TOOL_EXES:=expack$(EXEEXT) cmanip$(EXEEXT) ipack$(EXEEXT) mklink$(EXEEXT) rip$(EXEEXT) \
@@ -562,7 +562,7 @@ exultico.o: win32/exultico.rc win32/exult.ico win32/exult.exe.manifest
 exconfig_rc.o: win32/exconfig.rc
 	windres --include-dir win32 win32/exconfig.rc exconfig_rc.o
 
-exconfig.dll: $(FILE_OBJS) $(CONF_OBJS) exconfig_rc.o win32/exconfig.o
+exconfig.dll: $(FILE_OBJS) $(CONF_OBJS) exconfig_rc.o win32/exconfig.o istring.o
 	$(CXX) $(LDFLAGS) -shared -o $@ $^ -static -lstdc++ -Wl,--dynamicbase
 
 exult_studio$(EXEEXT): $(BG_PAPERDOLL) $(FLEXES) $(ES_OBJS)

@@ -48,6 +48,7 @@ PATH_OBJS:= \
 
 CONF_OBJS:= \
 	conf/Configuration.o \
+	conf/Settings.o      \
 	conf/XMLEntity.o
 # unused: xmain.o
 
@@ -616,8 +617,8 @@ $(BG_PAPERDOLL): expack$(EXEEXT) $(EXULT_BG_PAPERDOL_VGA_OBJECTS)
 $(BG_MR_FACES): expack$(EXEEXT) $(EXULT_BG_MR_FACES_VGA_OBJECTS)
 	$(SRC)/expack$(EXEEXT) -i data/bg/bg_mr_faces.in
 
-cmanip$(EXEEXT) : tools/cmanip.o $(CONF_OBJS) $(FILE_OBJS)
-	$(CXX) $(LDFLAGS) -o $(@) tools/cmanip.o $(CONF_OBJS) $(FILE_OBJS)
+cmanip$(EXEEXT) : tools/cmanip.o $(CONF_OBJS) $(FILE_OBJS) istring.o
+	$(CXX) $(LDFLAGS) -o $(@) tools/cmanip.o $(CONF_OBJS) $(FILE_OBJS) istring.o
 
 IPACK_OBJS:=\
 	files/Flat.o \
@@ -726,6 +727,7 @@ UCXT_OBJS:=\
 	$(CONF_OBJS) \
 	$(ZIP_OBJS) \
 	$(FILE_OBJS) \
+	istring.o \
 	gamemgr/modmgr.o \
 	usecode/ucsymtbl.o \
 	tools/ucxt/src/ops.o \
@@ -736,7 +738,7 @@ UCXT_OBJS:=\
 ucxt$(EXEEXT) : $(UCXT_OBJS)
 	$(CXX) $(LDFLAGS) -o $(@) $(UCXT_OBJS) $(ZIP_LIBS)
 
-CONFREGRESS_OBJS:=$(CONF_OBJS) conf/xmain.o files/utils.o files/listfiles.o 
+CONFREGRESS_OBJS:=$(CONF_OBJS) conf/xmain.o files/utils.o files/listfiles.o istring.o
 
 confregress$(EXEEXT)  : $(CONFREGRESS_OBJS)
 	$(CXX) $(LDFLAGS) -o $(@) $(CONFREGRESS_OBJS)

@@ -35,6 +35,7 @@
 #include "Gump_button.h"
 #include "Gump_manager.h"
 #include "Scroll_gump.h"
+#include "Settings.h"
 #include "ShortcutBar_gump.h"
 #include "U7file.h"
 #include "U7fileman.h"
@@ -145,7 +146,7 @@ int  usecode_trace   = 0;        // Do we trace Usecode-instructions?
 bool combat_trace = false;    // show combat messages?
 
 // Save game compression level
-bool ignore_crc       = false;
+bool ignore_crc = false;
 
 TouchUI* touchui = nullptr;
 
@@ -543,6 +544,8 @@ int exult_main(const char* runpath) {
 	} else {
 		config->read_config_file(USER_CONFIGURATION_FILE);
 	}
+	// Load all setting now that config is available
+	Settings::get().load_all(config);
 
 #if defined _WIN32
 	// Install the crash handler after we've loaded config
@@ -664,7 +667,6 @@ int exult_main(const char* runpath) {
 	}
 
 	config->value("config/debug/trace/combat", combat_trace);
-
 
 #ifdef USECODE_DEBUGGER
 	// Enable usecode debugger
@@ -1172,7 +1174,8 @@ static void Init() {
 						force_skip_splash = mod_info->get_force_skip_splash();
 					}
 					if (mod_info->has_force_digital_music_set()) {
-						force_digital_music = mod_info->get_force_digital_music();
+						force_digital_music
+								= mod_info->get_force_digital_music();
 					}
 				}
 			}
@@ -2786,7 +2789,8 @@ static void Shift_wizards_eye(int mx, int my) {
  *  Do the 'wizard's eye' spell by letting the user browse around.
  */
 
-void Wizard_eye(long msecs    // Length of time in milliseconds.
+void Wizard_eye(
+		long msecs    // Length of time in milliseconds.
 ) {
 	// Center of screen.
 	const int cx = gwin->get_width() / 2;
@@ -2839,8 +2843,9 @@ void Wizard_eye(long msecs    // Length of time in milliseconds.
 						mx, my);
 
 				Mouse::mouse()->move(mx, my);
-				Mouse::mouse()->set_shape(Mouse::mouse()->get_short_arrow(
-						Get_direction_NoWrap(cy - my, mx - cx)));
+				Mouse::mouse()->set_shape(
+						Mouse::mouse()->get_short_arrow(
+								Get_direction_NoWrap(cy - my, mx - cx)));
 				Mouse::mouse_update = true;
 				break;
 			}

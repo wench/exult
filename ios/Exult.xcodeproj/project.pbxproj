@@ -243,6 +243,7 @@
 		E700DF751A6E34C6006C8BE4 /* useval.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DF1D1A6E34C6006C8BE4 /* useval.cc */; };
 		E700DF8F1A6E364E006C8BE4 /* Configuration.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DF811A6E364E006C8BE4 /* Configuration.cc */; };
 		E700DF961A6E364E006C8BE4 /* XMLEntity.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DF891A6E364E006C8BE4 /* XMLEntity.cc */; };
+		E700DF9D1A6E364E006C8BE4 /* Settings.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DF841A6E364E006C8BE4 /* Settings.cc */; };
 		E700DF9D1A6E36D6006C8BE4 /* objserial.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DF971A6E36D6006C8BE4 /* objserial.cc */; };
 		E700DF9E1A6E36D6006C8BE4 /* servemsg.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DF991A6E36D6006C8BE4 /* servemsg.cc */; };
 		E700DFB51A6E372A006C8BE4 /* Astar.cc in Sources */ = {isa = PBXBuildFile; fileRef = E700DFA71A6E372A006C8BE4 /* Astar.cc */; };
@@ -799,6 +800,8 @@
 		E700DF791A6E3621006C8BE4 /* exult_si_flx.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = exult_si_flx.h; path = ../data/exult_si_flx.h; sourceTree = "<group>"; };
 		E700DF811A6E364E006C8BE4 /* Configuration.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Configuration.cc; sourceTree = "<group>"; };
 		E700DF821A6E364E006C8BE4 /* Configuration.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Configuration.h; sourceTree = "<group>"; };
+		E700DF831A6E364E006C8BE4 /* Settings.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Settings.h; path = Settings.h; sourceTree = "<group>"; };
+		E700DF841A6E364E006C8BE4 /* Settings.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Settings.cc; path = Settings.cc; sourceTree = "<group>"; };
 		E700DF891A6E364E006C8BE4 /* XMLEntity.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = XMLEntity.cc; sourceTree = "<group>"; };
 		E700DF8A1A6E364E006C8BE4 /* XMLEntity.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = XMLEntity.h; sourceTree = "<group>"; };
 		E700DF971A6E36D6006C8BE4 /* objserial.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = objserial.cc; path = ../server/objserial.cc; sourceTree = "<group>"; };
@@ -1557,6 +1560,8 @@
 			children = (
 				E700DF811A6E364E006C8BE4 /* Configuration.cc */,
 				E700DF821A6E364E006C8BE4 /* Configuration.h */,
+				E700DF831A6E364E006C8BE4 /* Settings.h */,
+				E700DF841A6E364E006C8BE4 /* Settings.cc */,
 				E700DF891A6E364E006C8BE4 /* XMLEntity.cc */,
 				E700DF8A1A6E364E006C8BE4 /* XMLEntity.h */,
 			);
@@ -1928,6 +1933,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E700DF9D1A6E364E006C8BE4 /* Settings.cc in Sources */,
 				8AC797C81C8D0E4F001AF014 /* zip.cc in Sources */,
 				E700DF441A6E34C6006C8BE4 /* debugserver.cc in Sources */,
 				E700DE2F1A6E344D006C8BE4 /* scale_hq2x.cc in Sources */,
