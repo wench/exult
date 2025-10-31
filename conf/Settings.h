@@ -3,6 +3,7 @@
 #include "istring.h"
 
 #include <algorithm>
+#include <charconv>
 #include <functional>
 #include <limits>
 #include <map>
@@ -12,7 +13,6 @@
 #include <vector>
 
 class Configuration;
-
 
 class Settings {
 public:
@@ -25,8 +25,6 @@ public:
 		bool config_write(const char* s, bool writeback);
 		bool config_read(std::string& s, const std::string& defaultvalue);
 		bool config_write(const std::string& s, bool writeback);
-		bool config_read(int& i, int defaultvalue);
-		bool config_write(int i, bool writeback);
 
 	private:
 		property(const property&)            = delete;
@@ -105,6 +103,8 @@ public:
 		T saved_value;
 
 	public:
+		using valuetype = T;
+
 		Tproperty(
 				const char* key, const T& def_value,
 				std::set<property*>* set = nullptr)
@@ -140,7 +140,7 @@ public:
 		}
 
 		T operator=(const T& v) {
-			set(v, false);
+			set(v);
 			return v;
 		}
 	};
@@ -182,6 +182,8 @@ public:
 		}
 
 		bool load() override {
+			auto& value = this->value;
+
 			std::string str_value;
 			bool        need_save = !this->config_read(str_value, {});
 
@@ -194,20 +196,20 @@ public:
 			}
 
 			if (find_it != values.end()) {
-				this->value = find_it->second;
+				value = find_it->second;
 			} else {
-				this->value = this->default_value;
-				need_save   = true;
+				value     = this->default_value;
+				need_save = true;
 			}
 
-			this->saved_value      = this->value;
+			this->saved_value      = value;
 			this->synced_to_config = true;
 			if (normalize || need_save) {
 				for (const auto& [str, enum_val] : values) {
-					if (enum_val == this->value) {
+					if (enum_val == value) {
 						if (need_save || str != str_value) {
 							if (this->config_write(std::string(str), false)) {
-								this->saved_value      = this->value;
+								this->saved_value      = value;
 								this->synced_to_config = true;
 							}
 
@@ -223,27 +225,53 @@ public:
 			}
 			return false;
 		}
+
+		using Tproperty<T>::operator=;
 	};
 
-	class int_property : public Tproperty<int> {
-		int min_value;
-		int max_value;
+	template <typename T = int>
+	class int_property : public Tproperty<T> {
+		T min_value;
+		T max_value;
+
+		bool config_read(T& i, T defaultvalue) {
+			std::string str_value;
+			if (!property::config_read(str_value, {})) {
+				i = defaultvalue;
+				return false;
+			}
+			if (std::from_chars(
+						str_value.data(), str_value.data() + str_value.size(),
+						i)
+						.ec
+				!= std::errc()) {
+				i = defaultvalue;
+				return false;
+			}
+			return true;
+		}
+
+		bool config_write(T i, bool writeback) {
+			return property::config_write(std::to_string(i), writeback);
+		}
 
 	public:
 		int_property(
-				const char* key, int def_value, int min_value, int max_value,
+				const char* key, T def_value, T min_value, T max_value,
 				std::set<property*>* set = nullptr)
 				: Tproperty<int>(key, def_value, set), min_value(min_value),
 				  max_value(max_value) {}
 
 		virtual void save(bool write_out = false) override {
-			config_write(value, write_out);
-			saved_value      = value;
-			synced_to_config = true;
+			if (config_write(this->value, write_out)) {
+				this->saved_value      = this->value;
+				this->synced_to_config = true;
+			}
 		}
 
 		bool load() override {
-			bool need_save = !config_read(value, default_value);
+			auto& value     = this->value;
+			bool  need_save = !config_read(value, this->default_value);
 			if (value < min_value) {
 				value     = min_value;
 				need_save = true;
@@ -251,16 +279,25 @@ public:
 				value     = max_value;
 				need_save = true;
 			}
-			saved_value      = value;
-			synced_to_config = true;
+			this->saved_value      = value;
+			this->synced_to_config = true;
 			if (need_save) {
-				if (!config_write(value, false))
-				{
-					synced_to_config = false;
+				if (!config_write(value, false)) {
+					this->synced_to_config = false;
 				}
 			}
 			return need_save;
 		}
+
+		T get_min() const {
+			return min_value;
+		}
+
+		T get_max() const {
+			return max_value;
+		}
+
+		using Tproperty<T>::operator=;
 	};
 
 	class string_property : public Tproperty<std::string> {
@@ -336,6 +373,25 @@ public:
 			synced_to_config = true;
 			return need_save;
 		}
+
+		using Tproperty<std::string>::operator=;
+	};
+
+	// ReadOnly wrapper for properties that only allows the friend class to
+	// modify them
+	template <typename Base, typename Tfriend = void>
+	class ReadOnly : private Base {
+		friend Tfriend;
+
+	public:
+		using Base::Base;
+		using Base::get;
+		using typename Base::valuetype;
+		using Base::operator const typename Base::valuetype &;
+
+	private:
+		using Base::set;
+		using Base::operator=;
 	};
 
 	static const std::vector<std::pair<std::string, bool>> boolyesnoany;
@@ -385,7 +441,7 @@ public:
 
 		void save_all(bool write_out = false);
 
-		void load_all();
+		bool load_all();
 
 		void save_dirty(bool write_out = false);
 	};
@@ -396,18 +452,18 @@ public:
 	struct Disk : public PropertySet {
 		Disk(Settings* settings) : PropertySet(settings) {}
 
-		int_property save_compression_level
+		int_property<> save_compression_level
 				= {"config/disk/save_compression_level", 1, 0, 2, this};
 
-		int_property autosave_count
+		int_property<> autosave_count
 				= {"config/disk/autosave_count", 5, 0,
 				   std::numeric_limits<int>::max(), this};
 
-		int_property quick_save_count
+		int_property<> quick_save_count
 				= {"config/disk/quick_save_count", 5, 1,
 				   std::numeric_limits<int>::max(), this};
 
-		enum_like_property<bool> use_old_style_save_load
+		ReadOnly<enum_like_property<bool>> use_old_style_save_load
 				= {"config/disk/use_old_style_save_load", false,
 				   Settings::boolyesnoany, true, this};
 
