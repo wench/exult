@@ -27,6 +27,7 @@
 #include "Gump_ToggleButton.h"
 #include "Gump_button.h"
 #include "Gump_manager.h"
+#include "Settings.h"
 #include "Slider_widget.h"
 #include "Text_button.h"
 #include "Yesno_gump.h"
@@ -226,11 +227,7 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 	} else if (!old_style_mode) {
 		// Only check for old style mode config setting if not in restore mode
 		// and old_style_mode has not been forced by constructor parameter
-		config->value(
-				"config/disk/use_old_style_save_load", old_style_mode, false);
-		config->set(
-				"config/disk/use_old_style_save_load",
-				old_style_mode ? "yes" : "no", true);
+		old_style_mode = Settings::get().disk.use_old_style_save_load;
 	}
 
 	newname[0] = 0;
