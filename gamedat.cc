@@ -29,6 +29,7 @@
 #include "Flex.h"
 #include "Newfile_gump.h"
 #include "Notebook_gump.h"
+#include "Settings.h"
 #include "Yesno_gump.h"
 #include "actors.h"
 #include "cheat.h"
@@ -44,9 +45,9 @@
 #include "mouse.h"
 #include "party.h"
 #include "span.h"
+#include "ucmachine.h"
 #include "utils.h"
 #include "version.h"
-#include "ucmachine.h"
 
 #include <cstddef>
 #include <cstdio>
@@ -258,23 +259,6 @@ void GameDat::restore_gamedat(
 	}
 }
 
-/*
- *  Write out the gamedat directory from a saved game.
- *
- *  Output: Aborts if error.
- */
-
-void GameDat::restore_gamedat(
-		int num    // 0-9, currently.
-) {
-	char fname[50];    // Set up name.
-	snprintf(
-			fname, sizeof(fname), SAVENAME, num,
-			Game::get_game_type() == BLACK_GATE     ? "bg"
-			: Game::get_game_type() == SERPENT_ISLE ? "si"
-													: "dev");
-	restore_gamedat(fname);
-}
 
 /*
  sof 'gamed*/
@@ -340,12 +324,11 @@ void GameDat::save_gamedat(
 ) {
 	// First check for compressed save game
 
-	// Clear the save_infos
-	clear_saveinfos();
-
+	
 #ifdef HAVE_ZIP_SUPPORT
 	// Try to save as a zip file
-	if (save_compression > 0 && save_gamedat_zip(fname, savename)) {
+	if (Settings::get().disk.save_compression_level > 0 && save_gamedat_zip(fname, savename)) {
+		read_save_infos_async(true);
 		return;
 	}
 #endif
@@ -416,17 +399,18 @@ for (const auto* savefile : savefiles) {
 			SavefileFromDataSource(flex, inds, dname);
 		}
 	}
+	read_save_infos_async(true);
 }
 
-std::string GameDat::get_save_filename(int num, int type) {
+std::string GameDat::get_save_filename(int num, SaveInfo::Type type) {
 	// preallocate string to a size that should be big enough
 	std::string fname(std::size(SAVENAME3) + 3, 0);
 	for (;;) {
 		auto needed = snprintf(
 				fname.data(), fname.size(), SAVENAME3,
-				type == SaveInfo::AUTOSAVE    ? "a"
-				: type == SaveInfo::QUICKSAVE ? "q"
-				: type == SaveInfo::CRASHSAVE ? "c"
+				type == SaveInfo::Type::AUTOSAVE    ? "a"
+				: type == SaveInfo::Type::QUICKSAVE ? "q"
+				: type == SaveInfo::Type::CRASHSAVE ? "c"
 											  : "",
 				num,
 				Game::get_game_type() == BLACK_GATE     ? "bg"
@@ -450,29 +434,66 @@ std::string GameDat::get_save_filename(int num, int type) {
 	return "";
 }
 
-/*
- *  Save to one of the numbered savegame files (and update save_names).
- *
- *  Output: false if error (reported).
- */
 
-void GameDat::save_gamedat(
-		int         num,        // 0-9, currently.
-		const char* savename    // User's savegame name.
-) {
-	std::string fname
-			= get_save_filename(num, SaveInfo::REGULAR);    // Set up name.
-	save_gamedat(fname.c_str(), savename);
-}
+void GameDat::save_gamedat(SaveInfo::Type type, const char* savename) {
+	int         index = first_free[int(type)];
+	int limit = INT_MAX;
+	if (type == SaveInfo::Type::QUICKSAVE) {
+		limit = Settings::get().disk.quicksave_count;
+	}
+	if (type == SaveInfo::Type::AUTOSAVE) {
+		limit = Settings::get().disk.autosave_count;
+	}
 
-void GameDat::save_gamedat(
-		const char* savename,    // User's savegame name.
-		int         type) {
+	if (limit == 0)
+	{
+		std::cerr << "Attempted to make " << (type == SaveInfo::Type::AUTOSAVE
+				? "AutoSave"
+				: "QuickSave") << " while disabled" << std::endl;
+		return;    // Autosaves or quicksaves disabled
+	} else if (index >= limit) {
+		index = oldest[int(type)];
+	}
+
+	char name[50];
+
+	// Create default savename wuth ISO date and Time if none given.
+	if (!savename || !*savename) {
+		const time_t t = time(nullptr);
+		if (type == SaveInfo::Type::AUTOSAVE) {
+			strcpy(name, "AutoSave ");
+		} else if (type == SaveInfo::Type::QUICKSAVE) {
+			strcpy(name, "QuickSave ");
+		} else if (type == SaveInfo::Type::CRASHSAVE) {
+			strcpy(name, "CrashSave ");
+		} else {
+			strcpy(name, "Save ");
+		}
+		size_t len = strlen(name);
+		if (strftime(name + len, sizeof(name) - len, "%F %T", localtime(&t))
+			== 0) {
+			// null terminate and strip trailing space if strftime fails
+			name[len - 1] = 0;
+		}
+		savename = name;
+	}
+
 	std::string fname
-			= get_save_filename(first_free[type], type);    // Set up name.
+			= get_save_filename(index, type);    // Set up name.
 	save_gamedat(fname.c_str(), savename);
 
 	// Update save_info
+}
+
+void GameDat::ResortSaveInfos() {
+	
+	wait_for_saveinfo_read();
+
+	std::lock_guard lock(save_info_mutex);
+
+	if (save_infos.size()) {
+		std::sort(save_infos.begin(), save_infos.end());
+	}
 }
 
 /*
@@ -510,10 +531,15 @@ void GameDat::read_save_infos() {
 		save_infos.emplace_back(std::string(filename));
 	}
 
+	
 	first_free.fill(-1);
+	oldest.fill(0);
 
 	std::array<int, SaveInfo::NUM_TYPES> last;
 	last.fill(-1);
+
+	std::array<SaveInfo*, SaveInfo::NUM_TYPES> oldestinfo;
+	oldestinfo.fill(nullptr);
 
 	// Read and cache all details
 	for (auto& saveinfo : save_infos) {
@@ -522,21 +548,38 @@ void GameDat::read_save_infos() {
 				saveinfo.details, saveinfo.party);
 
 		// Handling of regular savegame with a savegame number
-		if (saveinfo.type != SaveInfo::UNKNOWN && saveinfo.num >= 0) {
+		if (saveinfo.type != SaveInfo::Type::UNKNOWN && saveinfo.num >= 0) {
+			
+			int itype = int(saveinfo.type);
+
+			// Only try to figure oldest if saveinfo is readable and details were read
+			// If no savegame is good oldest will default to 0
+			if (saveinfo.readable) {
+
+				if (!oldestinfo[itype] || saveinfo.details.CompareRealTime(oldestinfo[itype]->details) < 0)
+				{
+					oldest[itype] = saveinfo.num;
+					oldestinfo[itype] = &saveinfo;
+
+				}
+			}
+
 			// First free not yet found
-			if (first_free[saveinfo.type] == -1) {
+			if (first_free[itype] == -1) {
 				// If the last save was not 1 before this there is a gap wer can
 				// use
-				if (last[saveinfo.type] + 1 != saveinfo.num) {
-					first_free[saveinfo.type] = last[saveinfo.type] + 1;
+				if (last[itype] + 1 != saveinfo.num) {
+					first_free[itype] = last[itype] + 1;
 				}
 
-				last[saveinfo.type] = saveinfo.num;
+				last[itype] = saveinfo.num;
 			}
+
+			
 		}
 	}
 	// If no gaps found set forst free of each type to last +1
-	for (int type = 0; type < SaveInfo::NUM_TYPES; ++type) {
+	for (int type = 0; type < int(SaveInfo::Type::NUM_TYPES); ++type) {
 		if (first_free[type] == -1) {
 			first_free[type] = last[type] + 1;
 		}
@@ -550,8 +593,7 @@ void GameDat::read_save_infos() {
 
 void GameDat::read_save_infos_async(bool force) {
 	std::lock_guard lock(save_info_mutex);
-	if (force)
-	{
+	if (force) {
 		clear_saveinfos();
 	}
 	if ((!saveinfo_future.valid()
@@ -576,7 +618,6 @@ void GameDat::wait_for_saveinfo_read() {
 }
 
 const std::vector<GameDat::SaveInfo>* GameDat::GetSaveGameInfos(bool force) {
-	
 	// read save infos if needed
 	read_save_infos_async(force);
 
@@ -686,8 +727,7 @@ void GameDat::write_saveinfo(bool screenshot) {
 	}
 }
 
-void GameDat::read_saveinfo() 
-{
+void GameDat::read_saveinfo() {
 	IFileDataSource ds(GSAVEINFO);
 	if (ds.good()) {
 		ds.skip(10);    // Skip 10 bytes.
@@ -1333,7 +1373,7 @@ bool GameDat::save_gamedat_zip(
 ) {
 	char iname[128];
 	// If no compression return
-	if (save_compression < 1) {
+	if (Settings::get().disk.save_compression_level < 1) {
 		return false;
 	}
 
@@ -1368,7 +1408,7 @@ bool GameDat::save_gamedat_zip(
 	Save_level1(zipfile, IDENTITY);
 
 	// Level 1 Compression
-	if (save_compression != 2) {
+	if (Settings::get().disk.save_compression_level != 2) {
 		for (const auto* savefile : savefiles) {
 			Save_level1(zipfile, savefile);
 		}
@@ -1477,7 +1517,7 @@ void GameDat::MakeEmergencySave(const char* savename) {
 	// save it as the save
 	std::cerr << " attempting to save gamedat as \"" << savename << "\""
 			  << std::endl;
-	save_gamedat(savename, SaveInfo::CRASHSAVE);
+	save_gamedat(SaveInfo::Type::CRASHSAVE, savename);
 
 	// Remove crashtemp
 	std::filesystem::remove_all(crashtemppath);
@@ -1486,16 +1526,141 @@ void GameDat::MakeEmergencySave(const char* savename) {
 	add_system_path("<GAMEDAT>", gamedatpath);
 }
 
-GameDat::GameDat() {
-	// Save game compression level
-	config->value(
-			"config/disk/save_compression_level", save_compression,
-			save_compression);
-	if (save_compression < 0 || save_compression > 2) {
-		save_compression = 1;
+GameDat::GameDat() {}
+
+void GameDat::Quicksave() {
+	gwin->write();
+	save_gamedat(SaveInfo::Type::QUICKSAVE, nullptr);
+}
+
+void GameDat::Savegame(const char* fname, const char* savename) {
+	gwin->write();
+	save_gamedat(fname, savename);
+}
+
+void GameDat::Savegame(const char* savename) {
+	gwin->write();
+	save_gamedat(SaveInfo::Type::REGULAR, savename);
+}
+
+void GameDat::Extractgame(const char* fname, bool doread) {
+	// Only restore if a filename is given
+	if (fname && *fname) {
+		restore_gamedat(fname);
 	}
-	config->set("config/disk/save_compression_level", save_compression, false);
+
+	if (doread) {
+		gwin->read();
+	}
 }
 
 
+// Move Costructor from a std::string filename
+GameDat::SaveInfo::SaveInfo(std::string&& filename)
+		: filename_(std::move(filename)) {
+	// Filename is likely a path so find the last directory separator
+	size_t filename_start = filename_.find_last_of("/\\");
 
+	// No diretory separators so actual filename starts at 0
+	if (filename_start == std::string::npos) {
+		filename_start = 0;
+	}
+	// Find where the savenume number starts
+	size_t number_start = filename_.find_first_of("0123456789", filename_start);
+
+	if (number_start == std::string::npos
+		|| number_start < filename_start + 5) {
+		// the savegame filename is not in the expected format
+		// this should never happen as filename glob should only list
+		// filenames in mostly the correct format
+		// EXULT*.sav
+		// Don't attempt to parse the savegame number
+		num  = -1;
+		type = Type::UNKNOWN;
+		return;
+		// quicksaves have Q before the number
+	} else if (std::tolower(filename_[number_start - 1]) == 'q') {
+		type = Type::QUICKSAVE;
+		// autosaves have A before the number
+	} else if (std::tolower(filename_[number_start - 1]) == 'a') {
+		type = Type::AUTOSAVE;
+		// crashsaves have C before the number
+	} else if (std::tolower(filename_[number_start - 1]) == 'c') {
+		type = Type::CRASHSAVE;
+		// regular saves have t from exult as character before the
+		// number
+	} else if (std::tolower(filename_[number_start - 1]) == 't') {
+		type = Type::REGULAR;
+	} else {
+		// Filename format is unknown
+		num  = -1;
+		type = Type::UNKNOWN;
+		return;
+	}
+
+	num = strtol(filename_.c_str() + number_start, nullptr, 10);
+}
+
+
+int GameDat::SaveInfo::compare(const SaveInfo& other) const noexcept {
+	if (type != other.type && Settings::get().disk.savegame_group_by_type) {
+		return int(other.type) - int(type);
+	}
+
+	if (Settings::get().disk.savegame_sort_by_name) {
+		int namecomp = Pentagram::strcasecmp(
+				this->savename.c_str(), other.savename.c_str());
+
+		if (namecomp != 0) {
+			return namecomp;
+		}
+	}
+
+	if (details && other.details) {
+		// Sort by time
+
+		int datecomp = details.CompareRealTime(other.details);
+		if (datecomp != 0) {
+			return datecomp;
+		}
+
+
+	} else if (details) {    // If the other doesn't have details we are
+							 // first
+		return -1;
+	} else if (other.details) {    // If we don't have details we are last
+		return 1;
+	}
+
+	// Lastly just sort by filename
+	return filename_.compare(other.filename_);
+}
+
+int GameDat::SaveGame_Details::CompareRealTime(
+		const SaveGame_Details& other) const noexcept {
+	if (real_year != other.real_year) {
+		return other.real_year-real_year ;
+	}
+
+	if (real_month != other.real_month) {
+		return other.real_month-real_month;
+	}
+
+	if (real_day != other.real_day) {
+		return other.real_day - real_day;
+	}
+
+
+	if (real_hour != other.real_hour) {
+		return other.real_hour - real_hour;
+	}
+
+	if (real_minute != other.real_minute) {
+		return other.real_minute - real_minute;
+	}
+
+	if (real_second != other.real_second) {
+		return other.real_second - real_second;
+	}
+	return 0;
+}

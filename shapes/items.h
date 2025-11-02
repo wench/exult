@@ -233,6 +233,10 @@ public:
 	static auto Doyoureallywanttoquit_() {
 		return get_text_msg(0x59D - msg_file_start);
 	}
+
+	static auto REVERT() {
+		return get_text_msg(0x59E - msg_file_start);
+	}
 };
 
 //	Misc. text (frames, etc.) start at 0x500 in text.flx.
