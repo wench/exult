@@ -459,8 +459,8 @@ public:
 				= {"config/disk/autosave_count", 5, 0,
 				   std::numeric_limits<int>::max(), this};
 
-		int_property<> quick_save_count
-				= {"config/disk/quick_save_count", 5, 1,
+		int_property<> quicksave_count
+				= {"config/disk/quicksave_count", 5, 1,
 				   std::numeric_limits<int>::max(), this};
 
 		ReadOnly<enum_like_property<bool>> use_old_style_save_load

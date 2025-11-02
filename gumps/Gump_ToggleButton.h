@@ -38,7 +38,9 @@ public:
 		return this->get_framenum();
 	}
 
-	virtual void toggle(int state) = 0;
+	virtual void toggle(int state) {
+		ignore_unused_variable_warning(state);
+	};
 
 protected:
 	template <typename... Ts>
