@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "gamedat.h"
 
 #include <array>
+#include <functional>
 #include <memory>
 
 class Shape_file;
@@ -40,23 +41,44 @@ public:
 	using SaveGame_Party   = GameDat::SaveGame_Party;
 
 protected:
-	enum button_ids {
-		id_first = 0,
-		id_load  = id_first,
+	enum widget_ids {
+		id_first  = 0,
+		id_scroll = id_first,
+		id_load,
 		id_save,
 		id_delete,
 		id_close,
+		id_change_mode,
+
+		// Settings widgets start here
+		id_apply,
+		id_revert,
+		id_slider_autocount,
+		id_slider_quickcount,
+		id_button_sortbyname,
+		id_button_groupbytype,
+		id_button_autosaves_write_to_gamedat,
+
+		// Old style mode buttons start here
 		id_music,
 		id_speech,
 		id_effects,
+
 		id_count,
+
+		id_normal_start    = id_scroll,
+		id_normal_last     = id_delete,
+		id_settings_start  = id_apply,
+		id_settings_last   = id_button_autosaves_write_to_gamedat,
+		id_old_style_start = id_music,
+		id_old_style_last  = id_effects,
 	};
 
-	std::array<std::unique_ptr<Gump_button>, id_count> buttons;
-	std::array<std::unique_ptr<Gump_button>, id_count> disabled_buttons;
+	std::array<std::unique_ptr<Gump_widget>, id_count> widgets;
+	std::array<std::unique_ptr<Gump_widget>, id_count> disabled_widgets;
 
 	// Enable or disable a button
-	void SetButtonEnabled(button_ids id, bool newenabled);
+	void SetWidgetEnabled(widget_ids id, bool newenabled);
 	// Button Coords
 	constexpr static std::array<short, 1> btn_rows = {
 			186,
@@ -135,6 +157,10 @@ protected:
 	// Quit, Sound, Speech and Music Buttons.
 	// Cannot be combined with restore_mode
 
+	uint64_t       transition_start_time = 0;
+	const uint64_t transition_duration   = 500;
+	bool           show_settings         = false;
+
 	bool                  old_style_mode;
 	std::shared_ptr<Font> tinyfont;
 
@@ -158,9 +184,13 @@ public:
 
 	// Handle one of the toggles.
 	void toggle_audio_option(Gump_widget* btn, int state);
-	void load();           // 'Load' was clicked.
-	void save();           // 'Save' was clicked.
-	void delete_file();    // 'Delete' was clicked.
+	void load();                        // 'Load' was clicked.
+	void save();                        // 'Save' was clicked.
+	void delete_file();                 // 'Delete' was clicked.
+	void toggle_settings(int state);    // 'Settings' was clicked.
+	void apply_settings();              // 'Apply' was clicked.
+	void revert_settings();             // 'Revert' was clicked.
+	bool run() override;                // Run the gump.
 
 	// Get the first slot
 	sint64 FirstSlot() const {
@@ -193,6 +223,9 @@ public:
 
 	bool is_draggable() const override;
 
+	void paint_normal();
+	void paint_settings();
+
 	void close() override {
 		done = true;
 	}
@@ -210,6 +243,8 @@ public:
 	bool mousewheel_down(int mx, int my) override;
 
 private:
+	bool forward_input(std::function<bool(Gump_widget*)>);
+
 	class Slot_widget : public Gump_widget {
 		Newfile_gump* nfg;
 
@@ -227,11 +262,13 @@ private:
 		void paint() override;
 	};
 
-	std::unique_ptr<Scrollable_widget> scroll;
-
 	// Calculate the top slot being shown
 	int list_position() {
-		return scroll->get_scroll_offset() / fieldh + FirstSlot();
+		if (auto scroll = dynamic_cast<Scrollable_widget*>(widgets[id_scroll].get())) {
+			return scroll->get_scroll_offset() / fieldh + FirstSlot();
+		} else {
+			return FirstSlot();
+		}
 	}
 };
 
