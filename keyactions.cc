@@ -115,7 +115,7 @@ void ActionQuicksave(const int* params) {
 	ignore_unused_variable_warning(params);
 	Game_window* gwin = Game_window::get_instance();
 	try {
-		gwin->write();
+		GameDat::get()->Quicksave();
 	} catch (exult_exception& /*e*/) {
 		gwin->get_effects()->center_text("Saving game failed!");
 		return;
@@ -129,7 +129,7 @@ void ActionQuickrestore(const int* params) {
 	ignore_unused_variable_warning(params);
 	Game_window* gwin = Game_window::get_instance();
 	try {
-		gwin->read();
+		gwin->read();		
 	} catch (exult_exception& /*e*/) {
 		gwin->get_effects()->center_text("Restoring game failed!");
 		return;
