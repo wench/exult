@@ -77,6 +77,8 @@ struct SaveGame_Details {
 	// Incase we want to add more later
 	char reserved0;        // 16
 	char reserved1[48];    // 64
+
+	int CompareRealTime(const SaveGame_Details& other) const noexcept;
 };
 
 struct SaveGame_Party {
@@ -123,49 +125,7 @@ public:
 	SaveInfo() {}
 
 	// Move Costructor from a std::string filename
-	SaveInfo(std::string&& filename) : filename_(std::move(filename)) {
-		// Filename is likely a path so find the last directory separator
-		size_t filename_start = filename_.find_last_of("/\\");
-
-		// No diretory separators so actual filename starts at 0
-		if (filename_start == std::string::npos) {
-			filename_start = 0;
-		}
-		// Find where the savenume number starts
-		size_t number_start
-				= filename_.find_first_of("0123456789", filename_start);
-
-		if (number_start == std::string::npos
-			|| number_start < filename_start + 5) {
-			// the savegame filename is not in the expected format
-			// this should never happen as filename glob should only list
-			// filenames in mostly the correct format
-			// EXULT*.sav
-			// Don't attempt to parse the savegame number
-			num  = -1;
-			type = UNKNOWN;
-			return;
-			// quicksaves have Q before the number
-		} else if (std::tolower(filename_[number_start - 1]) == 'q') {
-			type = QUICKSAVE;
-			// autosaves have A before the number
-		} else if (std::tolower(filename_[number_start - 1]) == 'a') {
-			type = AUTOSAVE;
-			// crashsaves have C before the number
-		} else if (std::tolower(filename_[number_start - 1]) == 'c') {
-			type = CRASHSAVE;
-			// regular saves have t from exult as character before the number
-		} else if (std::tolower(filename_[number_start - 1]) == 't') {
-			type = REGULAR;
-		} else {
-			// Filename format is unknown
-			num  = -1;
-			type = UNKNOWN;
-			return;
-		}
-
-		num = strtol(filename_.c_str() + number_start, nullptr, 10);
-	}
+	SaveInfo(std::string&& filename);
 
 	// No copy constructor as screenshot can't be copied because Shape_file has
 	// no copy constructor
@@ -185,88 +145,34 @@ public:
 	// No copy assignment operator, only move
 	SaveInfo& operator=(const SaveInfo&) = delete;
 	SaveInfo& operator=(SaveInfo&&)      = default;
-
-	enum Type {
+ 
+	enum class Type {
 		UNKNOWN = -1,
 		REGULAR = 0,
 		AUTOSAVE,
 		QUICKSAVE,
 		CRASHSAVE,
 		NUM_TYPES
-	} type = UNKNOWN;
+	} type = Type::UNKNOWN;
+
+	static const int NUM_TYPES = static_cast<int>(Type::NUM_TYPES);
 
 	// const getter for filename
 	const std::string& filename() const {
 		return filename_;
 	}
 
-	int compare(const SaveInfo* other) const noexcept {
-		// First by type in reverse order
-		if (type != other->type) {
-			return other->type - type;
+		int compare(const SaveInfo& other) const noexcept;
+
+		bool operator<(const SaveInfo& other) const noexcept {
+			return compare(other) < 0;
 		}
-		// Check by time first, if possible
-		if (details && other->details) {
-			if (details.real_year < other->details.real_year) {
-				return 1;
-			}
-			if (details.real_year > other->details.real_year) {
-				return -1;
-			}
-
-			if (details.real_month < other->details.real_month) {
-				return 1;
-			}
-			if (details.real_month > other->details.real_month) {
-				return -1;
-			}
-
-			if (details.real_day < other->details.real_day) {
-				return 1;
-			}
-			if (details.real_day > other->details.real_day) {
-				return -1;
-			}
-
-			if (details.real_hour < other->details.real_hour) {
-				return 1;
-			}
-			if (details.real_hour > other->details.real_hour) {
-				return -1;
-			}
-
-			if (details.real_minute < other->details.real_minute) {
-				return 1;
-			}
-			if (details.real_minute > other->details.real_minute) {
-				return -1;
-			}
-
-			if (details.real_second < other->details.real_second) {
-				return 1;
-			}
-			if (details.real_second > other->details.real_second) {
-				return -1;
-			}
-		} else if (details) {    // If the other doesn't have time we are first
-			return -1;
-		} else if (other->details) {    // If we don't have time we are last
-			return 1;
-		}
-
-		// Lastly just sort by filename
-		return filename_.compare(other->filename_);
-	}
-
-	bool operator<(const SaveInfo& other) const noexcept {
-		return compare(&other) < 0;
-	}
 };
-	int save_compression = 1;    // 1 is Default compression level
 	int save_count;
 
 	std::vector<SaveInfo>                save_infos;
 	std::array<int, SaveInfo::NUM_TYPES> first_free;
+	std::array<int, SaveInfo::NUM_TYPES> oldest;
 	std::string                          save_mask;
 	std::shared_future<void>             saveinfo_future;
 	std::recursive_mutex                 save_info_mutex;
@@ -294,17 +200,8 @@ public:
 
 
 	// Get the filename for savegame num of specified SaveInfo:Type
-	std::string get_save_filename(int num, int type);
+	std::string get_save_filename(int num, SaveInfo::Type type);
 
-	// Explode a savegame into "gamedat".
-	void restore_gamedat(const char* fname);
-	void restore_gamedat(int num);
-	// Save "gamedat".
-	void save_gamedat(const char* fname, const char* savename);
-	void save_gamedat(int num, const char* savename);
-	// Save gamedat to a new savegame of the specified SaveInfo:Type with the
-	// given name
-	void save_gamedat(const char* savename, int type);
 
 	// Emergency save Creates a new save in the next available index
 	// It preserves the existing GAMEDAT
@@ -314,7 +211,15 @@ public:
 
 	void write_saveinfo(
 			bool screenshot = true);    // Write the save info to gamedat
+	// Explode a savegame into "gamedat".
+	void restore_gamedat(const char* fname);
 
+	// Save "gamedat".
+	void save_gamedat(const char* fname, const char* savename);
+
+	// Save gamedat to a new savegame of the specified SaveInfo:Type with the
+	// given name
+	void save_gamedat(SaveInfo::Type type, const char* savename);
 	void read_saveinfo();    // Read the save info from gamedat
 private:
 
@@ -357,6 +262,28 @@ private:
 #endif	
 
 	void read_save_infos();
+
+
+public:
+	// Queue an autosave to occur at the next possible time. Safe to call at any
+	// time including during usecode execution
+	void Queue_Autosave(
+			int gflag = -1, int map_from = -1, int map_to = -1,
+			int sc_from = -1, int sc_to = -1);
+
+	void Autosave_Now(
+			bool write_gamedat = false, const char* savemessage = nullptr,
+			int gflag = -1, int map_from = -1, int map_to = -1,
+			int sc_from = -1, int sc_to = -1);
+
+	void Quicksave();
+
+	void Savegame(const char* fname, const char* savename);
+	void Savegame(const char* savename);
+
+	void Extractgame(const char* fname, bool doread);
+
+	void ResortSaveInfos();
 };
 
 #endif    // SAVEINFO_H_INCLUDED
