@@ -196,14 +196,42 @@ public:
 	static auto NoInfo() {
 		return get_text_msg(0x6D1 - msg_file_start);
 	}
+
+	static auto Settings() {
+		return get_text_msg(0x6D7 - msg_file_start);
+	}
+
+	static auto SaveGames() {
+		return get_text_msg(0x6D8 - msg_file_start);
+	}
+
+	static auto AutosaveCount_() {
+		return get_text_msg(0x6D9 - msg_file_start);
+	}
+
+	static auto QuicksaveCount_() {
+		return get_text_msg(0x6DA - msg_file_start);
+	}
+
+	static auto SortByName_() {
+		return get_text_msg(0x6DB - msg_file_start);
+	}
+
+	static auto GroupByType_() {
+		return get_text_msg(0x6DC - msg_file_start);
+	}
+
+	static auto AutosavesWriteToGamedat_() {
+		return get_text_msg(0x6DD - msg_file_start);
+	}
 };
 
 //
 // Enable or disable a button.
 //
-void Newfile_gump::SetButtonEnabled(button_ids id, bool newenabled) {
-	auto& source = newenabled ? disabled_buttons : buttons;
-	auto& dest   = newenabled ? buttons : disabled_buttons;
+void Newfile_gump::SetWidgetEnabled(widget_ids id, bool newenabled) {
+	auto& source = newenabled ? disabled_widgets : widgets;
+	auto& dest   = newenabled ? widgets : disabled_widgets;
 	// Only move to dest if source exists
 	// Don't want to overwrite an existing button in dest with a nullptr
 	if (source[id]) {
@@ -244,69 +272,154 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 
 		Audio* audio = Audio::get_ptr();
 		// Toggle Buttons
-		buttons[id_music]
-				= std::make_unique<CallbackToggleButton<Newfile_gump>>(
-						this, &Newfile_gump::toggle_audio_option,
-						old_btn_cols[0], old_btn_rows[1],
-						game->get_shape("gumps/musicbtn"),
-						!audio ? 0 : audio->is_music_enabled(), 2,
-						SF_GUMPS_VGA);
-		buttons[id_speech]
-				= std::make_unique<CallbackToggleButton<Newfile_gump>>(
-						this, &Newfile_gump::toggle_audio_option,
-						old_btn_cols[1], old_btn_rows[1],
-						game->get_shape("gumps/speechbtn"),
-						!audio ? 0 : audio->is_speech_enabled(), 2,
-						SF_GUMPS_VGA);
-		buttons[id_effects]
-				= std::make_unique<CallbackToggleButton<Newfile_gump>>(
-						this, &Newfile_gump::toggle_audio_option,
-						old_btn_cols[2], old_btn_rows[1],
-						game->get_shape("gumps/soundbtn"),
-						!audio ? 0 : audio->are_effects_enabled(), 2,
-						SF_GUMPS_VGA);
+		widgets[id_music] = std::make_unique<
+				SelfManaged<CallbackToggleButton<Newfile_gump>>>(
+				this, &Newfile_gump::toggle_audio_option, old_btn_cols[0],
+				old_btn_rows[1], game->get_shape("gumps/musicbtn"),
+				!audio ? 0 : audio->is_music_enabled(), 2, SF_GUMPS_VGA);
+		widgets[id_speech] = std::make_unique<
+				SelfManaged<CallbackToggleButton<Newfile_gump>>>(
+				this, &Newfile_gump::toggle_audio_option, old_btn_cols[1],
+				old_btn_rows[1], game->get_shape("gumps/speechbtn"),
+				!audio ? 0 : audio->is_speech_enabled(), 2, SF_GUMPS_VGA);
+		widgets[id_effects] = std::make_unique<
+				SelfManaged<CallbackToggleButton<Newfile_gump>>>(
+				this, &Newfile_gump::toggle_audio_option, old_btn_cols[2],
+				old_btn_rows[1], game->get_shape("gumps/soundbtn"),
+				!audio ? 0 : audio->are_effects_enabled(), 2, SF_GUMPS_VGA);
 
 		// QUIT
-		buttons[id_close] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+		widgets[id_close] = std::make_unique<
+				SelfManaged<CallbackTextButton<Newfile_gump>>>(
 				this, &Newfile_gump::quit, Strings::QUIT(), old_btn_cols[2],
 				old_btn_rows[0], 60);
 
 		// Save
-		buttons[id_save] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+		widgets[id_save] = std::make_unique<
+				SelfManaged<CallbackTextButton<Newfile_gump>>>(
 				this, &Newfile_gump::save, Strings::SAVE(), old_btn_cols[1],
 				old_btn_rows[0], 60);
 		// Load
-		buttons[id_load] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+		widgets[id_load] = std::make_unique<
+				SelfManaged<CallbackTextButton<Newfile_gump>>>(
 				this, &Newfile_gump::load, Strings::LOAD(), old_btn_cols[0],
 				old_btn_rows[0], 60);
 
-		HorizontalArrangeWidgets(tcb::span(buttons.data() + id_load, 4), 9);
+		HorizontalArrangeWidgets(
+				tcb::span(
+						widgets.data() + id_normal_start,
+						id_settings_start - id_normal_start),
+				9);
 
-		HorizontalArrangeWidgets(tcb::span(buttons.data() + id_music, 3), 9);
+		HorizontalArrangeWidgets(
+				tcb::span(
+						widgets.data() + id_old_style_start,
+						id_old_style_last + 1 - id_old_style_start),
+				9);
 
 	} else {
 		fieldcount = 14;
 		SetProceduralBackground(TileRect(0, 0, 320, 200), -1, false);
 
 		// Cancel
-		buttons[id_close] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+		widgets[id_close] = std::make_unique<
+				SelfManaged<CallbackTextButton<Newfile_gump>>>(
 				this, &Newfile_gump::close, Strings::CANCEL(), btn_cols[3],
 				btn_rows[0]);
 		// Save
-		buttons[id_save] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+		widgets[id_save] = std::make_unique<
+				SelfManaged<CallbackTextButton<Newfile_gump>>>(
 				this, &Newfile_gump::save, Strings::SAVE(), btn_cols[0],
 				btn_rows[0]);
 		// Load
-		buttons[id_load] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+		widgets[id_load] = std::make_unique<
+				SelfManaged<CallbackTextButton<Newfile_gump>>>(
 				this, &Newfile_gump::load, Strings::LOAD(), btn_cols[1],
 				btn_rows[0]);
 		// Delete
-		buttons[id_delete] = std::make_unique<CallbackTextButton<Newfile_gump>>(
+		widgets[id_delete] = std::make_unique<
+				SelfManaged<CallbackTextButton<Newfile_gump>>>(
 				this, &Newfile_gump::delete_file, Strings::DELETE(),
 				btn_cols[2], btn_rows[0]);
 
+		widgets[id_change_mode] = std::make_unique<
+				SelfManaged<CallbackToggleTextButton<Newfile_gump>>>(
+				this, &Newfile_gump::toggle_settings,
+				std::vector<std::string>{
+						Strings::Settings(), Strings::SaveGames()},
+				0, btn_cols[3], btn_rows[0], 0, 0);
+
 		HorizontalArrangeWidgets(
-				tcb::span(buttons.data() + id_load, 4), 9, 217);
+				tcb::span(
+						widgets.data() + id_normal_start,
+						id_settings_start - id_normal_start),
+				9, 217);
+
+		// Apply button uses same location as save button
+		widgets[id_apply] = std::make_unique<
+				SelfManaged<CallbackTextButton<Newfile_gump>>>(
+				this, &Newfile_gump::apply_settings, Strings::APPLY(), 1,
+				btn_rows[0]);
+
+		// Revert button uses same location as load button
+		widgets[id_revert] = std::make_unique<
+				SelfManaged<CallbackTextButton<Newfile_gump>>>(
+				this, &Newfile_gump::revert_settings, Strings::REVERT(), 2,
+				btn_rows[0]);
+
+		HorizontalArrangeWidgets(
+				tcb::span(widgets.data() + id_apply, 2), 9,
+				widgets[id_close]->get_x());
+
+		// Settings widgets
+		int yindex = 0;
+
+		int maxval = Settings::get().disk.autosave_count;
+		if (maxval < 100) {
+			maxval = 100;
+		} else  {
+			maxval = std::max(1000,maxval);
+		}
+		widgets[id_slider_autocount] = std::make_unique<Slider_widget>(
+				this, get_button_pos_for_label(Strings::AutosaveCount_()),
+				yForRow(yindex++)-12, std::nullopt, std::nullopt, std::nullopt,
+				Settings::get().disk.autosave_count.get_min(), maxval,
+				1, Settings::get().disk.autosave_count, 64, font, 40, false);
+
+		maxval = Settings::get().disk.quicksave_count;
+		if (maxval < 100) {
+			maxval = 100;
+		} else {
+			maxval = std::max(1000, maxval);
+		}
+		
+		widgets[id_slider_quickcount] = std::make_unique<Slider_widget>(
+				this, get_button_pos_for_label(Strings::QuicksaveCount_()),
+				yForRow(yindex++)-12, std::nullopt, std::nullopt, std::nullopt,
+				Settings::get().disk.quicksave_count.get_min(),
+				maxval,
+				1, Settings::get().disk.quicksave_count, 64, font, 40, false);
+
+		widgets[id_button_sortbyname] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
+				this,std::vector<std::string>{Strings::No(), Strings::Yes()},
+				Settings::get().disk.savegame_sort_by_name,
+				get_button_pos_for_label(Strings::SortByName_()),
+				yForRow(yindex++)-2,64,0);
+
+		widgets[id_button_groupbytype] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
+			this,std::vector<std::string>{Strings::No(), Strings::Yes()},
+				Settings::get().disk.savegame_group_by_type,
+				get_button_pos_for_label(Strings::GroupByType_()),
+						yForRow(yindex++)-2,64,0);
+
+		widgets[id_button_autosaves_write_to_gamedat] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
+			this,std::vector<std::string>{Strings::No(), Strings::Yes()},
+				Settings::get().disk.autosaves_write_to_gamedat,
+				get_button_pos_for_label(Strings::AutosavesWriteToGamedat_()),
+						yForRow(yindex++)-2,64,0);
+
+		RightAlignWidgets(tcb::span(widgets.data() + id_slider_autocount, 5));
+		//RightAlignWidgets(tcb::span(widgets.data() + id_button_sortbyname, 3),44);
 	}
 
 	// Reposition the gump
@@ -314,7 +427,7 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 	x         = (gwin->get_width() + area.x - area.w) / 2;
 	y         = (gwin->get_height() + area.y - area.h) / 2;
 
-	scroll = std::make_unique<Scrollable_widget>(
+	auto scroll = std::make_unique<Scrollable_widget>(
 			this, fieldx, fieldy, fieldw,
 			fieldcount * (fieldh + fieldgap) - fieldgap, 0,
 			old_style_mode ? Scrollable_widget::ScrollbarType::None
@@ -322,6 +435,7 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 			false, 0xff, 1);
 	scroll->add_child(std::make_shared<Slot_widget>(this));
 	scroll->set_line_height(fieldh + fieldgap, false);
+	widgets[id_scroll] = std::move(scroll);
 
 	LoadSaveGameDetails(false);
 	SelectSlot(NoSlot);
@@ -360,12 +474,9 @@ void Newfile_gump::load() {
 
 	// Aborts if unsuccessful.
 	if (selected_slot >= SavegameSlots && selected_slot <= LastSlot()) {
-		gamedat->restore_gamedat((*games)[selected_slot - SavegameSlots].filename().c_str());
-	}
-
-	// Read Gamedat if not in restore mode
-	if (!restore_mode) {
-		gwin->read();
+		gamedat->Extractgame(
+				(*games)[selected_slot - SavegameSlots].filename().c_str(),
+				!restore_mode);
 	}
 
 	// Set Done
@@ -390,47 +501,42 @@ void Newfile_gump::save() {
 	size_t save_num = selected_slot - SavegameSlots;
 
 	// Already a game in this slot? If so ask to delete
-	if (selected_slot >= SavegameSlots
-		&& games && games->size() > save_num
-			&& !(*games)[save_num].savename.empty()
-				   && (*games)[save_num].details) {
+	if (selected_slot >= SavegameSlots && games && games->size() > save_num
+		&& !(*games)[save_num].savename.empty() && (*games)[save_num].details) {
 		if (!Yesno_gump::ask("Okay to write over existing saved game?")) {
 			return;
 		}
 	}
 
-
+	const SaveInfo* info = nullptr;
 	// Use actual savegame num if overwriting existing game
 	if (games && games->size() > size_t(save_num)) {
 		save_num = (*games)[save_num].num;
+		info     = &((*games)[save_num]);
 	}
 	// if not old stylemode and saving to empty slot, use unspecified num
-	else if (!old_style_mode)
-	{
+	else if (!old_style_mode) {
 		save_num = -1;
 	}
-	// Write to gamedat
-	gwin->write();
 
 	// Now write to savegame file
 	if (selected_slot >= SavegameSlots && selected_slot <= LastSlot()) {
-		if (save_num == -1) {
-		
-		gamedat->save_gamedat(newname, SaveInfo::REGULAR);
+		if (!info || info->filename().empty()) {
+			gamedat->Savegame(newname);
 		} else {
-			gamedat->save_gamedat(save_num, newname);
+			gamedat->Savegame(info->filename().c_str(), newname);
 		}
 	} else if (selected_slot == EmptySlot) {
-		gamedat->save_gamedat(newname, SaveInfo::REGULAR);
+		gamedat->Savegame(newname);
 	} else if (selected_slot == QuicksaveSlot) {
-		gamedat->save_gamedat("", SaveInfo::QUICKSAVE);
+		gamedat->Quicksave();
 	}
 
 	cout << "Saved game #" << selected_slot << " successfully." << endl;
 
 	// Reset everything
 	FreeSaveGameDetails();
-	LoadSaveGameDetails(true);
+	LoadSaveGameDetails(false);
 	gwin->set_all_dirty();
 	gwin->got_bad_feeling(4);
 	SelectSlot(NoSlot);
@@ -463,6 +569,65 @@ void Newfile_gump::delete_file() {
 	LoadSaveGameDetails(true);
 	gwin->set_all_dirty();
 	SelectSlot(NoSlot);
+}
+
+void Newfile_gump::toggle_settings(int state) {
+	show_settings = (state != 0);
+
+	if (!show_settings)
+	{
+		auto selected_before = selected_slot;
+		FreeSaveGameDetails();
+		GameDat::get()->ResortSaveInfos();
+		LoadSaveGameDetails(false);
+		SelectSlot(selected_before);
+	}
+
+	transition_start_time = SDL_GetTicks();
+}
+
+void Newfile_gump::apply_settings() {
+auto &settings = Settings::get().disk;
+	settings.autosave_count = widgets[id_slider_autocount]->getselection();
+	settings.quicksave_count = widgets[id_slider_quickcount]->getselection();
+	settings.savegame_sort_by_name = widgets[id_button_sortbyname]->getselection() != 0;
+	settings.savegame_group_by_type
+			= widgets[id_button_groupbytype]->getselection() != 0;
+	settings.autosaves_write_to_gamedat = widgets[id_button_autosaves_write_to_gamedat]->getselection() != 0;
+
+	
+	
+	settings.save_dirty(true);
+}
+
+void Newfile_gump::revert_settings() {
+	auto& settings = Settings::get().disk;
+	widgets[id_slider_autocount]->setselection(settings.autosave_count);
+	widgets[id_slider_quickcount]->setselection(settings.quicksave_count);
+	widgets[id_button_sortbyname]->setselection(
+			settings.savegame_sort_by_name);
+	widgets[id_button_groupbytype]->setselection( 
+			settings.savegame_group_by_type);
+	widgets[id_button_autosaves_write_to_gamedat]->setselection( 
+			settings.autosaves_write_to_gamedat);
+
+}
+
+bool Newfile_gump::run() {
+	bool need_repaint = Modal_gump::run() || transition_start_time != 0;
+
+	if (transition_start_time != 0
+		&& SDL_GetTicks() > transition_start_time + transition_duration) {
+		transition_start_time = 0;
+	}
+
+	for (auto& btn : widgets) {
+		if (btn) {
+			need_repaint = btn->run() || need_repaint;
+		}
+	}
+
+	return need_repaint;
 }
 
 void Newfile_gump::Slot_widget::paint() {
@@ -506,7 +671,7 @@ void Newfile_gump::Slot_widget::paint() {
 			text = Strings::GamedatDirectory();
 		}
 		// The Slot being drawn is selected for saving
-		else if (actual_slot == nfg->selected_slot && !nfg->buttons[id_load]) {
+		else if (actual_slot == nfg->selected_slot && !nfg->widgets[id_load]) {
 			text = nfg->newname;
 		} else if (actual_slot == EmptySlot) {
 			if (nfg->restore_mode) {
@@ -554,35 +719,78 @@ void Newfile_gump::Slot_widget::paint() {
  */
 
 void Newfile_gump::paint() {
+	if (old_style_mode || !show_settings || transition_start_time) {
+		paint_normal();
+	}
+	if (old_style_mode || !(show_settings || transition_start_time)) {
+		return;
+	}
+	Image_window8* iwin = gwin->get_win();
+	Image_buffer8* ibuf = iwin->get_ib8();
+
+	//
+	// create a barn door wipe using clipping rect to transition between normal
+	// and settings
+	//
+	// The clipping rect controls how much of the settings to show
+	//
+	auto     clipsave = ibuf->SaveClip();
+	TileRect newclip  = get_rect();
+
+	if (transition_start_time) {
+		Uint32 elapsed = std::min(
+				SDL_GetTicks() - transition_start_time, transition_duration);
+		int total_width = newclip.w;
+		if (show_settings) {
+			// Expanding
+			newclip.w = (elapsed * total_width) / transition_duration;
+		} else {
+			// Contracting
+			newclip.w = total_width
+						- (elapsed * total_width) / transition_duration;
+		}
+		newclip.x = newclip.x + (total_width - newclip.w) / 2;
+	}
+
+	newclip = clipsave.Rect().intersect(newclip);
+	ibuf->set_clip(newclip.x, newclip.y, newclip.w, newclip.h);
+	paint_settings();
+}
+
+void Newfile_gump::paint_normal() {
 	Modal_gump::paint();
 
 	Image_window8* iwin = gwin->get_win();
 	Image_buffer8* ibuf = iwin->get_ib8();
 
-	auto r = buttons[id_close]->get_rect();
-	// draw slider and button backgrounds
+	// draw button backgrounds
 	if (!old_style_mode) {
 		ibuf->draw_box(x + 212, y + 3, 7, 25, 0, 145, 142);
 		ibuf->draw_box(x + 212, y + 28, 7, 129, 0, 143, 142);
 		ibuf->draw_box(x + 212, y + 157, 7, 38, 0, 145, 142);
 
-		int bbglimit = r.x + r.w - x;
-		if (bbglimit > 219) {
-			bbglimit = get_usable_area().w - 3;
-		} else {
-			bbglimit = 219;
-		}
-
-		ibuf->draw_box(x + 3, y + 188, bbglimit - 3, 7, 0, 145, 142);
+		ibuf->draw_box(x , y + 188, get_usable_area().w , 7, 0, 145, 142);
 	} else {
-		ibuf->draw_box(x + 3, y + 134, get_usable_area().w - 4, 7, 0, 145, 142);
+		ibuf->draw_box(x , y + 134, get_usable_area().w , 7, 0, 145, 142);
 	}
 
-	// Paint scroll widget, that paints the fields
-	scroll->paint();
+	// Ensure change mode button always says Settings if savegames shown
+	if (widgets[id_change_mode]) {
+		widgets[id_change_mode]->setselection(0);
+	}
 
-	// Paint Buttons
-	for (const auto& btn : buttons) {
+	// Paint widgets after scroll background but first need to restore clip to
+	// draw without transition
+	for (int i = id_first; i < id_count; i++) {
+		auto& btn = widgets[i];
+
+		if ((i >= id_settings_start && i <= id_settings_last)
+			|| (!old_style_mode && i >= id_old_style_start
+				&& i <= id_old_style_last)) {
+			// Skip settings buttons in normal paint
+			continue;
+		}
+
 		if (btn) {
 			btn->paint();
 		}
@@ -735,7 +943,8 @@ void Newfile_gump::paint() {
 				info[std::min(cursize, std::size(info) - 1)] = 0;
 			}
 			tinyfont->paint_text_box(
-					ibuf, info, x + infox, y + infoy, infow, infoh,0,false,false);
+					ibuf, info, x + infox, y + infoy, infow, infoh, 0, false,
+					false);
 		}
 
 		if (!is_readable && !(restore_mode && selected_slot == NoSlot)) {
@@ -752,10 +961,106 @@ void Newfile_gump::paint() {
 	}
 }
 
+void Newfile_gump::paint_settings() {
+	Image_window8* iwin = gwin->get_win();
+	Image_buffer8* ibuf = iwin->get_ib8();
+
+	Modal_gump::paint();
+	TileRect usable = get_usable_area();
+	ibuf->draw_box(x , y + 188, usable.w , 7, 0, 145, 142);
+
+
+	// Ensure change mode button always says SaveGames in if settings shown
+	widgets[id_change_mode]->setselection(1);
+
+	int sx = 0, sy = 0, y_index = 0;
+	local_to_screen(sx, sy);
+
+
+
+	// Paint all buttons
+	for (int i = id_first; i < id_count; i++) {
+		auto& widget = widgets[i];
+
+		if ((i >= id_normal_start && i <= id_normal_last)
+			|| (i >= id_old_style_start && i <= id_old_style_last)) {
+			continue;
+		}
+
+		if (widget) {
+			auto rect = widget->get_rect();
+			//Slider_widget* slider = dynamic_cast<Slider_widget*>(widget.get());
+			//if (slider) {
+				
+					//ibuf->draw_box(
+						//	rect.x + 12, rect.y + 2, 64,
+							//Slider_widget::Diamond::get_height_static(), 0, 143,
+							//142);
+				
+
+			//}
+			// Zebra striping
+			if (i >= id_slider_autocount
+				&& i <= id_button_autosaves_write_to_gamedat) {
+
+				ibuf->draw_box(
+						sx + usable.x , rect.y + 2, usable.w , rect.h - 4,
+						0, 143, 142);
+			}
+			widget->paint();
+
+		}
+	}
+
+	font->paint_text(
+			iwin->get_ib8(), Strings::AutosaveCount_(), sx + label_margin,
+			sy + yForRow(y_index));
+	font->paint_text(
+			iwin->get_ib8(), Strings::QuicksaveCount_(), sx + label_margin,
+			sy + yForRow(++y_index));
+	font->paint_text(
+			iwin->get_ib8(), Strings::SortByName_(), sx + label_margin,
+			sy + yForRow(++y_index));
+	font->paint_text(
+			iwin->get_ib8(), Strings::GroupByType_(), sx + label_margin,
+			sy + yForRow(++y_index));
+	font->paint_text(
+			iwin->get_ib8(), Strings::AutosavesWriteToGamedat_(),
+			sx + label_margin, sy + yForRow(++y_index));
+}
+
 void Newfile_gump::quit() {
 	if (gumpman->okay_to_quit()) {
 		done = true;
 	}
+}
+
+inline bool Newfile_gump::forward_input(
+		std::function<bool(Gump_widget*)> func) {
+	for (const auto& widget : widgets) {
+		auto found = widget ? widget->Input_first() : nullptr;
+		if (found && func(found)) {
+			return true;
+		}
+	}
+
+	bool do_normal   = !transition_start_time && !show_settings;
+	bool do_settings = !transition_start_time && show_settings;
+
+	for (int i = id_first; i < id_count; i++) {
+		const auto& widget = widgets[i];
+		// Skip widgets not in current mode
+		if ((!do_normal && i >= id_normal_start && i <= id_normal_last)
+			|| (!do_settings && i >= id_settings_start && i <= id_settings_last)
+			|| (!old_style_mode && i >= id_old_style_start
+				&& i <= id_old_style_last)) {
+			continue;
+		}
+		if (widget && func(widget.get())) {
+			return true;
+		}
+	}
+	return false;
 }
 
 /*
@@ -765,29 +1070,15 @@ void Newfile_gump::quit() {
 bool Newfile_gump::mouse_down(
 		int mx, int my, MouseButton button    // Position in window.
 ) {
-
-	pushed = Gump::on_button(mx, my);
-	// Try buttons at bottom.
-	if (!pushed) {
-		for (const auto& btn : buttons) {
-			if (btn && btn->on_button(mx, my)) {
-				pushed = btn.get();
-				break;
-			}
-		}
-	}
-
-	if (pushed) {    // On a button?
-		if (!pushed->push(button)) {
-			pushed = nullptr;
-		}
+	if (forward_input([mx, my, button](Gump_widget* widget) {
+			return widget->mouse_down(mx, my, button);
+		})) {
 		return true;
 	}
 
-	gwin->set_all_dirty();    // Repaint.
-	return scroll->mouse_down(mx, my, button)
-		   || Modal_gump::mouse_down(mx, my, button);
-	// See if on text field.
+	gwin->set_all_dirty();    // Request Repaint.
+
+	return Modal_gump::mouse_down(mx, my, button);
 }
 
 bool Newfile_gump::Slot_widget::mouse_down(int mx, int my, MouseButton button) {
@@ -824,18 +1115,11 @@ bool Newfile_gump::Slot_widget::mouse_down(int mx, int my, MouseButton button) {
 bool Newfile_gump::mouse_up(
 		int mx, int my, MouseButton button    // Position in window.
 ) {
+	bool result = Modal_gump::mouse_up(mx, my, button)
+				  || forward_input([mx, my, button](Gump_widget* widget) {
+						 return widget->mouse_up(mx, my, button);
+					 });
 
-
-	bool result = scroll->mouse_up(mx, my, button);
-
-	if (pushed) {    // Pushing a button?
-		pushed->unpush(button);
-		if (pushed->on_button(mx, my)) {
-			pushed->activate(button);
-		}
-		pushed = nullptr;
-		result |= true;
-	}
 	if (touchui != nullptr
 		&& ((selected_slot == EmptySlot && last_selected != InvalidSlot)
 			|| (selected_slot >= 0 && selected_slot == last_selected))) {
@@ -845,18 +1129,21 @@ bool Newfile_gump::mouse_up(
 	// reset so the prompt doesn't pop up on closing
 	last_selected = InvalidSlot;
 
-	return result || Modal_gump::mouse_up(mx, my, button);
+	return result;
 }
 
 bool Newfile_gump::mousewheel_up(int mx, int my) {
-	return scroll->mousewheel_up(mx, my)
-		   || Modal_gump::mousewheel_up(mx, my);
+	return Modal_gump::mousewheel_up(mx, my)
+		   || forward_input([mx, my](Gump_widget* widget) {
+				  return widget->mousewheel_up(mx, my);
+			  });
 }
 
-
 bool Newfile_gump::mousewheel_down(int mx, int my) {
-	return scroll->mousewheel_down(mx, my)
-		   || Modal_gump::mousewheel_down(mx, my);
+	return Modal_gump::mousewheel_down(mx, my)
+		   || forward_input([mx, my](Gump_widget* widget) {
+				  return widget->mousewheel_down(mx, my);
+			  });
 }
 
 /*
@@ -866,10 +1153,18 @@ bool Newfile_gump::mousewheel_down(int mx, int my) {
 bool Newfile_gump::mouse_drag(
 		int mx, int my    // Where mouse is.
 ) {
-	return scroll->mouse_drag(mx, my) || Modal_gump::mouse_drag(mx, my);
+	return Modal_gump::mouse_drag(mx, my)
+		   || forward_input([mx, my](Gump_widget* widget) {
+				  return widget->mouse_drag(mx, my);
+			  });
 }
 
 bool Newfile_gump::text_input(const char* text) {
+	if (forward_input([text](Gump_widget* widget) {
+			return widget->text_input(text);
+		})) {
+		return true;
+	}
 	if (restore_mode) {
 		return true;
 	}
@@ -885,11 +1180,11 @@ bool Newfile_gump::text_input(const char* text) {
 	cursor = static_cast<int>(strlen(text));
 
 	// Show save button if newname is not empty
-	SetButtonEnabled(id_save, *newname != 0);
+	SetWidgetEnabled(id_save, *newname != 0);
 
 	// Remove Load and Delete Button
-	SetButtonEnabled(id_load, false);
-	SetButtonEnabled(id_delete, false);
+	SetWidgetEnabled(id_load, false);
+	SetWidgetEnabled(id_delete, false);
 
 	screenshot = cur_shot.get();
 	details    = &cur_details;
@@ -904,6 +1199,16 @@ bool Newfile_gump::text_input(const char* text) {
  */
 
 bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
+	if (transition_start_time) {
+		return false;
+	}
+
+	if (forward_input([chr, unicode](Gump_widget* widget) {
+			return widget->key_down(chr, unicode);
+		})) {
+		return true;
+	}
+
 	bool update_details = false;
 	int  repaint        = false;
 
@@ -917,33 +1222,37 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 	}
 
 	switch (chr) {
-	case SDLK_RETURN:    // If only 'Save', do it.
-		if (!buttons[id_load] && buttons[id_save]) {
-			if (buttons[id_save]->push(MouseButton::Left)) {
+	case SDLK_RETURN: {
+		auto load_button = dynamic_cast<Gump_button*>(widgets[id_load].get());
+		auto save_button = dynamic_cast<Gump_button*>(widgets[id_save].get());
+		// If only 'Save', do it.
+		if (!load_button && save_button) {
+			if (save_button->push(MouseButton::Left)) {
 				gwin->show(true);
-				buttons[id_save]->unpush(MouseButton::Left);
+				save_button->unpush(MouseButton::Left);
 				gwin->show(true);
-				buttons[id_save]->activate(MouseButton::Left);
+				save_button->activate(MouseButton::Left);
 			}
 		}    // If only 'Load', do it.
-		if (buttons[id_load] && !buttons[id_save]) {
-			if (buttons[id_load]->push(MouseButton::Left)) {
+		if (load_button && !save_button) {
+			if (load_button->push(MouseButton::Left)) {
 				gwin->show(true);
-				buttons[id_load]->unpush(MouseButton::Left);
+				load_button->unpush(MouseButton::Left);
 				gwin->show(true);
-				buttons[id_load]->activate(MouseButton::Left);
+				load_button->activate(MouseButton::Left);
 			}
 		}
 		update_details = true;
 		break;
+	}
 
 	case SDLK_BACKSPACE:
 		if (BackspacePressed()) {
 			// Can't restore/delete now.
-			SetButtonEnabled(id_load, false);
-			SetButtonEnabled(id_delete, false);
+			SetWidgetEnabled(id_load, false);
+			SetWidgetEnabled(id_delete, false);
 			// If no chars cant save either
-			SetButtonEnabled(id_save, *newname != 0);
+			SetWidgetEnabled(id_save, *newname != 0);
 			update_details = true;
 		}
 		break;
@@ -951,10 +1260,10 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 	case SDLK_DELETE:
 		if (DeletePressed()) {
 			// Can't restore/delete now.
-			SetButtonEnabled(id_load, false);
-			SetButtonEnabled(id_delete, false);
+			SetWidgetEnabled(id_load, false);
+			SetWidgetEnabled(id_delete, false);
 			// If no chars cant save either
-			SetButtonEnabled(id_save, *newname != 0);
+			SetWidgetEnabled(id_save, *newname != 0);
 
 			repaint        = true;
 			update_details = true;
@@ -987,10 +1296,10 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 		if (unicode < 256 && isascii(unicode)) {
 			if (AddCharacter(unicode)) {
 				// Can't restore/delete now.
-				SetButtonEnabled(id_load, false);
-				SetButtonEnabled(id_delete, false);
+				SetWidgetEnabled(id_load, false);
+				SetWidgetEnabled(id_delete, false);
 				// If no chars cant save either
-				SetButtonEnabled(id_save, *newname != 0);
+				SetWidgetEnabled(id_save, *newname != 0);
 
 				repaint        = true;
 				update_details = true;
@@ -1055,7 +1364,7 @@ int Newfile_gump::AddCharacter(char c) {
 	char text[MAX_SAVEGAME_NAME_LEN];
 
 	strncpy(text, newname, cursor);
-	text[cursor]     = c;
+	text[cursor] = c;
 	strncpy(text + cursor + 1, newname + cursor,
 			MAX_SAVEGAME_NAME_LEN - cursor - 1);
 	text[MAX_SAVEGAME_NAME_LEN - 1] = 0;
@@ -1075,11 +1384,11 @@ void Newfile_gump::SelectSlot(int slot) {
 	if (slot < NoSlot || slot > LastSlot()) {
 		slot = NoSlot;
 	}
-	selected_slot    = slot;
-	bool want_load   = true;
-	bool want_delete = true;
-	bool want_save   = true;
-	size_t  savegame_index = selected_slot - SavegameSlots;
+	selected_slot         = slot;
+	bool   want_load      = true;
+	bool   want_delete    = true;
+	bool   want_save      = true;
+	size_t savegame_index = selected_slot - SavegameSlots;
 
 	if (selected_slot == EmptySlot) {
 		want_load   = false;
@@ -1143,19 +1452,25 @@ void Newfile_gump::SelectSlot(int slot) {
 		want_save = false;
 	}
 
-	SetButtonEnabled(id_load, want_load);
-	SetButtonEnabled(id_save, want_save);
-	SetButtonEnabled(id_delete, want_delete);
+	SetWidgetEnabled(id_load, want_load);
+	SetWidgetEnabled(id_save, want_save);
+	SetWidgetEnabled(id_delete, want_delete);
 
 	gwin->set_all_dirty();    // Repaint.
 }
 
 void Newfile_gump::LoadSaveGameDetails(bool force) {
 	// Gamedat Details
-	gamedat->get_saveinfo(gd_shot, gd_details, gd_party,false);
+	if (!gd_shot || !gd_details || gd_party.empty()) {
+		// Only if any are missing
+		gamedat->get_saveinfo(gd_shot, gd_details, gd_party, false);
+	}
 
 	if (!restore_mode) {
-		gamedat->get_saveinfo(cur_shot, cur_details, cur_party, true);
+		// Only if any are missing
+		if (!cur_shot || !cur_details || cur_party.empty()) {
+			gamedat->get_saveinfo(cur_shot, cur_details, cur_party, true);
+		}
 	}
 	if (!old_style_mode) {
 		games = gamedat->GetSaveGameInfos(force);
@@ -1173,7 +1488,7 @@ void Newfile_gump::LoadSaveGameDetails(bool force) {
 		for (int i = 0; i < fieldcount; ++i) {
 			if (old_games[i].num != i) {
 				old_games[i] = SaveInfo(
-						gamedat->get_save_filename(i, SaveInfo::REGULAR));
+						gamedat->get_save_filename(i, SaveInfo::Type::REGULAR));
 			}
 		}
 
@@ -1188,21 +1503,25 @@ void Newfile_gump::LoadSaveGameDetails(bool force) {
 			 << " : " << (*games)[i].savename << endl;
 	}
 #endif
-	scroll->run();
+	if (widgets[id_scroll]) {
+		widgets[id_scroll]->run();
+	}
 }
 
 void Newfile_gump::FreeSaveGameDetails() {
-	cur_shot.reset();
-	cur_details = SaveGame_Details();
-	cur_party.clear();
+	//cur_shot.reset();
+	//cur_details = SaveGame_Details();
+	//cur_party.clear();
 
-	gd_shot.reset();
-	gd_details = SaveGame_Details();
-	gd_party.clear();
+	//gd_shot.reset();
+	//gd_details = SaveGame_Details();
+	//gd_party.clear();
+
 
 	filename = nullptr;
 	details  = nullptr;
 	party    = nullptr;
+	screenshot = nullptr;
 
 	// The SaveInfo struct will delete everything that it's got allocated
 	// So we don't need to worry about that
@@ -1211,7 +1530,7 @@ void Newfile_gump::FreeSaveGameDetails() {
 
 void Newfile_gump::toggle_audio_option(Gump_widget* btn, int state) {
 	auto audio = Audio::get_ptr();
-	if (btn == buttons[id_music].get()) {    // Music?
+	if (btn == widgets[id_music].get()) {    // Music?
 		if (audio) {
 			audio->set_music_enabled(state);
 			if (!state) {    // Stop what's playing.
@@ -1221,7 +1540,7 @@ void Newfile_gump::toggle_audio_option(Gump_widget* btn, int state) {
 		const string s = state ? "yes" : "no";
 		// Write option out.
 		config->set("config/audio/midi/enabled", s, true);
-	} else if (btn == buttons[id_speech].get()) {    // Speech?
+	} else if (btn == widgets[id_speech].get()) {    // Speech?
 		if (audio) {
 			audio->set_speech_enabled(state);
 			if (!state) {
@@ -1231,7 +1550,7 @@ void Newfile_gump::toggle_audio_option(Gump_widget* btn, int state) {
 		const string s = state ? "yes" : "no";
 		// Write option out.
 		config->set("config/audio/speech/enabled", s, true);
-	} else if (btn == buttons[id_effects].get()) {    // Sound effects?
+	} else if (btn == widgets[id_effects].get()) {    // Sound effects?
 		if (audio) {
 			audio->set_effects_enabled(state);
 			if (!state) {    // Off?  Stop what's playing.
