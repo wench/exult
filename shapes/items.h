@@ -275,6 +275,26 @@ struct StringsBase {
 	// Alias of String that returns std::string_view
 	template <unsigned INDEX, unsigned COUNT = 1>
 	using stringviewString = String<INDEX, COUNT, std::string_view>;
+
+	template <unsigned INDEX>
+	class NewlineCString : public String<INDEX, 1, const char*> {
+		using Base = String<INDEX, 1>;
+		const char* operator[](unsigned offset) const override {
+			static std::string ret;
+			if (ret.empty()) {
+				ret = Base::get(offset);
+
+				// Replace all ~ with \n
+				for (char& c : ret) {
+					if (c == '~') {
+						c = '\n';
+					}
+				}
+			}
+
+			return ret.c_str();
+		}
+	};
 };
 
 // Shared gump strings are here, gump specific strings are found in the Strings
@@ -304,6 +324,8 @@ public:
 	static inline const String<0x59C> Default = {};
 
 	static inline const String<0x59D> Doyoureallywanttoquit_ = {};
+
+	static inline const String<0x59E> REVERT = {};
 };
 
 //	Misc. text (frames, etc.) start at 0x500 in text.flx.
