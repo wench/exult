@@ -445,9 +445,11 @@
 0x6D8:SaveGames
 0x6D9:Autosave Count:
 0x6DA:Quicksave Count:
-0x6DB:Sort Saves By Name:
+0x6DB:Sort Savegames by:
 0x6DC:Group Saves By Type:
 0x6DD:Autosaves write to Gamedat:
+0x6DE:Real Time
+0x6DF: Name
 
 #Misc
 # SI copy protection failed

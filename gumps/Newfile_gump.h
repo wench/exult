@@ -55,7 +55,7 @@ protected:
 		id_revert,
 		id_slider_autocount,
 		id_slider_quickcount,
-		id_button_sortbyname,
+		id_button_sortby,
 		id_button_groupbytype,
 		id_button_autosaves_write_to_gamedat,
 

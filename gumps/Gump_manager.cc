@@ -818,14 +818,15 @@ void Gump_manager::paint_num(
 		int                   num,
 		int                   x,    // Coord. of right edge of #.
 		int                   y,    // Coord. of top of #.
-		std::shared_ptr<Font> font) {
+		std::shared_ptr<Font> font, 
+		bool left_align) {
 	//  Shape_manager *sman = Shape_manager::get_instance();
 	char buf[20];
 	snprintf(buf, sizeof(buf), "%d", num);
 	if (font == nullptr) {
 		font = sman->get_font(2);
 	}
-	sman->paint_text(font, buf, x - font->get_text_width(buf), y);
+	sman->paint_text(font, buf, x - (left_align?0:font->get_text_width(buf)), y);
 }
 
 /*

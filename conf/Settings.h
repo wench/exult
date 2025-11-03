@@ -467,9 +467,24 @@ public:
 				= {"config/disk/use_old_style_save_load", false,
 				   Settings::boolyesnoany, true, this};
 
-		enum_like_property<bool> savegame_sort_by_name
-				= {"config/disk/savegame_sort_by_name", false,
-				   Settings::boolyesnoany, true, this};
+		enum SaveGame_sort {
+			SORTBY_REALTIME = 0,
+			SORTBY_NAME     = 1,
+			SORTBY_GAMETIME = 2
+		};
+
+		enum_like_property<int> savegame_sort_by = {
+				"config/disk/savegame_sort_by",
+				SORTBY_REALTIME,
+				{{"realtime", SORTBY_REALTIME},
+				  {"time", SORTBY_REALTIME},
+				  {"savename", SORTBY_NAME},
+				  {"name", SORTBY_NAME},
+				  {"gametime", SORTBY_GAMETIME},
+				  {"ingametime", SORTBY_GAMETIME}},
+				true,
+				this
+        };
 
 		enum_like_property<bool> savegame_group_by_type
 				= {"config/disk/savegame_group_by_type", false,

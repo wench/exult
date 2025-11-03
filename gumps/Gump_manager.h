@@ -120,7 +120,9 @@ public:
 			 Paintable* paint = nullptr, bool* escaped = nullptr);
 	bool do_modal_gump(
 			Modal_gump*, Mouse::Mouse_shapes, Paintable* paint = nullptr);
-	void paint_num(int num, int x, int y, std::shared_ptr<Font> font = nullptr);
+	void paint_num(
+			int num, int x, int y, std::shared_ptr<Font> font = nullptr,
+			bool left_align = false);
 
 	Gump_manager();
 
