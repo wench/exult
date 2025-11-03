@@ -46,10 +46,11 @@ Slider_widget::Slider_widget(
 		Gump_Base* par, int px, int py, std::optional<ShapeID> osidLeft,
 		std::optional<ShapeID> osidRight, std::optional<ShapeID> osidDiamond,
 		int mival, int mxval, int step, int defval, int width,
-		std::shared_ptr<Font> font, int digits_width, bool logarithmic)
+		std::shared_ptr<Font> font, int digits_width,
+		bool left_align,bool logarithmic)
 		: Gump_widget(par, -1, px, py, -1), callback(nullptr),
 		  logarithmic(logarithmic), min_val(mival), max_val(mxval),
-		  step_val(step), val(defval), prev_dragx(INT32_MIN), font(font) {
+		  step_val(step), val(defval), prev_dragx(INT32_MIN), font(font), left_align(left_align) {
 	diamond = std::make_unique<Diamond>(this, 0, 0, osidDiamond);
 
 	if (osidLeft) {
@@ -124,7 +125,9 @@ Slider_widget::Slider_widget(
 		max_digits_width
 				= std::max(max_digits_width, font->get_text_width(buf) + 2);
 	}
-
+	if (left_align) {
+		max_digits_width += 2;
+	}
 	set_val(defval, true);
 }
 
@@ -204,8 +207,8 @@ void Slider_widget::paint() {
 	if (font) {
 		auto rect = right->get_rect();
 		gumpman->paint_num(
-				val, rect.x + rect.w + max_digits_width,
-				rect.y + (rect.h - font->get_text_height() + 1) / 2, font);
+				val, rect.x + rect.w + (left_align?2:max_digits_width),
+				rect.y + (rect.h - font->get_text_height() + 1) / 2, font,left_align);
 	}
 }
 
