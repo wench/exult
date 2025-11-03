@@ -1607,7 +1607,8 @@ int GameDat::SaveInfo::compare(const SaveInfo& other) const noexcept {
 		return int(other.type) - int(type);
 	}
 
-	if (Settings::get().disk.savegame_sort_by_name) {
+	if (Settings::get().disk.savegame_sort_by
+		== Settings::Disk::SORTBY_NAME) {
 		int namecomp = Pentagram::strcasecmp(
 				this->savename.c_str(), other.savename.c_str());
 
@@ -1619,7 +1620,18 @@ int GameDat::SaveInfo::compare(const SaveInfo& other) const noexcept {
 	if (details && other.details) {
 		// Sort by time
 
-		int datecomp = details.CompareRealTime(other.details);
+
+		if (Settings::get().disk.savegame_sort_by == Settings::Disk::SORTBY_GAMETIME)
+		{
+			int datecomp = details.CompareGameTime(other.details);
+			if (datecomp != 0) {
+				return datecomp;
+			}
+
+		} 
+
+			int datecomp
+				= details.CompareRealTime(other.details);
 		if (datecomp != 0) {
 			return datecomp;
 		}
@@ -1662,5 +1674,21 @@ int GameDat::SaveGame_Details::CompareRealTime(
 	if (real_second != other.real_second) {
 		return other.real_second - real_second;
 	}
+	return 0;
+}
+
+int GameDat::SaveGame_Details::CompareGameTime(
+		const SaveGame_Details& other) const noexcept {
+	if (game_day != other.game_day) {
+		return other.game_day - game_day;
+	}
+
+	if (game_hour != other.game_hour) {
+		return other.game_hour - game_hour;
+	}
+	if (game_minute != other.game_minute) {
+		return other.game_minute - game_minute;
+	}
+
 	return 0;
 }
