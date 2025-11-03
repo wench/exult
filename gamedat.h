@@ -79,6 +79,7 @@ struct SaveGame_Details {
 	char reserved1[48];    // 64
 
 	int CompareRealTime(const SaveGame_Details& other) const noexcept;
+	int CompareGameTime(const SaveGame_Details& other) const noexcept;
 };
 
 struct SaveGame_Party {
