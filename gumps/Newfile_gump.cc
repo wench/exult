@@ -132,11 +132,16 @@ public:
 
 	static inline const String<0x6DA> QuicksaveCount_;
 
-	static inline const String<0x6DB> SortByName_;
+	static inline const String<0x6DB> SortSavegamesBy_;
 
 	static inline const String<0x6DC> GroupByType_;
 
 	static inline const String<0x6DD> AutosavesWriteToGamedat_;
+
+	static inline const String<0x6DE> RealTime;
+
+	static inline const String<0x6DF> Name;
+	
 };
 
 //
@@ -255,32 +260,36 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 		// Settings widgets
 		int yindex = 0;
 
-		int maxval = Settings::get().disk.autosave_count;
-		if (maxval < 100) {
-			maxval = 100;
+		int amaxval = Settings::get().disk.autosave_count;
+		if (amaxval < 100) {
+			amaxval = 100;
 		} else {
-			maxval = std::max(1000, maxval);
+			amaxval = std::max(1000, amaxval);
 		}
+		int qmaxval = Settings::get().disk.quicksave_count;
+		if (qmaxval < 100) {
+			qmaxval = 100;
+		} else {
+			qmaxval = std::max(1000, qmaxval);
+		}
+
+		int num_width = std::max(
+				font->get_text_width(std::to_string(amaxval).c_str()), font->get_text_width(std::to_string(qmaxval).c_str()));
+
 		widgets[id_slider_autocount] = std::make_unique<Slider_widget>(
 				this, get_button_pos_for_label(Strings::AutosaveCount_()), yForRow(yindex++) - 12, std::nullopt, std::nullopt,
-				std::nullopt, Settings::get().disk.autosave_count.get_min(), maxval, 1, Settings::get().disk.autosave_count, 64,
-				font, 40, false);
-
-		maxval = Settings::get().disk.quicksave_count;
-		if (maxval < 100) {
-			maxval = 100;
-		} else {
-			maxval = std::max(1000, maxval);
-		}
+				std::nullopt, Settings::get().disk.autosave_count.get_min(), amaxval, 1, Settings::get().disk.autosave_count, 64,
+				font, num_width, true, false);
 
 		widgets[id_slider_quickcount] = std::make_unique<Slider_widget>(
 				this, get_button_pos_for_label(Strings::QuicksaveCount_()), yForRow(yindex++) - 12, std::nullopt, std::nullopt,
-				std::nullopt, Settings::get().disk.quicksave_count.get_min(), maxval, 1, Settings::get().disk.quicksave_count, 64,
-				font, 40, false);
+				std::nullopt, Settings::get().disk.quicksave_count.get_min(), qmaxval, 1, Settings::get().disk.quicksave_count, 64,
+				font, num_width, true, false);
 
-		widgets[id_button_sortbyname] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
-				this, std::vector<std::string>{Strings::No(), Strings::Yes()}, Settings::get().disk.savegame_sort_by_name,
-				get_button_pos_for_label(Strings::SortByName_()), yForRow(yindex++) - 2, 64, 0);
+		widgets[id_button_sortby] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
+				this, std::vector<std::string>{Strings::RealTime(), Strings::Name(), Strings::GameTime()},
+				Settings::get().disk.savegame_sort_by, get_button_pos_for_label(Strings::SortSavegamesBy_()), yForRow(yindex++) - 2,
+				64, 0);
 
 		widgets[id_button_groupbytype] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
 				this, std::vector<std::string>{Strings::No(), Strings::Yes()}, Settings::get().disk.savegame_group_by_type,
@@ -291,7 +300,7 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 				get_button_pos_for_label(Strings::AutosavesWriteToGamedat_()), yForRow(yindex++) - 2, 64, 0);
 
 		RightAlignWidgets(tcb::span(widgets.data() + id_slider_autocount, 5));
-		// RightAlignWidgets(tcb::span(widgets.data() + id_button_sortbyname, 3),44);
+		// RightAlignWidgets(tcb::span(widgets.data() + id_button_sortbyname, 3),num_width+4);
 	}
 
 	// Reposition the gump
@@ -453,7 +462,7 @@ void Newfile_gump::apply_settings() {
 	auto& settings                      = Settings::get().disk;
 	settings.autosave_count             = widgets[id_slider_autocount]->getselection();
 	settings.quicksave_count            = widgets[id_slider_quickcount]->getselection();
-	settings.savegame_sort_by_name      = widgets[id_button_sortbyname]->getselection() != 0;
+	settings.savegame_sort_by           = widgets[id_button_sortby]->getselection();
 	settings.savegame_group_by_type     = widgets[id_button_groupbytype]->getselection() != 0;
 	settings.autosaves_write_to_gamedat = widgets[id_button_autosaves_write_to_gamedat]->getselection() != 0;
 
@@ -464,7 +473,7 @@ void Newfile_gump::revert_settings() {
 	auto& settings = Settings::get().disk;
 	widgets[id_slider_autocount]->setselection(settings.autosave_count);
 	widgets[id_slider_quickcount]->setselection(settings.quicksave_count);
-	widgets[id_button_sortbyname]->setselection(settings.savegame_sort_by_name);
+	widgets[id_button_sortby]->setselection(settings.savegame_sort_by);
 	widgets[id_button_groupbytype]->setselection(settings.savegame_group_by_type);
 	widgets[id_button_autosaves_write_to_gamedat]->setselection(settings.autosaves_write_to_gamedat);
 }
@@ -680,7 +689,7 @@ void Newfile_gump::paint_normal() {
 				}
 			}
 			ShapeID shape(shape_num, 16, shape_file);
-			shape.paint_shape(x + 249 + (i & 3) * 23, y + 157 + i / 4 * 27);
+			shape.paint_shape(x + 249 + (i & 3) * 23, y + 157 + i / 4 * 27, true);
 		}
 
 		char info[320];
@@ -829,7 +838,7 @@ void Newfile_gump::paint_settings() {
 
 	font->paint_text(iwin->get_ib8(), Strings::AutosaveCount_(), sx + label_margin, sy + yForRow(y_index));
 	font->paint_text(iwin->get_ib8(), Strings::QuicksaveCount_(), sx + label_margin, sy + yForRow(++y_index));
-	font->paint_text(iwin->get_ib8(), Strings::SortByName_(), sx + label_margin, sy + yForRow(++y_index));
+	font->paint_text(iwin->get_ib8(), Strings::SortSavegamesBy_(), sx + label_margin, sy + yForRow(++y_index));
 	font->paint_text(iwin->get_ib8(), Strings::GroupByType_(), sx + label_margin, sy + yForRow(++y_index));
 	font->paint_text(iwin->get_ib8(), Strings::AutosavesWriteToGamedat_(), sx + label_margin, sy + yForRow(++y_index));
 }
