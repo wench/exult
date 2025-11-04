@@ -36,11 +36,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 class IDataSource;
 class Flex_writer;
 class unzFile;
+class zipFile;
 class Shape_file;
-
-struct zip_internal;
-using zipFile = zip_internal*;
-
 
 #define MAX_SAVEGAME_NAME_LEN 0x50
 
@@ -248,7 +245,6 @@ bool read_saveinfo(
 		IDataSource* in, SaveGame_Details& details,
 		std::vector<SaveGame_Party>& party);
 #ifdef HAVE_ZIP_SUPPORT
-private:
 	bool get_saveinfo_zip(
 			const char* fname, std::string& name,
 			std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
@@ -256,11 +252,11 @@ private:
 	bool save_gamedat_zip(const char* fname, const char* savename);
 	bool Restore_level2(unzFile& unzipfile, const char* dirname, int dirlen);
 	bool restore_gamedat_zip(const char* fname);
-	bool Save_level2(zipFile zipfile, const char* fname);
-	bool Save_level1(zipFile zipfile, const char* fname);
-	bool Begin_level2(zipFile zipfile, int mapnum);
-	bool End_level2(zipFile zipfile);
-#endif	
+	bool Save_level2(zipFile& zipfile, const char* fname);
+	bool Save_level1(zipFile& zipfile, const char* fname,bool rquired = true);
+	bool Begin_level2(zipFile& zipfile, int mapnum);
+	bool End_level2(zipFile& zipfile);
+#endif
 
 	void read_save_infos();
 
