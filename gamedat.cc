@@ -1270,11 +1270,11 @@ bool GameDat::restore_gamedat_zip(
 }
 
 // Level 1 Compression
-bool GameDat::Save_level1(zipFile zipfile, const char* fname) {
+bool GameDat::Save_level1(zipFile& zipfile, const char* fname, bool required) {
 	IFileDataSource ds(fname);
 	if (!ds.good()) {
-		if (Game::is_editing()) {
-			return false;    // Newly developed game.
+		if (Game::is_editing() || !required) {
+			return false;    // Newly developed game. or file is not required
 		}
 		throw file_read_exception(fname);
 	}
@@ -1292,7 +1292,7 @@ bool GameDat::Save_level1(zipFile zipfile, const char* fname) {
 }
 
 // Level 2 Compression
-bool GameDat::Begin_level2(zipFile zipfile, int mapnum) {
+bool GameDat::Begin_level2(zipFile& zipfile, int mapnum) {
 	char oname[8];    // Set up name.
 	if (mapnum == 0) {
 		strcpy(oname, "GAMEDAT");
@@ -1310,7 +1310,7 @@ bool GameDat::Begin_level2(zipFile zipfile, int mapnum) {
 		   == ZIP_OK;
 }
 
-bool GameDat::Save_level2(zipFile zipfile, const char* fname) {
+bool GameDat::Save_level2(zipFile& zipfile, const char* fname) {
 	IFileDataSource ds(fname);
 	if (!ds.good()) {
 		if (Game::is_editing()) {
@@ -1352,7 +1352,7 @@ bool GameDat::Save_level2(zipFile zipfile, const char* fname) {
 	return err == ZIP_OK;
 }
 
-bool GameDat::End_level2(zipFile zipfile) {
+bool GameDat::End_level2(zipFile& zipfile) {
 	uint32 zeros = 0;
 
 	// Write a terminator (12 zeros)
@@ -1399,18 +1399,18 @@ bool GameDat::save_gamedat_zip(
 	zipFile           zipfile = zipOpen(filestr.c_str(), 1);
 
 	// We need to explicitly save these as they are no longer included in
-	// savefiles and they should always be stored first and as level 1
-	// Screenshot may not exist so only include it if it exists
-	if (U7exists(GSCRNSHOT)) {
-		Save_level1(zipfile, GSCRNSHOT);
-	}
-	Save_level1(zipfile, GSAVEINFO);
-	Save_level1(zipfile, IDENTITY);
+	// savefiles span and they should always be stored first and as level 1
+	// screnshot and saveinfo are not required files
+	Save_level1(zipfile, GSCRNSHOT,false);
+	Save_level1(zipfile, GSAVEINFO,false);
+	Save_level1(zipfile, IDENTITY,true);
 
 	// Level 1 Compression
 	if (Settings::get().disk.save_compression_level != 2) {
 		for (const auto* savefile : savefiles) {
-			Save_level1(zipfile, savefile);
+			if (!Save_level1(zipfile, savefile)) {
+				throw file_write_exception(fname);
+			}
 		}
 
 		// Now the Ireg's.
@@ -1425,7 +1425,9 @@ bool GameDat::save_gamedat_zip(
 				// for existing games
 				if (U7exists(
 							map->get_schunk_file_name(U7IREG, schunk, iname))) {
-					Save_level1(zipfile, iname);
+					if (!Save_level1(zipfile, iname)) {
+						throw file_write_exception(fname);
+					}
 				}
 			}
 		}
@@ -1433,10 +1435,14 @@ bool GameDat::save_gamedat_zip(
 	// Level 2 Compression
 	else {
 		// Start the GAMEDAT file.
-		Begin_level2(zipfile, 0);
+		if (!Begin_level2(zipfile, 0)) {
+			throw file_write_exception(fname);
+		}
 
 		for (const char* savefilename : savefiles) {
-			Save_level2(zipfile, savefilename);
+			if (!Save_level2(zipfile, savefilename)) {
+				throw file_write_exception(fname);
+			}
 		}
 
 		// Now the Ireg's.
@@ -1446,9 +1452,10 @@ bool GameDat::save_gamedat_zip(
 			}
 			if (map->get_num() != 0) {
 				// Finish the open file (GAMEDAT or mapXX).
-				End_level2(zipfile);
-				// Start the next file (mapXX).
-				Begin_level2(zipfile, map->get_num());
+				if (!End_level2(zipfile)
+					|| !Begin_level2(zipfile, map->get_num())) {
+					throw file_write_exception(fname);
+				}
 			}
 			for (int schunk = 0; schunk < 12 * 12; schunk++) {
 				// Check to see if the ireg exists before trying to
@@ -1456,16 +1463,19 @@ bool GameDat::save_gamedat_zip(
 				// for existing games
 				if (U7exists(
 							map->get_schunk_file_name(U7IREG, schunk, iname))) {
-					Save_level2(zipfile, iname);
+					if (!Save_level2(zipfile, iname)) {
+						throw file_write_exception(fname);
+					}
 				}
 			}
 		}
 
-		End_level2(zipfile);
+		if (!End_level2(zipfile)) {
+			throw file_write_exception(fname);
+		}
 	}
-
-	// ++++Better error system needed??
-	if (zipClose(zipfile, savename) != ZIP_OK) {
+	
+	if (zipfile.close(savename) != ZIP_OK) {
 		throw file_write_exception(fname);
 	}
 
