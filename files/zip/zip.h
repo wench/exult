@@ -51,15 +51,16 @@
 /* Added by Ryan Nunn */
 #ifdef HAVE_ZIP_SUPPORT
 
-#	ifdef __cplusplus
-extern "C" {
-#	endif
+#include<memory>
+#include <memory_resource>
 
 #	define ZLIB_CONST
 #	include <zlib.h>
 
 struct zip_internal;
-using zipFile = zip_internal*;
+//using zip_internal* = zip_internal*;
+class zipFile;
+class ODataSource;
 
 #	define ZIP_OK            (0)
 #	define ZIP_ERRNO         (Z_ERRNO)
@@ -86,19 +87,21 @@ struct zip_fileinfo {
 	uLong external_fa; /* external file attributes        4 bytes */
 };
 
-extern zipFile ZEXPORT zipOpen(const char* pathname, int append);
+extern zipFile ZEXPORT
+		zipOpen(std::shared_ptr<ODataSource>           ds,
+				std::pmr::polymorphic_allocator<char> allocator = {});
 /*
   Create a zipfile.
 	 pathname contain on Windows NT a filename like "c:\\zlib\\zlib111.zip" or
   on an Unix computer "zlib/zlib111.zip". if the file pathname exist and
   append=1, the zip will be created at the end of the file. (useful if the file
   contain a self extractor code) If the zipfile cannot be opened, the return
-  value is nullptr. Else, the return value is a zipFile Handle, usable with
+  value is nullptr. Else, the return value is a zip_internal* Handle, usable with
   other function of this zip package.
 */
 
 extern int ZEXPORT zipOpenNewFileInZip(
-		zipFile file, const char* filename, const zip_fileinfo* zipfi,
+		zip_internal* file, const char* filename, const zip_fileinfo* zipfi,
 		const void* extrafield_local, uInt size_extrafield_local,
 		const void* extrafield_global, uInt size_extrafield_global,
 		const char* comment, int method, int level);
@@ -115,24 +118,61 @@ extern int ZEXPORT zipOpenNewFileInZip(
   level contain the level of compression (can be Z_DEFAULT_COMPRESSION)
 */
 
-extern int ZEXPORT zipWriteInFileInZip(zipFile file, voidpc buf, unsigned len);
+extern int ZEXPORT zipWriteInFileInZip(zip_internal* file, voidpc buf, unsigned len);
 /*
   Write data in the zipfile
 */
 
-extern int ZEXPORT zipCloseFileInZip(zipFile file);
+extern int ZEXPORT zipCloseFileInZip(zip_internal* file);
 /*
   Close the current file in the zipfile
 */
 
-extern int ZEXPORT zipClose(zipFile file, const char* global_comment);
-/*
-  Close the zipfile
-*/
 
-#	ifdef __cplusplus
-}
-#	endif
+
+class zipFile {
+	std::shared_ptr<zip_internal> data;
+
+public:
+	zipFile();
+
+	// No copying allowed
+	zipFile(const zipFile&) = delete;
+
+	// Only moving allowed
+	zipFile(zipFile&& other) noexcept;
+
+	zipFile(std::shared_ptr<zip_internal>&& data) noexcept;
+
+	int close(const char* global_comment);
+
+	int set(std::shared_ptr<zip_internal>&&);
+
+	~zipFile();
+
+	// No copying allowed
+	zipFile& operator=(const zipFile& other) = delete;
+
+	// Only moving allowed
+	zipFile& operator=(zipFile&& other) noexcept {
+		if (this != &other) {
+			std::swap(data, other.data);
+		}
+		return *this;
+	}
+
+	operator bool() {
+		return data.get();
+	}
+
+	operator zip_internal*() {
+		return data.get();
+	}
+
+	zip_internal* operator->() {
+		return data.get();
+	}
+};
 
 /* Added by Ryan Nunn */
 #endif /*HAVE_ZIP_SUPPORT*/
