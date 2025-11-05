@@ -673,11 +673,11 @@ void Image_window::create_surface(unsigned int w, unsigned int h) {
 
 	// Update line size in words.
 	ibuf->line_width = draw_surface->pitch / ibuf->pixel_size;
-	// Offset it set to the top left pixel if the game window
-	ibuf->offset_x = (get_full_width() - get_game_width()) / 2;
-	ibuf->offset_y = (get_full_height() - get_game_height()) / 2;
-	ibuf->bits     = static_cast<unsigned char*>(draw_surface->pixels)
-				 - get_start_x() - get_start_y() * ibuf->line_width;
+	ibuf->bits       = static_cast<unsigned char*>(draw_surface->pixels);
+	// Offset is set to the top left pixel of the game window
+	ibuf->set_offset(
+			(get_full_width() - get_game_width()) / 2,
+			(get_full_height() - get_game_height()) / 2);
 	// Scaler guardband is in effect
 	if (draw_surface != display_surface) {
 		ibuf->bits += guard_band + ibuf->line_width * guard_band;
@@ -944,6 +944,7 @@ void Image_window::free_surface() {
 	inter_surface    = nullptr;
 	draw_surface     = nullptr;
 	display_surface  = nullptr;
+	ibuf->set_offset(0, 0);
 	ibuf->bits       = nullptr;
 	if (screen_renderer != nullptr) {
 		SDL_DestroyRenderer(screen_renderer);
