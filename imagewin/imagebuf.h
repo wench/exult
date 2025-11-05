@@ -146,7 +146,11 @@ public:
 	friend class Image_buffer8;
 
 	virtual ~Image_buffer() {
-		delete[] bits;    // In case Image_window didn't.
+		// delete bits in case Image_window didn't.
+		if (bits) {
+			set_offset(0, 0);    // Reset bits pointer.
+			delete[] bits;       
+		}
 	}
 	friend class Image_window;
 
@@ -201,13 +205,28 @@ public:
 		cliph = h;
 	}
 
-	void get_clip(int& x, int& y, int& w, int& h) {
+	void get_clip(int& x, int& y, int& w, int& h) const {
 		x = clipx;
 		y = clipy;
 		w = clipw;
 		h = cliph;
 	}
 
+	// Set offset for where (0,0) is in the buffer.
+	void set_offset(int x, int y) {
+		// Adjust clip for new offset
+		clipx += offset_x - x;		
+		clipy += offset_y - y;
+		// Move bits pointer to new origin
+		bits += (-offset_y+y) * line_width + (-offset_x+x);
+		// Set new offset
+		offset_x = x;
+		offset_y = y;
+	}
+	void get_offset(int& x, int& y) const {
+		x = offset_x;
+		y = offset_y;
+	}
 	// Is rect. visible within clip?
 	bool is_visible(int x, int y, int w, int h) {
 		return x < clipx + clipw && y < clipy + cliph && x + w > clipx
