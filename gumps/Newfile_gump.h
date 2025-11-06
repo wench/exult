@@ -20,14 +20,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define NEWFILE_GUMP_H
 
 #include "Modal_gump.h"
-#include "gamedat.h"
 #include "Scrollable_widget.h"
+#include "gamedat.h"
+
 #include <array>
-#include <memory>
 #include <functional>
+#include <memory>
 
 class Shape_file;
 class Image_buffer;
+class PageTurnEffect;
 
 /*
  *  The file save/load box:
@@ -162,9 +164,9 @@ protected:
 	// Quit, Sound, Speech and Music Buttons.
 	// Cannot be combined with restore_mode
 
-	uint64_t transition_start_time = 0;
-	const uint64_t transition_duration   = 500;
-	bool     show_settings         = false;
+	const uint64_t                  transition_duration = 500;
+	bool                            show_settings       = false;
+	std::unique_ptr<PageTurnEffect> page_turn_effect;
 
 	bool                  old_style_mode;
 	std::shared_ptr<Font> tinyfont;
