@@ -416,4 +416,74 @@ public:
 	void handle_event(unsigned long curtime, uintptr udata) override;
 };
 
+class BufferTransitionEffect {
+protected:
+	std::unique_ptr<Image_buffer> buffer1;
+	std::unique_ptr<Image_buffer> buffer2;
+
+	uint64 startTime;
+	uint64    duration;    // In milliseconds.
+
+	public:
+	BufferTransitionEffect(uint64 duration, TileRect effectRect);
+
+		uint64 getElapsedTime() const;
+
+		void start();
+
+		// Buffers must be filled before painting the effect.
+		// Only need to be filled once.
+		Image_buffer8* getBuffer1();
+
+		Image_buffer8* getBuffer2();
+
+		void swapBuffers() {
+			std::swap(buffer1, buffer2);
+		}
+		void UpdateRect(const TileRect& rect);
+
+		virtual ~BufferTransitionEffect() = default;
+
+		bool isComplete() const
+		{
+			return getElapsedTime() >= static_cast<uint64>(duration);
+		}
+		
+		bool isStarted() const {
+			return startTime != 0;
+		}
+
+		virtual void paint() = 0;
+		
+
+};
+
+class PageTurnEffect : public BufferTransitionEffect {
+	bool forward;
+	uint8 lineColour;
+	bool  alternativeEffect;
+
+public:
+
+	// Create a page turn effect over the given rectangle.
+	// effectRect is in screen coordinates.
+	PageTurnEffect(
+			uint64 duration, TileRect effectRect, uint8 lineColour = 0xff,
+			bool alternativeEffect=false)
+			: BufferTransitionEffect(duration, effectRect), forward(true),
+			  lineColour(lineColour), alternativeEffect(alternativeEffect)
+	{
+	}
+
+	// Start the effect.
+	// Forward = true means turn to next page (initial showing buffer 1 transition
+	// to buffer2), false means previous page (initial showing buffer2 transition
+	// to buffer1)
+	void start(bool fwrd) {
+		forward = fwrd;
+		BufferTransitionEffect::start();
+	}
+
+	void paint() override;
+};
 #endif

@@ -398,6 +398,74 @@ void Image_buffer8::copy8(
 	}
 }
 
+void Image_buffer8::copy_col8(
+		Image_buffer8* src_buf, int srcx, int srcy, int height, int destx,
+		int desty) {
+	int  cx, cy, cw, ch;
+	bool clipped = false;
+	auto clipsave = src_buf->SaveClip();
+	// Clear source clip temporarily
+	src_buf->clear_clip();
+
+	// Loop until no more clipping occurs
+	do {
+		clipped = false;
+
+		// Destination Clipping
+		get_clip(cx, cy, cw, ch);
+		// Make sure X is not clipped
+		if (destx < cx || destx >= cx + cw) {
+			return;
+		}
+		if (desty < cy) {
+			int offscreen = cy - desty;
+			srcy += offscreen;
+			height -= offscreen;
+			desty   = cy;
+			clipped = true;
+		}
+		if (desty + height > cy + ch) {
+			int offscreen = (desty + height) - (cy + ch);
+			height -= offscreen;
+			clipped = true;
+		}
+		// Source Clipping
+		src_buf->get_clip(cx, cy, cw, ch);
+		// Make sure X is not clipped
+		if (srcx < cx || srcx >= cx + cw) {
+			return;
+		}
+		if (srcy < cy) {
+			int offscreen = cy - srcy;
+			desty += offscreen;
+			height -= offscreen;
+			srcy    = cy;
+			clipped = true;
+		}
+
+		if (srcy + height > cy + ch) {
+			int offscreen = (srcy + height) - (cy + ch);
+			height -= offscreen;
+			clipped = true;
+		}
+		if (height <= 0) {
+			return;
+		}
+	} while (clipped);
+
+	int         this_line_width = this->line_width;
+	int         src_line_width  = src_buf->line_width;
+	auto*       to              = bits + desty * this_line_width + destx;
+	auto*       end             = to + height * this_line_width;
+	const auto* from            = src_buf->bits + srcy * src_line_width + srcx;
+
+	do {
+		*to = *from;
+		from += src_line_width;
+		to += this_line_width;
+	} while (to < end);
+}
+
 /*
  *  Copy a line into this buffer.
  */

@@ -75,6 +75,10 @@ public:
 	void copy8(
 			const unsigned char* src_pixels, int srcw, int srch, int destx,
 			int desty) override;
+	// Copy a column from another buffer 
+	virtual void copy_col8(
+			Image_buffer8* src_buf, int srcx, int srcy, int height,
+			int destx, int desty) override;
 	// Copy line to here.
 	void copy_hline8(
 			const unsigned char* src_pixels, int srcw, int destx,
