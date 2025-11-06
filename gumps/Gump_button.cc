@@ -148,8 +148,7 @@ bool Gump_button::mouse_drag(int mx, int my) {
 }
 
 void Basic_button::paint() {
-	Image_window8* iwin = gwin->get_win();
-	auto*          ib8  = iwin->get_ib8();
+	auto ib8 = Shape_frame::get_to_render();
 
 	int offset = 0;
 	int px     = 0;

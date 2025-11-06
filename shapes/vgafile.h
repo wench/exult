@@ -70,8 +70,32 @@ public:
 			int yoff, bool setrle);
 	std::unique_ptr<Shape_frame> reflect();    // Create new frame, reflected.
 
+	class RenderRestorer {
+		Image_buffer8* oldscrwin;
+
+	public:
+		RenderRestorer(Image_buffer8*w) : oldscrwin(w) {}
+		~RenderRestorer() {
+			scrwin = oldscrwin;
+		}
+
+		operator Image_buffer8*() const {
+			return oldscrwin;
+		}
+
+	};
+
+	static  RenderRestorer set_to_render_safe(Image_buffer8* w) {
+		std::swap(scrwin, w);
+		return RenderRestorer(w);
+	}
+
 	static void set_to_render(Image_buffer8* w) {
 		scrwin = w;
+	}
+
+	static Image_buffer8* get_to_render() {
+		return scrwin;
 	}
 
 	unsigned char* get_data() {
