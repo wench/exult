@@ -177,7 +177,7 @@ protected:
 	int  AddCharacter(char c);
 	void SelectSlot(int slot);    // Select a given slot
 
-	void LoadSaveGameDetails(bool force);    // Loads (and sorts) all the savegame details
+	void LoadSaveGameDetails();    // Loads (and sorts) all the savegame details
 	void FreeSaveGameDetails();    // Frees all the savegame details
 
 public:
