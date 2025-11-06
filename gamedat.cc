@@ -402,6 +402,32 @@ for (const auto* savefile : savefiles) {
 	read_save_infos_async(true);
 }
 
+void GameDat::DeleteSaveGame(const std::string& fname) {
+	U7remove(fname);
+
+	// Update save_info
+	std::lock_guard lock(save_info_mutex);
+
+	auto it = std::find_if(
+			save_infos.begin(), save_infos.end(), [&fname](const SaveInfo& si) {
+				return si.filename() == fname;
+			});
+
+
+	if (it != save_infos.end()) {
+
+		int itype = static_cast<int>(it->type);
+
+		// Update first_free if needed
+		if (first_free[itype] > it->num) {
+			first_free[itype] = it->num;
+		}
+
+		save_infos.erase(it);
+	}
+
+}
+
 std::string GameDat::get_save_filename(int num, SaveInfo::Type type) {
 	// preallocate string to a size that should be big enough
 	std::string fname(std::size(SAVENAME3) + 3, 0);

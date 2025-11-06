@@ -281,6 +281,10 @@ public:
 	void Extractgame(const char* fname, bool doread);
 
 	void ResortSaveInfos();
+	
+	// Delete a savegame file. This will invalidate any existing SaveInfo
+	// vectors
+	void DeleteSaveGame(const std::string& fname);
 };
 
 #endif    // SAVEINFO_H_INCLUDED
