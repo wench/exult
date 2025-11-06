@@ -222,7 +222,7 @@ Arrow_Button::Arrow_Button(
 
 void Arrow_Button::paint() {
 	Basic_button::paint();
-	auto ib8       = gwin->get_win()->get_ib8();
+	auto ib8       = Shape_frame::get_to_render();
 	auto draw_area = get_draw_area();
 	local_to_screen(draw_area.x , draw_area.y);
 	if (!double_) {
