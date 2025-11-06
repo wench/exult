@@ -52,9 +52,17 @@
 #	endif
 #endif    // __GNUC__
 #include <SDL3/SDL.h>
+
+#include <cmath>
 #ifdef __GNUC__
 #	pragma GCC diagnostic pop
 #endif    // __GNUC__
+
+// Most compilers wont define M_PI in cmath as it's not part of the standard
+// so we define it here if needed.
+#ifndef M_PI
+#	define M_PI 3.14159265358979323846
+#endif
 
 using namespace Pentagram;
 
@@ -107,9 +115,10 @@ void Effects_manager::add_text(const char* msg, Game_object* item) {
  */
 
 void Effects_manager::add_text(const char* msg, int x, int y) {
-	texts.emplace_front(std::make_unique<Text_effect>(
-			msg, gwin->get_scrolltx() + x / c_tilesize,
-			gwin->get_scrollty() + y / c_tilesize, gwin));
+	texts.emplace_front(
+			std::make_unique<Text_effect>(
+					msg, gwin->get_scrolltx() + x / c_tilesize,
+					gwin->get_scrollty() + y / c_tilesize, gwin));
 }
 
 /**
@@ -751,13 +760,15 @@ void Projectile_effect::handle_event(
 				offset = Tile_coord(0, 0, 0);
 			}
 			if (ainf && ainf->is_homing()) {
-				eman->add_effect(std::make_unique<Homing_projectile>(
-						weapon, att_obj.get(), tgt_obj.get(), pos,
-						pos + offset));
+				eman->add_effect(
+						std::make_unique<Homing_projectile>(
+								weapon, att_obj.get(), tgt_obj.get(), pos,
+								pos + offset));
 			} else {
-				eman->add_effect(std::make_unique<Explosion_effect>(
-						pos + offset, nullptr, 0, weapon, projectile_shape,
-						att_obj.get()));
+				eman->add_effect(
+						std::make_unique<Explosion_effect>(
+								pos + offset, nullptr, 0, weapon,
+								projectile_shape, att_obj.get()));
 			}
 			target = Game_object_weak();    // Takes care of attack.
 		} else {
@@ -1458,8 +1469,9 @@ Storm_effect::Storm_effect(
 	// Start raining soon.
 	eman->add_effect(std::make_unique<Clouds_effect>(duration + 1, delay));
 	const int rain_delay = 20 + rand() % 1000;
-	eman->add_effect(std::make_unique<Rain_effect<Raindrop>>(
-			duration + 2, rain_delay, 0));
+	eman->add_effect(
+			std::make_unique<Rain_effect<Raindrop>>(
+					duration + 2, rain_delay, 0));
 	const int lightning_delay = rain_delay + rand() % 500;
 	eman->add_effect(
 			std::make_unique<Lightning_effect>(duration - 2, lightning_delay));
@@ -1494,8 +1506,9 @@ Snowstorm_effect::Snowstorm_effect(
 		: Weather_effect(duration, delay, 1, egg), start(true) {
 	// Start snowing soon.
 	eman->add_effect(std::make_unique<Clouds_effect>(duration + 1, delay));
-	eman->add_effect(std::make_unique<Rain_effect<Snowflake>>(
-			duration + 2, 20 + rand() % 1000, 0));
+	eman->add_effect(
+			std::make_unique<Rain_effect<Snowflake>>(
+					duration + 2, 20 + rand() % 1000, 0));
 }
 
 /**
@@ -1527,8 +1540,9 @@ Sparkle_effect::Sparkle_effect(
 		: Weather_effect(duration, delay, 3, egg), start(true) {
 	// Start snowing soon.
 
-	eman->add_effect(std::make_unique<Rain_effect<Sparkle>>(
-			duration, delay, MAXDROPS / 6, 3, egg));
+	eman->add_effect(
+			std::make_unique<Rain_effect<Sparkle>>(
+					duration, delay, MAXDROPS / 6, 3, egg));
 }
 
 /**
@@ -1566,8 +1580,9 @@ Fog_effect::Fog_effect(
 	// SI adds sparkle/raindrops to the fog palette shift
 	// let's do that for all games
 	const int rain_delay = 250 + rand() % 1000;
-	eman->add_effect(std::make_unique<Rain_effect<Sparkle>>(
-			duration, rain_delay, MAXDROPS / 2));
+	eman->add_effect(
+			std::make_unique<Rain_effect<Sparkle>>(
+					duration, rain_delay, MAXDROPS / 2));
 }
 
 void Fog_effect::handle_event(unsigned long curtime, uintptr udata) {
@@ -1874,5 +1889,169 @@ void Fire_field_effect::handle_event(
 		auto ownHandle = eman->remove_effect(this);
 	} else {
 		gwin->get_tqueue()->add(curtime + gwin->get_std_delay(), this, udata);
+	}
+}
+
+BufferTransitionEffect::BufferTransitionEffect(
+		uint64 duration, TileRect effectRect)
+		: startTime(0), duration(duration) {
+	auto gwin = Game_window::get_instance();
+	auto win  = gwin->get_win();
+
+	buffer1 = win->create_buffer(effectRect.w, effectRect.h);
+	buffer1->set_offset(-effectRect.x, -effectRect.y);
+	buffer2 = win->create_buffer(effectRect.w, effectRect.h);
+	buffer2->set_offset(-effectRect.x, -effectRect.y);
+}
+
+uint64 BufferTransitionEffect::getElapsedTime() const {
+	return SDL_GetTicks() - startTime;
+}
+
+void BufferTransitionEffect::start() {
+	startTime = SDL_GetTicks();
+}
+
+Image_buffer8* BufferTransitionEffect::getBuffer1() {
+	return static_cast<Image_buffer8*>(buffer1.get());
+}
+
+Image_buffer8* BufferTransitionEffect::getBuffer2() {
+	return static_cast<Image_buffer8*>(buffer2.get());
+}
+
+void BufferTransitionEffect::UpdateRect(const TileRect& rect) {
+	// recreate buffers if dimemsions changed
+	if (int(buffer1->get_width()) != rect.w
+		|| int(buffer1->get_height()) != rect.h) {
+		auto gwin = Game_window::get_instance();
+		auto win  = gwin->get_win();
+		buffer1   = win->create_buffer(rect.w, rect.h);
+		buffer2   = win->create_buffer(rect.w, rect.h);
+	}
+	buffer1->set_offset(-rect.x, -rect.y);
+	buffer2->set_offset(-rect.x, -rect.y);
+}
+
+void PageTurnEffect::paint() {
+	buffer1->clear_clip();
+	buffer2->clear_clip();
+	int pageWidth  = buffer1->get_width() / 2;
+	int pageHeight = buffer1->get_height();
+	int ox, oy;
+	buffer1->get_offset(ox, oy);
+	ox = -ox;
+	oy = -oy;
+
+	// page corner follows the path a 6:1 elipse
+	float angle
+			= std::min(1.0f, static_cast<float>(getElapsedTime()) / duration)
+			  * M_PI;
+	float cornerX = cos(angle) * pageWidth;
+	float cornerY = -sin(angle) * pageWidth / 4.0f;
+
+	if (!forward) {
+		cornerX = -cornerX;
+	}
+	auto ibuf = Shape_frame::get_to_render();
+	
+
+	auto clip_save = ibuf->SaveClip();
+
+	auto buf1 = getBuffer1();
+	auto buf2 = getBuffer2();
+
+
+	 // Draw background pages. Only draw the parts that would not be covered by the turning
+	 // page
+	 for (int i = 0; i < pageWidth * 2; i++)
+	 {
+		 if (i < pageWidth)
+		 {
+			  // Left Page - comes from Buffer1
+			 if (pageWidth - i > -cornerX) {
+				 // Full column
+				 ibuf->copy_col8(buf1, ox + i, oy, pageHeight, ox + i, oy);
+			 } else {
+				 // Partial column (bottom part)
+				 int y = oy+pageHeight + cornerY;
+				 ibuf->copy_col8(buf1, ox + i, y, -cornerY, ox + i, y);
+			 }
+		 
+		 } else {
+			 // RightPage - comes from Buffer2
+			 if (i-pageWidth > cornerX) {
+				 // Full column
+				 ibuf->copy_col8(buf2, ox + i, oy, pageHeight, ox + i, oy);
+			 } else {
+				 // Partial column (bottom part)
+				 int y = oy + pageHeight + cornerY;
+				 ibuf->copy_col8(buf2, ox + i, y, -cornerY, ox + i, y);
+			 }
+		 }
+	 }
+
+
+	// Top of turning page is drawn as straight edge and page contents is drawn
+	// as columns interpolared linearly. Would probably look more natural with a
+	// curved top of the page to simulate a bent paper page and using non linear
+	// interpolation but my maths skills aren't good enough to come up with a
+	// suitable curve equation and then to figure out the correct interpolation.
+	//
+	// The linear interpolation used here is not perspective correct but this is
+	// only pseudo 3d so I don't care and as the page is contents is scaled down
+	// with no filtering The distortion of affine texturing will not be noticable
+	// beyond all the point sampling artefacts.
+	float xinc = cornerX < 0 ? -1 : 1;
+	for (float x = 0;; x += xinc) {
+		float f = x / cornerX;
+		if (f >= 1.0f) {
+			break;
+		}
+		float         y = cornerY * f;
+		float         srcx;
+		Image_buffer8* src;
+
+		if (x > 0 || (x == 0 && cornerX > 0)) {
+			// Need to draw right page of buf1
+			// first pixel is left
+			srcx = pageWidth + 1+f *(pageWidth-2);
+			src  = buf1;
+
+		} else {
+			// Need to draw left page of buf2
+			// first pixel is right
+			src  = buf2;
+			srcx = pageWidth - (1+ f * (pageWidth-2));
+		}
+
+		// copy column. If dest buffer was 32 bit we could use filtering with
+		// the Bilinear scaler but we don't support drawing to 32 bit buffers
+		// 
+		if (!alternativeEffect) {
+			// default effect with complete rotation effect and scaled contents
+			ibuf->copy_col8(
+					src, ox + srcx, oy, pageHeight, ox + pageWidth + x, oy + y);
+		} else {
+			// alternative effect without scaling page content
+			ibuf->copy_col8(
+					src, ox + pageWidth + x, oy, pageHeight, ox + pageWidth + x,
+					oy + y);
+		}
+	}
+
+	if (lineColour != 0xff) {
+		// Top line
+		ibuf->draw_line8(
+				lineColour, ox + pageWidth, oy,
+				ox + pageWidth + cornerX, oy + cornerY);
+		// bottom line
+		ibuf->draw_line8(
+				lineColour, ox + pageWidth, oy + pageHeight,
+				ox + pageWidth + cornerX, oy + cornerY + pageHeight);
+		// edge line
+		ibuf->draw_line8(
+				lineColour, ox + pageWidth + cornerX, oy + cornerY,
+				ox + pageWidth + cornerX, oy + cornerY + pageHeight);
 	}
 }
