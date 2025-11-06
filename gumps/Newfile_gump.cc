@@ -32,6 +32,7 @@
 #include "Text_button.h"
 #include "Yesno_gump.h"
 #include "actors.h"
+#include "effects.h"
 #include "exult.h"
 #include "game.h"
 #include "gameclk.h"
@@ -228,10 +229,10 @@ public:
 	static auto RealTime() {
 		return get_text_msg(0x6DE - msg_file_start);
 	}
+
 	static auto Name() {
 		return get_text_msg(0x6DF - msg_file_start);
 	}
-
 };
 
 //
@@ -385,8 +386,8 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 		int amaxval = Settings::get().disk.autosave_count;
 		if (amaxval < 100) {
 			amaxval = 100;
-		} else  {
-			amaxval = std::max(1000,amaxval);
+		} else {
+			amaxval = std::max(1000, amaxval);
 		}
 		int qmaxval = Settings::get().disk.quicksave_count;
 		if (qmaxval < 100) {
@@ -401,41 +402,48 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 
 		widgets[id_slider_autocount] = std::make_unique<Slider_widget>(
 				this, get_button_pos_for_label(Strings::AutosaveCount_()),
-				yForRow(yindex++)-12, std::nullopt, std::nullopt, std::nullopt,
-				Settings::get().disk.autosave_count.get_min(), amaxval, 1, Settings::get().disk.autosave_count, 64, font,
+				yForRow(yindex++) - 12, std::nullopt, std::nullopt,
+				std::nullopt, Settings::get().disk.autosave_count.get_min(),
+				amaxval, 1, Settings::get().disk.autosave_count, 64, font,
 				num_width, true, false);
 
-		
 		widgets[id_slider_quickcount] = std::make_unique<Slider_widget>(
 				this, get_button_pos_for_label(Strings::QuicksaveCount_()),
-				yForRow(yindex++)-12, std::nullopt, std::nullopt, std::nullopt,
-				Settings::get().disk.quicksave_count.get_min(),
+				yForRow(yindex++) - 12, std::nullopt, std::nullopt,
+				std::nullopt, Settings::get().disk.quicksave_count.get_min(),
 				qmaxval, 1, Settings::get().disk.quicksave_count, 64, font,
 				num_width, true, false);
 
-		widgets[id_button_sortby] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
+		widgets[id_button_sortby]
+				= std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
 						this,
 						std::vector<std::string>{
 								Strings::RealTime(), Strings::Name(),
 								Strings::GameTime()},
-				Settings::get().disk.savegame_sort_by,
-				get_button_pos_for_label(Strings::SortSavegamesBy_()),
-				yForRow(yindex++)-2,64,0);
+						Settings::get().disk.savegame_sort_by,
+						get_button_pos_for_label(Strings::SortSavegamesBy_()),
+						yForRow(yindex++) - 2, 64, 0);
 
-		widgets[id_button_groupbytype] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
-			this,std::vector<std::string>{Strings::No(), Strings::Yes()},
-				Settings::get().disk.savegame_group_by_type,
-				get_button_pos_for_label(Strings::GroupByType_()),
-						yForRow(yindex++)-2,64,0);
+		widgets[id_button_groupbytype]
+				= std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
+						this,
+						std::vector<std::string>{Strings::No(), Strings::Yes()},
+						Settings::get().disk.savegame_group_by_type,
+						get_button_pos_for_label(Strings::GroupByType_()),
+						yForRow(yindex++) - 2, 64, 0);
 
-		widgets[id_button_autosaves_write_to_gamedat] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
-			this,std::vector<std::string>{Strings::No(), Strings::Yes()},
-				Settings::get().disk.autosaves_write_to_gamedat,
-				get_button_pos_for_label(Strings::AutosavesWriteToGamedat_()),
-						yForRow(yindex++)-2,64,0);
+		widgets[id_button_autosaves_write_to_gamedat]
+				= std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
+						this,
+						std::vector<std::string>{Strings::No(), Strings::Yes()},
+						Settings::get().disk.autosaves_write_to_gamedat,
+						get_button_pos_for_label(
+								Strings::AutosavesWriteToGamedat_()),
+						yForRow(yindex++) - 2, 64, 0);
 
 		RightAlignWidgets(tcb::span(widgets.data() + id_slider_autocount, 5));
-		//RightAlignWidgets(tcb::span(widgets.data() + id_button_sortbyname, 3),num_width+4);
+		// RightAlignWidgets(tcb::span(widgets.data() + id_button_sortbyname,
+		// 3),num_width+4);
 	}
 
 	// Reposition the gump
@@ -590,29 +598,53 @@ void Newfile_gump::delete_file() {
 void Newfile_gump::toggle_settings(int state) {
 	show_settings = (state != 0);
 
-	if (!show_settings)
-	{
+	TileRect usable = get_usable_area();
+	local_to_screen(usable.x, usable.y);
+
+	if (!page_turn_effect) {
+		page_turn_effect = std::make_unique<PageTurnEffect>(
+				transition_duration, usable, 0, false);
+	} else {
+		// Update the rect in case the usable area has changed
+		page_turn_effect->UpdateRect(usable);
+	}
+
+	if (!show_settings) {
 		auto selected_before = selected_slot;
 		FreeSaveGameDetails();
 		GameDat::get()->ResortSaveInfos();
 		LoadSaveGameDetails(false);
 		SelectSlot(selected_before);
 	}
+	page_turn_effect->start(show_settings);
 
-	transition_start_time = SDL_GetTicks();
+	// paint buffers
+	{
+		// Paint normal screen to buffer 1
+		Image_buffer8* ibuf    = page_turn_effect->getBuffer1();
+		auto           restore = Shape_frame::set_to_render_safe(ibuf);
+		paint_normal();
+	}
+
+	{
+		// Paint settings screen to buffer 2
+		Image_buffer8* ibuf    = page_turn_effect->getBuffer2();
+		auto           restore = Shape_frame::set_to_render_safe(ibuf);
+		paint_settings();
+	}
 }
 
 void Newfile_gump::apply_settings() {
-auto &settings = Settings::get().disk;
-	settings.autosave_count = widgets[id_slider_autocount]->getselection();
-	settings.quicksave_count = widgets[id_slider_quickcount]->getselection();
+	auto& settings            = Settings::get().disk;
+	settings.autosave_count   = widgets[id_slider_autocount]->getselection();
+	settings.quicksave_count  = widgets[id_slider_quickcount]->getselection();
 	settings.savegame_sort_by = widgets[id_button_sortby]->getselection();
 	settings.savegame_group_by_type
 			= widgets[id_button_groupbytype]->getselection() != 0;
-	settings.autosaves_write_to_gamedat = widgets[id_button_autosaves_write_to_gamedat]->getselection() != 0;
+	settings.autosaves_write_to_gamedat
+			= widgets[id_button_autosaves_write_to_gamedat]->getselection()
+			  != 0;
 
-	
-	
 	settings.save_dirty(true);
 }
 
@@ -620,22 +652,16 @@ void Newfile_gump::revert_settings() {
 	auto& settings = Settings::get().disk;
 	widgets[id_slider_autocount]->setselection(settings.autosave_count);
 	widgets[id_slider_quickcount]->setselection(settings.quicksave_count);
-	widgets[id_button_sortby]->setselection(
-			settings.savegame_sort_by);
-	widgets[id_button_groupbytype]->setselection( 
+	widgets[id_button_sortby]->setselection(settings.savegame_sort_by);
+	widgets[id_button_groupbytype]->setselection(
 			settings.savegame_group_by_type);
-	widgets[id_button_autosaves_write_to_gamedat]->setselection( 
+	widgets[id_button_autosaves_write_to_gamedat]->setselection(
 			settings.autosaves_write_to_gamedat);
-
 }
 
 bool Newfile_gump::run() {
-	bool need_repaint = Modal_gump::run() || transition_start_time != 0;
-
-	if (transition_start_time != 0
-		&& SDL_GetTicks() > transition_start_time + transition_duration) {
-		transition_start_time = 0;
-	}
+	bool need_repaint = Modal_gump::run()
+						|| (page_turn_effect && page_turn_effect->isStarted());
 
 	for (auto& btn : widgets) {
 		if (btn) {
@@ -645,6 +671,7 @@ bool Newfile_gump::run() {
 
 	return need_repaint;
 }
+
 
 void Newfile_gump::Slot_widget::paint() {
 	int sx = 0, sy = 0;
@@ -734,49 +761,34 @@ void Newfile_gump::Slot_widget::paint() {
  */
 
 void Newfile_gump::paint() {
-	auto ibuf = Shape_frame::get_to_render();
+	if (page_turn_effect && page_turn_effect->isStarted()
+		&& !page_turn_effect->isComplete()) {
+		// First let modal gunp paint to ensure anything out of the effect rect is painted
+		Modal_gump::paint();
 
-	if (old_style_mode || !show_settings || transition_start_time) {
-		paint_normal();
-	}
-	if (old_style_mode || !(show_settings || transition_start_time)) {
-		return;
-	}
-	
-	//
-	// create a barn door wipe using clipping rect to transition between normal
-	// and settings
-	//
-	// The clipping rect controls how much of the settings to show
-	//
-	auto     clipsave = ibuf->SaveClip();
-	TileRect newclip  = get_rect();
-
-	if (transition_start_time) {
-		Uint32 elapsed = std::min(
-				SDL_GetTicks() - transition_start_time, transition_duration);
-		int total_width = newclip.w;
-		if (show_settings) {
-			// Expanding
-			newclip.w = (elapsed * total_width) / transition_duration;
-		} else {
-			// Contracting
-			newclip.w = total_width
-						- (elapsed * total_width) / transition_duration;
+		// Update the effect rect in case the gump position has changed
+		TileRect usable = get_usable_area();
+		local_to_screen(usable.x, usable.y);
+		page_turn_effect->UpdateRect(usable);
+		page_turn_effect->paint();
+		// If effect is not complete we return without further painting
+		// otherwise we fall through to do regular painting of current mode
+		if (!page_turn_effect->isComplete()) {
+			return;
 		}
-		newclip.x = newclip.x + (total_width - newclip.w) / 2;
 	}
 
-	newclip = clipsave.Rect().intersect(newclip);
-	ibuf->set_clip(newclip.x, newclip.y, newclip.w, newclip.h);
-	paint_settings();
+	if (!show_settings) {
+		paint_normal();
+	} else {
+		paint_settings();
+	}
 }
 
 void Newfile_gump::paint_normal() {
-	Modal_gump::paint();
+	auto ibuf = Shape_frame::get_to_render();
 
-	Image_window8* iwin = gwin->get_win();
-	Image_buffer8* ibuf = iwin->get_ib8();
+	Modal_gump::paint();
 
 	// draw button backgrounds
 	if (!old_style_mode) {
@@ -784,9 +796,9 @@ void Newfile_gump::paint_normal() {
 		ibuf->draw_box(x + 212, y + 28, 7, 129, 0, 143, 142);
 		ibuf->draw_box(x + 212, y + 157, 7, 38, 0, 145, 142);
 
-		ibuf->draw_box(x , y + 188, get_usable_area().w , 7, 0, 145, 142);
+		ibuf->draw_box(x, y + 188, get_usable_area().w, 7, 0, 145, 142);
 	} else {
-		ibuf->draw_box(x , y + 134, get_usable_area().w , 7, 0, 145, 142);
+		ibuf->draw_box(x, y + 134, get_usable_area().w, 7, 0, 145, 142);
 	}
 
 	// Ensure change mode button always says Settings if savegames shown
@@ -853,7 +865,8 @@ void Newfile_gump::paint_normal() {
 				}
 			}
 			ShapeID shape(shape_num, 16, shape_file);
-			shape.paint_shape(x + 249 + (i & 3) * 23, y + 157 + i / 4 * 27,true);
+			shape.paint_shape(
+					x + 249 + (i & 3) * 23, y + 157 + i / 4 * 27, true);
 		}
 
 		char info[320];
@@ -981,16 +994,13 @@ void Newfile_gump::paint_settings() {
 
 	Modal_gump::paint();
 	TileRect usable = get_usable_area();
-	ibuf->draw_box(x , y + 188, usable.w , 7, 0, 145, 142);
-
+	ibuf->draw_box(x, y + 188, usable.w, 7, 0, 145, 142);
 
 	// Ensure change mode button always says SaveGames in if settings shown
 	widgets[id_change_mode]->setselection(1);
 
 	int sx = 0, sy = 0, y_index = 0;
 	local_to_screen(sx, sy);
-
-
 
 	// Paint all buttons
 	for (int i = id_first; i < id_count; i++) {
@@ -1003,26 +1013,23 @@ void Newfile_gump::paint_settings() {
 
 		if (widget) {
 			auto rect = widget->get_rect();
-			//Slider_widget* slider = dynamic_cast<Slider_widget*>(widget.get());
-			//if (slider) {
-				
-					//ibuf->draw_box(
-						//	rect.x + 12, rect.y + 2, 64,
-							//Slider_widget::Diamond::get_height_static(), 0, 143,
-							//142);
-				
+			// Slider_widget* slider =
+			// dynamic_cast<Slider_widget*>(widget.get()); if (slider) {
+
+			// ibuf->draw_box(
+			//	rect.x + 12, rect.y + 2, 64,
+			// Slider_widget::Diamond::get_height_static(), 0, 143,
+			// 142);
 
 			//}
 			// Zebra striping
 			if (i >= id_slider_autocount
 				&& i <= id_button_autosaves_write_to_gamedat) {
-
 				ibuf->draw_box(
-						sx + usable.x , rect.y + 2, usable.w , rect.h - 4,
-						0, 143, 142);
+						sx + usable.x, rect.y + 2, usable.w, rect.h - 4, 0, 143,
+						142);
 			}
 			widget->paint();
-
 		}
 	}
 
@@ -1039,8 +1046,8 @@ void Newfile_gump::paint_settings() {
 			ibuf, Strings::GroupByType_(), sx + label_margin,
 			sy + yForRow(++y_index));
 	font->paint_text(
-			ibuf, Strings::AutosavesWriteToGamedat_(),
-			sx + label_margin, sy + yForRow(++y_index));
+			ibuf, Strings::AutosavesWriteToGamedat_(), sx + label_margin,
+			sy + yForRow(++y_index));
 }
 
 void Newfile_gump::quit() {
@@ -1058,8 +1065,10 @@ inline bool Newfile_gump::forward_input(
 		}
 	}
 
-	bool do_normal   = !transition_start_time && !show_settings;
-	bool do_settings = !transition_start_time && show_settings;
+	bool doing_transition = page_turn_effect && page_turn_effect->isStarted()
+							&& !page_turn_effect->isComplete();
+	bool do_normal   = !doing_transition && !show_settings;
+	bool do_settings = !doing_transition && show_settings;
 
 	for (int i = id_first; i < id_count; i++) {
 		const auto& widget = widgets[i];
@@ -1213,7 +1222,10 @@ bool Newfile_gump::text_input(const char* text) {
  */
 
 bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
-	if (transition_start_time) {
+	bool doing_transition = page_turn_effect && page_turn_effect->isStarted()
+							&& !page_turn_effect->isComplete();
+
+	if (doing_transition) {
 		return false;
 	}
 
@@ -1523,18 +1535,17 @@ void Newfile_gump::LoadSaveGameDetails(bool force) {
 }
 
 void Newfile_gump::FreeSaveGameDetails() {
-	//cur_shot.reset();
-	//cur_details = SaveGame_Details();
-	//cur_party.clear();
+	// cur_shot.reset();
+	// cur_details = SaveGame_Details();
+	// cur_party.clear();
 
-	//gd_shot.reset();
-	//gd_details = SaveGame_Details();
-	//gd_party.clear();
+	// gd_shot.reset();
+	// gd_details = SaveGame_Details();
+	// gd_party.clear();
 
-
-	filename = nullptr;
-	details  = nullptr;
-	party    = nullptr;
+	filename   = nullptr;
+	details    = nullptr;
+	party      = nullptr;
 	screenshot = nullptr;
 
 	// The SaveInfo struct will delete everything that it's got allocated
