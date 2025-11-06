@@ -249,7 +249,7 @@ void Slider_widget::Diamond::paint() {
 		return Gump_widget::paint();
 	}
 
-	auto ibuf8 = gwin->get_win()->get_ib8();
+	auto ibuf8 = Shape_frame::get_to_render();
 	int  x = 0, y = 0;
 
 	local_to_screen(x, y);
