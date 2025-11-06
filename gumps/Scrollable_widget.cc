@@ -290,7 +290,7 @@ bool Scrollable_widget::mousewheel_down(int mx, int my) {
 void Scrollable_widget::paint() {
 	int sx, sy;
 	// Save clipping rect
-	auto ibuf = gwin->get_win()->get_ib8();
+	auto ibuf = Shape_frame::get_to_render();
 
 	Image_buffer::ClipRectSave clip(ibuf);
 
