@@ -383,20 +383,13 @@ for (const auto* savefile : savefiles) {
 		} else {
 			// Multimap directory entries. Each map is stored in their
 			// own flex file contained inside the general gamedat flex.
-			char dname[128];
-			// Need to have read/write access here.
-			std::stringstream outbuf(
-					std::ios::in | std::ios::out | std::ios::binary);
-			OStreamDataSource outds(&outbuf);
 			{
-				Flex_writer flexbuf(
-						outds, map->get_mapped_name(GAMEDAT, dname), 12 * 12);
-				// Save chunks to memory flex
-				save_gamedat_chunks(map, flexbuf);
+				char dname[32];
+				map->get_mapped_name(GAMEDAT, dname);
+				Flex_writer mapflex = flex.start_nested_flex(dname, 12 * 12);
+				// Save chunks to nested flex
+				save_gamedat_chunks(map, mapflex);
 			}
-			outbuf.seekg(0);
-			IStreamDataSource inds(&outbuf);
-			SavefileFromDataSource(flex, inds, dname);
 		}
 	}
 	read_save_infos_async(true);
