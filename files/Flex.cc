@@ -155,7 +155,7 @@ bool Flex::is_flex(const std::string& fname) {
  *  Start writing out a new Flex file.
  */
 Flex_writer::Flex_writer(
-		OStreamDataSource&     o,        ///< Where to write.
+		ODataSource&     o,        ///< Where to write.
 		const char*            title,    ///< Flex title.
 		size_t                 cnt,      ///< Number of entries we'll write.
 		Flex_header::Flex_vers vers      ///< Version of flex file.
@@ -179,12 +179,20 @@ Flex_writer::~Flex_writer() {
 
 void Flex_writer::flush() {
 	if (table) {
-		dout.seek(Flex_header::FLEX_HEADER_LEN);    // Write table.
-		dout.write(table.get(), 2 * count * 4);
+		// Seek to table position offset from start_pos
+		dout.seek(start_pos + Flex_header::FLEX_HEADER_LEN);    																
+		dout.write(table.get(), 2 * count * 4);    // Write table.
 		dout.flush();
 		table.reset();
+		// Restore position in case the flex is nested. cur_start is set to the end of the last object.
+		// which will be the end of this flex file.
+		dout.seek(cur_start);
 	}
-}
+	if (parent) {
+		parent->finish_object();
+		parent = nullptr;
+	}
+	}
 
 /**
  *  Call this when done writing out a section.
