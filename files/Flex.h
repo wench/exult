@@ -120,7 +120,8 @@ using FlexBuffer = U7DataBuffer<Flex>;
  *  This is for writing out a whole Flex file.
  */
 class Flex_writer {
-	OStreamDataSource&       dout;     // Or this, if non-0.
+	Flex_writer*       parent=nullptr;    // If nested, this is non-null.
+	ODataSource&       dout;
 	const size_t             count;    // # entries.
 	const size_t             start_pos;
 	size_t                   cur_start;    // Start of cur. entry being written.
@@ -130,7 +131,7 @@ class Flex_writer {
 
 public:
 	Flex_writer(
-			OStreamDataSource& o, const char* title, size_t cnt,
+			ODataSource& o, const char* title, size_t cnt,
 			Flex_header::Flex_vers vers = Flex_header::orig);
 	Flex_writer(const Flex_writer&) noexcept            = delete;
 	Flex_writer& operator=(const Flex_writer&) noexcept = delete;
@@ -138,6 +139,16 @@ public:
 	Flex_writer& operator=(Flex_writer&&) noexcept      = delete;
 	~Flex_writer();
 
+private:
+	Flex_writer(
+			Flex_writer* parent, ODataSource& o, const char* title, size_t cnt,
+			Flex_header::Flex_vers vers = Flex_header::orig)
+			: Flex_writer(o, title, cnt, vers) {
+		this->parent = parent;
+	}
+
+
+public:
 	std::string base_name(std::string fullname) {
 		// Remove trailing (back)slash, if any
 		if (fullname.back() == '/' || fullname.back() == '\\') {
@@ -201,6 +212,12 @@ public:
 
 	void empty_object() {
 		finish_object();
+	}
+
+	Flex_writer start_nested_flex(const char* filename, size_t cnt)
+		{
+		write_name(filename);		
+		return Flex_writer(this, dout, filename, cnt);
 	}
 
 	void flush();
