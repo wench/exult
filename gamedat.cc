@@ -427,14 +427,17 @@ std::string GameDat::get_save_filename(int num, SaveInfo::Type type) {
 	for (;;) {
 		auto needed = snprintf(
 				fname.data(), fname.size(), SAVENAME3,
-				type == SaveInfo::Type::AUTOSAVE    ? "a"
-				: type == SaveInfo::Type::QUICKSAVE ? "q"
-				: type == SaveInfo::Type::CRASHSAVE ? "c"
-											  : "",
-				num,
+		num,
 				Game::get_game_type() == BLACK_GATE     ? "bg"
 				: Game::get_game_type() == SERPENT_ISLE ? "si"
-														: "dev");
+														: "dev",
+				type == SaveInfo::Type::AUTOSAVE    ? "_a"
+				: type == SaveInfo::Type::QUICKSAVE ? "_q"
+				: type == SaveInfo::Type::CRASHSAVE ? "_c"
+													: ""
+		
+		
+		);
 		// snprintf failed
 		if (needed < 0) {
 			return "";
@@ -1593,12 +1596,16 @@ GameDat::SaveInfo::SaveInfo(std::string&& filename)
 	// No diretory separators so actual filename starts at 0
 	if (filename_start == std::string::npos) {
 		filename_start = 0;
+	} else
+		{
+		// Move to the character after the last directory separator
+		filename_start++;
 	}
 	// Find where the savenume number starts
 	size_t number_start = filename_.find_first_of("0123456789", filename_start);
 
-	if (number_start == std::string::npos
-		|| number_start < filename_start + 5) {
+	if (number_start == std::string::npos || number_start != filename_start + 5
+		|| Pentagram::strncasecmp(filename_.c_str() + filename_.size() - 4, ".sav",4)) {
 		// the savegame filename is not in the expected format
 		// this should never happen as filename glob should only list
 		// filenames in mostly the correct format
@@ -1607,29 +1614,33 @@ GameDat::SaveInfo::SaveInfo(std::string&& filename)
 		num  = -1;
 		type = Type::UNKNOWN;
 		return;
-		// quicksaves have Q before the number
-	} else if (std::tolower(filename_[number_start - 1]) == 'q') {
-		type = Type::QUICKSAVE;
-		// autosaves have A before the number
-	} else if (std::tolower(filename_[number_start - 1]) == 'a') {
-		type = Type::AUTOSAVE;
-		// crashsaves have C before the number
-	} else if (std::tolower(filename_[number_start - 1]) == 'c') {
-		type = Type::CRASHSAVE;
-		// regular saves have t from exult as character before the
-		// number
-	} else if (std::tolower(filename_[number_start - 1]) == 't') {
-		type = Type::REGULAR;
-	} else {
-		// Filename format is unknown
-		num  = -1;
-		type = Type::UNKNOWN;
-		return;
+	} 
+
+	else if (filename_[filename_.size()-6] == '_') {
+		// quicksaves have 'q' at the end
+		if (std::tolower(filename_[filename_.size() - 5]) == 'q') {
+			type = Type::QUICKSAVE;
+			// autosaves have 'a' at the end
+		} else if (std::tolower(filename_[filename_.size() - 5]) == 'a') {
+			type = Type::AUTOSAVE;
+			// crashsaves have 'a' at the end
+		} else if (std::tolower(filename_[filename_.size() - 5]) == 'c') {
+			type = Type::CRASHSAVE;
+		}
+		else {
+			// Filename has unknown type tag
+			num  = -1;
+			type = Type::UNKNOWN;
+			return;
+		}
 	}
+	else {
+	// No special type tag so regular savegame
+		type = Type::REGULAR;
+	} 
 
 	num = strtol(filename_.c_str() + number_start, nullptr, 10);
 }
-
 
 int GameDat::SaveInfo::compare(const SaveInfo& other) const noexcept {
 	if (type != other.type && Settings::get().disk.savegame_group_by_type) {
