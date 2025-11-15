@@ -75,6 +75,7 @@ struct SaveGame_Details {
 	char reserved0;        // 16
 	char reserved1[48];    // 64
 
+		// Compare functions for display sorting Newer comes first 
 	int CompareRealTime(const SaveGame_Details& other) const noexcept;
 	int CompareGameTime(const SaveGame_Details& other) const noexcept;
 };
@@ -219,7 +220,7 @@ public:
 	// given name
 	void save_gamedat(SaveInfo::Type type, const char* savename);
 	void read_saveinfo();    // Read the save info from gamedat
-private:
+	void read_saveinfo(bool newgame);    // Read the save info from gamedat
 
 	void restore_flex_files(IDataSource& in, const char* basepath);
 
