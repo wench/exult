@@ -1512,7 +1512,8 @@ void Newfile_gump::LoadSaveGameDetails() {
 		old_games.clear();
 		old_games.resize(fieldcount);
 		for (const auto& savegame : *gamedat->GetSaveGameInfos(false)) {
-			if (savegame.num >= 0 && savegame.num < fieldcount) {
+			if (savegame.num >= 0 && savegame.num < fieldcount
+				&& savegame.type == SaveInfo::Type::REGULAR) {
 				old_games[savegame.num] = SaveInfo(savegame, {});
 			}
 		}
