@@ -535,8 +535,8 @@ void Newfile_gump::save() {
 	const SaveInfo* info = nullptr;
 	// Use actual savegame num if overwriting existing game
 	if (games && games->size() > size_t(save_num)) {
-		save_num = (*games)[save_num].num;
 		info     = &((*games)[save_num]);
+		save_num = (*games)[save_num].num;
 	}
 	// if not old stylemode and saving to empty slot, use unspecified num
 	else if (!old_style_mode) {
@@ -680,8 +680,7 @@ void Newfile_gump::Slot_widget::paint() {
 	auto ibuf = Shape_frame::get_to_render();
 
 	auto     clipsave = ibuf->SaveClip();
-	TileRect newclip  = clipsave.Rect().intersect(get_rect());
-	ibuf->set_clip(newclip.x, newclip.y, newclip.w, newclip.h);
+	const TileRect newclip  = clipsave.Rect().intersect(get_rect());
 
 	// Start at the first field that would be visible
 	for (int i = std::max(0, (newclip.y - sy) / (fieldh + fieldgap));
@@ -701,10 +700,25 @@ void Newfile_gump::Slot_widget::paint() {
 		if (!newclip.intersects(fieldrect)) {
 			continue;
 		}
+		// Clip to field area
+		ibuf->set_clip(newclip.intersect(fieldrect));
 		// Always paint the field background
 		ibuf->draw_beveled_box(
 				fx, fy, fieldw, fieldh, 1, 137, 144, 144, 140, 140, 142);
+		
+		// If selected, show selected icon
+		if (nfg->selected_slot == actual_slot) {
+			int ix = iconx + fx;
+			int iy = icony + fy;
 
+			for (int l = 0; l < 4; l++) {
+				ibuf->draw_line8(142, ix + l, iy + l, ix + l, iy + 6 - l);
+			}
+
+			ibuf->draw_line8(146, ix + 1, iy + 7, ix + 4, iy + 4);
+			ibuf->draw_line8(146, ix + 1, iy + 6, ix + 3, iy + 4);
+		}
+		
 		const char* text;
 
 		if (actual_slot == QuicksaveSlot) {
@@ -731,6 +745,11 @@ void Newfile_gump::Slot_widget::paint() {
 			text = "";
 		}
 
+		TileRect textrect(fx + textx, fy + texty, textw,texth);
+
+		// Clip to text area
+		ibuf->set_clip(newclip.intersect(fieldrect).intersect(textrect));
+		
 		sman->paint_text(2, text, fx + textx, fy + texty);
 
 		// Being Edited? If so paint cursor
@@ -741,18 +760,6 @@ void Newfile_gump::Slot_widget::paint() {
 					fy + texty);
 		}
 
-		// If selected, show selected icon
-		if (nfg->selected_slot == actual_slot) {
-			int ix = iconx + fx;
-			int iy = icony + fy;
-
-			for (int l = 0; l < 4; l++) {
-				ibuf->draw_line8(142, ix + l, iy + l, ix + l, iy + 6 - l);
-			}
-
-			ibuf->draw_line8(146, ix + 1, iy + 7, ix + 4, iy + 4);
-			ibuf->draw_line8(146, ix + 1, iy + 6, ix + 3, iy + 4);
-		}
 	}
 }
 
@@ -1539,9 +1546,9 @@ void Newfile_gump::FreeSaveGameDetails() {
 	// cur_details = SaveGame_Details();
 	// cur_party.clear();
 
-	// gd_shot.reset();
-	// gd_details = SaveGame_Details();
-	// gd_party.clear();
+	gd_shot.reset();
+	gd_details = SaveGame_Details();
+	gd_party.clear();
 
 	filename   = nullptr;
 	details    = nullptr;
