@@ -136,6 +136,10 @@ public:
 		return pal1[3 * nr + 2];
 	}
 
+	const unsigned char* get_colors() const {
+		return pal1;
+	}
+
 	void set_palette(const unsigned char palnew[768]);
 
 	int get_palette_index() const {
