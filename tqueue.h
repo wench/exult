@@ -25,7 +25,7 @@
 
 #include <list>
 #include <memory>
-
+#include <mutex>
 /*
  *  An interface for entries in the queue:
  */
@@ -91,6 +91,7 @@ class Time_queue {
 	Temporal_sequence data;
 	uint32            pause_time = 0;    // Time when paused.
 	int               paused     = 0;    // Count of calls to 'pause()'.
+	mutable std::recursive_mutex mutex = {};	 // Mutex to ensure Timequeue is only accessed by a single thread at a time
 
 	// Activate head + any others due.
 	void activate0(uint32 curtime);
@@ -98,6 +99,9 @@ class Time_queue {
 	void activate_mapedit(uint32 curtime);
 
 public:
+	auto get_lock() const {
+		return std::unique_lock<std::recursive_mutex>(mutex);
+	}
 	friend class Time_queue_iterator;
 	void clear();    // Remove all entries.
 
@@ -142,6 +146,7 @@ public:
 	void activate(uint32 curtime);
 
 	void pause(uint32 curtime) {    // Game paused.
+		auto lock = get_lock();
 		if (!paused++) {
 			pause_time = curtime;
 		}
@@ -154,9 +159,12 @@ class Time_queue_iterator {
 	Time_queue::Temporal_sequence::iterator iter;
 	Time_queue*                             tqueue;
 	Time_sensitive* this_obj;    // Only return entries for this obj.
+	// Time_queue_iterator keeps time_queue locked lor the life of the iterator 
+	std::unique_lock<std::recursive_mutex>  lock;
+
 public:
 	Time_queue_iterator(Time_queue* tq, Time_sensitive* obj)
-			: iter(tq->data.begin()), tqueue(tq), this_obj(obj) {}
+			: iter(tq->data.begin()), tqueue(tq), this_obj(obj),lock(tqueue->get_lock()) {}
 
 	bool operator()(Time_sensitive*& obj, uintptr& data);
 };

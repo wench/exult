@@ -48,6 +48,7 @@
  */
 
 void Time_queue::clear() {
+	auto lock = get_lock();
 	for (auto& ent : data) {
 		ent.handler->dequeue();
 	}
@@ -60,6 +61,7 @@ void Time_queue::clear() {
 
 void Time_queue::add(
 		uint32 t, std::shared_ptr<Time_sensitive> obj, uintptr ud) {
+	auto lock = get_lock();
 	obj->queue_cnt++;    // It's going in, no matter what.
 	Queue_entry newent;
 	uint32      added_pause_time = 0;
@@ -79,6 +81,7 @@ void Time_queue::add(
 		Time_sensitive* obj,    // Object to be added.
 		uintptr         ud      // User data.
 ) {
+	auto lock = get_lock();
 	obj->queue_cnt++;    // It's going in, no matter what.
 	Queue_entry newent;
 	uint32      added_pause_time = 0;
@@ -108,6 +111,7 @@ bool Time_queue::remove(Time_sensitive* obj) {
 			= std::find_if(data.begin(), data.end(), [obj](const auto& el) {
 				  return el.handler == obj || el.sp_handler.get() == obj;
 			  });
+	auto lock  = get_lock();
 	auto found = toRemove != data.end();
 	if (found) {
 		toRemove->handler->queue_cnt--;
@@ -117,6 +121,7 @@ bool Time_queue::remove(Time_sensitive* obj) {
 }
 
 bool Time_queue::remove(std::shared_ptr<Time_sensitive> obj) {
+	auto lock = get_lock();
 	auto toRemove
 			= std::find_if(data.begin(), data.end(), [obj](const auto& el) {
 				  return el.handler == obj.get() || el.sp_handler == obj;
@@ -139,6 +144,7 @@ bool Time_queue::remove(Time_sensitive* obj, uintptr udata) {
 	auto       it = std::find_if(data.begin(), data.end(), [&](const auto& el) {
         return el.handler == obj && el.udata == udata;
     });
+	auto       lock  = get_lock();
 	const bool found = it != data.end();
 	if (found) {
 		obj->queue_cnt--;
@@ -152,6 +158,7 @@ bool Time_queue::remove(std::shared_ptr<Time_sensitive> obj, uintptr udata) {
         return (el.handler == obj.get() || el.sp_handler == obj)
                && el.udata == udata;
     });
+	auto       lock  = get_lock();
 	const bool found = it != data.end();
 	if (found) {
 		obj->queue_cnt--;
@@ -167,6 +174,7 @@ bool Time_queue::remove(std::shared_ptr<Time_sensitive> obj, uintptr udata) {
  */
 
 bool Time_queue::find(const Time_sensitive* obj) const {
+	auto lock = get_lock();
 	return std::find_if(
 				   data.begin(), data.end(),
 				   [&](const auto& el) {
@@ -182,6 +190,7 @@ bool Time_queue::find(const Time_sensitive* obj) const {
  */
 
 long Time_queue::find_delay(const Time_sensitive* obj, uint32 curtime) const {
+	auto lock  = get_lock();
 	auto found = std::find_if(data.begin(), data.end(), [&](const auto& el) {
 		return obj == el.handler || obj == el.sp_handler.get();
 	});
@@ -196,6 +205,7 @@ long Time_queue::find_delay(const Time_sensitive* obj, uint32 curtime) const {
 }
 
 void Time_queue::activate(uint32 curtime) {
+	auto lock = get_lock();
 	if (cheat.in_map_editor()) {
 		activate_mapedit(curtime);
 	} else if (paused > 0) {
@@ -210,8 +220,10 @@ void Time_queue::activate(uint32 curtime) {
  *  known to be due).
  */
 
-void Time_queue::activate0(uint32 curtime    // Current time.
+void Time_queue::activate0(
+		uint32 curtime    // Current time.
 ) {
+	auto lock = get_lock();
 	do {
 		Queue_entry                     ent    = data.front();
 		Time_sensitive*                 obj    = ent.handler;
@@ -235,8 +247,10 @@ void Time_queue::activate0(uint32 curtime    // Current time.
  *  the queue is paused.
  */
 
-void Time_queue::activate_always(uint32 curtime    // Current time.
+void Time_queue::activate_always(
+		uint32 curtime    // Current time.
 ) {
+	auto lock = get_lock();
 	if (data.empty()) {
 		return;
 	}
@@ -264,8 +278,10 @@ void Time_queue::activate_always(uint32 curtime    // Current time.
  *  map edit mode is enabled.
  */
 
-void Time_queue::activate_mapedit(uint32 curtime    // Current time.
+void Time_queue::activate_mapedit(
+		uint32 curtime    // Current time.
 ) {
+	auto lock = get_lock();
 	if (data.empty()) {
 		return;
 	}
@@ -299,6 +315,7 @@ void Time_queue::resume(uint32 curtime) {
 	if (paused == 0 || --paused > 0) {    // Only unpause when stack empty.
 		return;                           // Not paused.
 	}
+	auto         lock               = get_lock();
 	const int    diff               = curtime - pause_time;
 	const uint32 current_pause_time = pause_time;    // Save before clearing
 	pause_time                      = 0;
