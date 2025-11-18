@@ -143,6 +143,9 @@ protected:
 	SaveGame_Details            gd_details;    // Details in Gamedat
 	std::vector<SaveGame_Party> gd_party;      // Party in Gamedat
 
+	unsigned char				*palette_map = nullptr;
+	unsigned char				sg_palette_map[256];
+
 	const Shape_file*       screenshot = nullptr;    // The picture to be drawn
 	const SaveGame_Details* details    = nullptr;    // The game details to show
 	const std::vector<SaveGame_Party>* party = nullptr;    // The party to show
