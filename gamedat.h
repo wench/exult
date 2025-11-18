@@ -21,13 +21,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef SAVEINFO_H_INCLUDED
 #define SAVEINFO_H_INCLUDED
 
-#include <ctype.h>
+#include "databuf.h"
+#include "items.h"
+#include "palette.h"
+#include "singles.h"
+#include "tqueue.h"
 
 #include <array>
-#include <algorithm>
-#include <cstdlib>
+#include <deque>
+#include <future>
 #include <memory>
+#include <memory_resource>
+#include <mutex>
 #include <string>
+#include <unordered_map>
+#include <variant>
 #include <vector>
 #include <future>
 #include <mutex>
@@ -114,11 +122,12 @@ class SaveInfo {
 public:
 	int num = -1;
 
-	std::string                 savename;
-	bool                        readable = false;
-	SaveGame_Details            details;
-	std::vector<SaveGame_Party> party;
-	std::unique_ptr<Shape_file> screenshot;
+		std::string                 savename;
+		bool                        readable = false;
+		SaveGame_Details            details;
+		std::vector<SaveGame_Party> party;
+		std::unique_ptr<Shape_file> screenshot = nullptr;
+		std::unique_ptr<Palette>    palette    = nullptr;
 
 	// Default constructor is allowed
 	SaveInfo() {}
@@ -225,9 +234,10 @@ public:
 	void restore_flex_files(IDataSource& in, const char* basepath);
 
  	bool get_saveinfo(
-		const std::string& filename, std::string& name,
-		std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-		std::vector<SaveGame_Party>& party);
+			const std::string& filename, std::string& name,
+			std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
+			std::vector<SaveGame_Party>& party,
+			std::unique_ptr<Palette>&    palette);
 
 	void clear_saveinfos();
 
@@ -249,7 +259,8 @@ bool read_saveinfo(
 	bool get_saveinfo_zip(
 			const char* fname, std::string& name,
 			std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-			std::vector<SaveGame_Party>& party);
+			std::vector<SaveGame_Party>& party,
+			std::unique_ptr<Palette>&    palette);
 	bool save_gamedat_zip(const char* fname, const char* savename);
 	bool Restore_level2(unzFile& unzipfile, const char* dirname, int dirlen);
 	bool restore_gamedat_zip(const char* fname);

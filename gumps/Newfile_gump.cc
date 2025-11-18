@@ -838,7 +838,7 @@ void Newfile_gump::paint_normal() {
 	// Paint the savegame details
 
 	if (screenshot) {
-		sman->paint_shape(x + 222, y + 2, screenshot->get_frame(0));
+		sman->paint_shape(x + 222, y + 2, screenshot->get_frame(0),false, palette_map);
 	} else {
 		// Paint No Screenshot background
 		ibuf->draw_box(x + 222, y + 2, 96, 60, 0, 143, 142);
@@ -1422,6 +1422,7 @@ void Newfile_gump::SelectSlot(int slot) {
 	bool   want_delete    = true;
 	bool   want_save      = true;
 	size_t savegame_index = selected_slot - SavegameSlots;
+	palette_map           = nullptr;
 
 	if (selected_slot == EmptySlot) {
 		want_load   = false;
@@ -1463,6 +1464,43 @@ void Newfile_gump::SelectSlot(int slot) {
 		cursor      = static_cast<int>(strlen(newname));
 		is_readable = want_load = (*games)[savegame_index].readable;
 		filename                = (*games)[savegame_index].filename().c_str();
+		// We have a palette so create a palette map
+		if (screenshot && (*games)[savegame_index].palette) {
+			std::unique_ptr<Palette> newpal;
+			// It's faded out so create a partly faded intermediate
+			if ((*games)[savegame_index].palette->is_faded_out()) {
+				newpal = (*games)[savegame_index]
+								 .palette->create_fadeintermediate(3, 1);
+			}
+			// Palette is not same as current and is not 0, Create intermediate palette between this 
+			// one and palette 0 palette to brighten it up slightly
+			else if (
+					(*games)[savegame_index].palette->get_palette_index()
+							!= gwin->get_pal()->get_palette_index()
+					&& (*games)[savegame_index].palette->get_palette_index() !=0) {
+
+				Palette palette0;
+				palette0.load(PALETTES_FLX, PATCH_PALETTES, 0);
+
+				newpal = (*games)[savegame_index].palette->create_intermediate(
+						palette0 , 3, 1,false);
+			
+			}
+			palette_map = sg_palette_map;
+			if (newpal) {
+				newpal->create_palette_map(gwin->get_pal(), sg_palette_map,true);
+			} else if (
+					(*games)[savegame_index].palette->get_palette_index()
+					!= gwin->get_pal()->get_palette_index()) {
+				(*games)[savegame_index].palette->create_palette_map(
+						gwin->get_pal(), sg_palette_map,true);
+			}
+			else
+			{
+				palette_map = nullptr;
+			}
+
+		}
 	} else {
 		// No slot Selected
 		want_load   = false;
@@ -1555,6 +1593,7 @@ void Newfile_gump::FreeSaveGameDetails() {
 	details    = nullptr;
 	party      = nullptr;
 	screenshot = nullptr;
+	palette_map = nullptr;
 
 	// The SaveInfo struct will delete everything that it's got allocated
 	// So we don't need to worry about that
