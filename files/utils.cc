@@ -187,6 +187,11 @@ TA_String<Allocator> T_get_system_path(const TA_String<Allocator>& path) {
 	using size_type = typename string::size_type;
 	size_type pos;
 	size_type pos2;
+	
+	// Empty path gets returned unchanged
+	if (path.empty()) {
+		return path;
+	}
 
 	pos  = new_path.find('>');
 	pos2 = new_path.find('<');
