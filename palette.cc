@@ -510,20 +510,25 @@ int Palette::find_color(int r, int g, int b, int last) const {
  *  Creates a translation table between two palettes.
  */
 
-void Palette::create_palette_map(const Palette* to, unsigned char* buf) const {
-	// Assume buf has 256 elements
-	for (int i = 0; i < 256; i++) {
+void Palette::create_palette_map(
+		const Palette* to, unsigned char* buf, bool keep_rotating) const {
+		// Assume buf has 256 elements
+		int limit = keep_rotating ? 0xe0 : 256;
+	for (int i = 0; i < limit; i++) {
 		buf[i] = to->find_color(
-				pal1[3 * i], pal1[3 * i + 1], pal1[3 * i + 2], 256);
+				pal1[3 * i], pal1[3 * i + 1], pal1[3 * i + 2], limit);
 	}
-}
+	for (int i = limit; i < 256;i++) {
+		buf[i] = i;
+	}
+	}
 
 /*
  *  Creates a palette in-between two palettes.
  */
 
 std::unique_ptr<Palette> Palette::create_intermediate(
-		const Palette& to, int nsteps, int pos) const {
+			const Palette& to, int nsteps, int pos, bool apply) const {
 	auto newpal = std::make_unique<Palette>();
 	if (fades_enabled) {
 		for (int c = 0; c < 768; c++) {
@@ -542,7 +547,32 @@ std::unique_ptr<Palette> Palette::create_intermediate(
 	// Reset palette data and set.
 	memset(newpal->pal2, 0, 768);
 	newpal->border255 = true;
-	newpal->apply(true);
+	if (apply) {
+		newpal->apply(true);
+	}
+	return newpal;
+}
+
+std::unique_ptr<Palette> Palette::create_fadeintermediate(
+		int nsteps, int pos) const {
+	auto newpal = std::make_unique<Palette>();
+	if (fades_enabled) {
+		for (int c = 0; c < 768; c++) {
+			newpal->pal1[c] = ((pal1[c] - pal2[c]) * pos) / nsteps + pal2[c];
+		}
+	} else {
+		const unsigned char* palold;
+		if (2 * pos >= nsteps) {
+			palold = pal1;
+		} else {
+			palold = pal2;
+		}
+		memcpy(newpal->pal1, palold, 768);
+	}
+
+	// Reset palette data and set.
+	memset(newpal->pal2, 0, 768);
+	newpal->border255 = true;
 	return newpal;
 }
 
