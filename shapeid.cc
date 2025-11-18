@@ -148,6 +148,8 @@ void Shape_manager::load() {
 	shapes.reset_imports();
 
 	// Determine some colors based on the default palette
+	// Clear palette cache
+	Palette::ClearCache();
 	Palette pal;
 	// could throw!
 	pal.load(PALETTES_FLX, PATCH_PALETTES, 0);

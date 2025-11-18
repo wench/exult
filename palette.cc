@@ -34,6 +34,8 @@
 
 #include <algorithm>
 #include <cstring>
+#include <map>
+#include <tuple>
 
 #ifdef __GNUC__
 #	pragma GCC diagnostic push
@@ -52,6 +54,64 @@ using std::size_t;
 using std::string;
 
 unsigned char Palette::border[3] = {0, 0, 0};
+
+namespace Cache {
+	using KeyType = std::tuple<File_spec, File_spec, File_spec, int>;
+
+	static std::map<KeyType, U7multiobject> loaded;
+
+	static U7multiobject& Load(
+			const File_spec& fname0, const File_spec& fname1,
+			const File_spec& fname2, int index) {
+		// Key uses real paths
+		KeyType key = {
+				{std::string(get_system_path(fname0.name)), fname0.index},
+				{std::string(get_system_path(fname1.name)), fname1.index},
+				{std::string(get_system_path(fname2.name)), fname2.index},
+				index
+        };
+
+		auto it = loaded.find(key);
+
+		// Already Loaded
+		if (it != loaded.end()) {
+			return it->second;
+
+		} else if (!std::get<2>(key).name.empty()) {
+			// 3 Filenames
+			auto res = loaded.emplace(
+					key, U7multiobject(
+								 std::get<0>(key), std::get<1>(key),
+								 std::get<2>(key), std::get<3>(key)));
+			if (res.second) {
+				return res.first->second;
+			}
+
+		} else if (!std::get<1>(key).name.empty()) {
+			// 2 Filenames
+			auto res = loaded.emplace(
+					key, U7multiobject(
+								 std::get<0>(key), std::get<1>(key),
+								 std::get<3>(key)));
+
+			if (res.second) {
+				return res.first->second;
+			}
+		} else {
+			// 1 filename
+			auto res = loaded.emplace(
+					key, U7multiobject(std::get<0>(key), std::get<3>(key)));
+
+			if (res.second) {
+				return res.first->second;
+			}
+		}
+
+		// Should never happen
+		throw file_open_exception(fname0.name);
+	}
+
+}    // namespace Cache
 
 Palette::Palette()
 		: win(Game_window::get_instance()->get_win()), palette(-1),
@@ -253,6 +313,10 @@ void Palette::set_loaded(
 	}
 }
 
+void Palette::ClearCache() {
+	Cache::loaded.clear();
+}
+
 /**
  *  Loads a palette from the given spec. Optionally loads a
  *  xform from the desired file.
@@ -263,8 +327,7 @@ void Palette::set_loaded(
  */
 void Palette::load(
 		const File_spec& fname0, int index, const char* xfname, int xindex) {
-	const U7multiobject pal(fname0, index);
-	set_loaded(pal, xfname, xindex);
+	set_loaded(Cache::Load(fname0, "", "",  index), xfname, xindex);
 }
 
 /**
@@ -280,7 +343,7 @@ void Palette::load(
 		const File_spec& fname0, const File_spec& fname1, int index,
 		const char* xfname, int xindex) {
 	const U7multiobject pal(fname0, fname1, index);
-	set_loaded(pal, xfname, xindex);
+	set_loaded(Cache::Load(fname0, fname1, "", index), xfname, xindex);
 }
 
 /**
@@ -296,8 +359,31 @@ void Palette::load(
 void Palette::load(
 		const File_spec& fname0, const File_spec& fname1,
 		const File_spec& fname2, int index, const char* xfname, int xindex) {
-	const U7multiobject pal(fname0, fname1, fname2, index);
-	set_loaded(pal, xfname, xindex);
+	set_loaded(Cache::Load(fname0, fname1, fname2, index), xfname, xindex);
+}
+
+void Palette::Serialize(ODataSource& ds) {
+	// Save out the entire object in declared order
+	// except fades_enabled as that is a user settings
+	ds.write(pal1, sizeof(pal1));
+	ds.write(pal2, sizeof(pal2));
+	// Using write 4 for ints
+	ds.write4(palette);
+	ds.write4(brightness);
+	ds.write4(max_val);
+	ds.write1(border255);
+	ds.write1(faded_out);
+}
+
+void Palette::Deserialize(IDataSource& ds) {
+	// Read the entire object
+	ds.read(pal1, sizeof(pal1));
+	ds.read(pal2, sizeof(pal2));
+	palette = ds.read4();
+	brightness = ds.read4();
+	max_val    = ds.read4();
+	border255  = ds.read1();
+	faded_out  = ds.read1();
 }
 
 void Palette::set_brightness(int bright) {

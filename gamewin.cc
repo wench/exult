@@ -1455,6 +1455,9 @@ void Game_window::write(bool nopaint) {
 	Notebook_gump::write();    // Write out journal.
 	write_gwin();              // Write our data.
 	GameDat::get()->write_saveinfo(!nopaint);
+	/// Write Palette
+	OFileDataSource palette_dat(GPALETTE);
+	pal->Serialize(palette_dat);
 }
 
 
@@ -3066,9 +3069,20 @@ void Game_window::setup_game(bool map_editing) {
 		}
 	}
 
-	// Set palette for time-of-day.
-	clock->reset_palette();
-	pal->fade(6, 1, -1);    // Fade back in.
+	// load saved palette or set palette for time-of-day.
+	IFileDataSource palette_dat(GPALETTE);
+	if (palette_dat.good()) {
+		pal->Deserialize(palette_dat);
+	}
+	else {
+		clock->reset_palette();
+	}
+	// if deserialized palette was faded out we should not fade in here
+	// as Usecode probably expects to fade back in
+	// example autosaves during moon gate travel will have a faded out palette and fading in here will cause a double fade in when loading the Autosave
+	if (!pal->is_faded_out()) {
+		pal->fade(6, 1, -1);    // Fade back in.
+	}
 }
 
 void Game_window::plasma(int w, int h, int x, int y, int startc, int endc) {

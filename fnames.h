@@ -148,6 +148,7 @@
 #define GNEWGAMEVER "<GAMEDAT>/newgame.ver"
 #define KEYRINGDAT  "<GAMEDAT>/keyring.dat"
 #define NOTEBOOKXML "<GAMEDAT>/notebook.xml"
+#define GPALETTE     "<GAMEDAT>/palette.dat"
 
 #define TEXTMSGS       "<STATIC>/textmsg.txt"
 #define PATCH_TEXTMSGS "<PATCH>/textmsg.txt"
