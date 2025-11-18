@@ -261,14 +261,14 @@ void GameDat::restore_gamedat(
 
 
 /*
- sof 'gamed*/
-
+ *  List of 'gamedat' files to save (in addition to 'iregxx'):
+ */
 constexpr static const std::array bgsavefiles{
-		GEXULTVER, GNEWGAMEVER, NPC_DAT, MONSNPCS,  USEVARS,
+		GEXULTVER, GNEWGAMEVER, GPALETTE, NPC_DAT, MONSNPCS,  USEVARS,
 		USEDAT,    FLAGINIT,    GWINDAT, GSCHEDULE, NOTEBOOKXML};
 
 constexpr static const std::array sisavefiles{
-		GEXULTVER, GNEWGAMEVER, NPC_DAT,   MONSNPCS,   USEVARS,    USEDAT,
+		GEXULTVER, GNEWGAMEVER, GPALETTE, NPC_DAT, MONSNPCS,   USEVARS,    USEDAT,
 		FLAGINIT,  GWINDAT,     GSCHEDULE, KEYRINGDAT, NOTEBOOKXML};
 
 void GameDat::SavefileFromDataSource(
@@ -567,7 +567,7 @@ void GameDat::read_save_infos() {
 	for (auto& saveinfo : save_infos) {
 		saveinfo.readable = get_saveinfo(
 				saveinfo.filename(), saveinfo.savename, saveinfo.screenshot,
-				saveinfo.details, saveinfo.party);
+				saveinfo.details, saveinfo.party,saveinfo.palette);
 
 		// Handling of regular savegame with a savegame number
 		if (saveinfo.type != SaveInfo::Type::UNKNOWN && saveinfo.num >= 0) {
@@ -845,16 +845,17 @@ bool GameDat::read_saveinfo(
 bool GameDat::get_saveinfo(
 		const std::string& filename, std::string& name,
 		std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-		std::vector<SaveGame_Party>& party) {
+		std::vector<SaveGame_Party>& party, std::unique_ptr<Palette>& palette) {
 	// Clear out old info
 	details = SaveGame_Details();
 	party.clear();
 	map.reset();
 	name.clear();
+	palette.reset();
 
 	// First check for compressed save game
 #ifdef HAVE_ZIP_SUPPORT
-	if (get_saveinfo_zip(filename.c_str(), name, map, details, party)) {
+	if (get_saveinfo_zip(filename.c_str(), name, map, details, party, palette)) {
 		return true;
 	}
 #endif
@@ -914,6 +915,12 @@ bool GameDat::get_saveinfo(
 			map     = std::make_unique<Shape_file>(ds.get());
 		} else if (!strcmp(fname, GSAVEINFO)) {
 			read_saveinfo(&in, details, party);
+		}
+
+		else if (!strcmp(fname, GPALETTE)) {
+			auto ds = in.makeSource(len);
+			palette     = std::make_unique<Palette>();
+			palette->Deserialize(*ds);
 		}
 	}
 	return true;
@@ -1019,7 +1026,8 @@ static const char* remove_dir(const char* fname) {
 
 bool GameDat::get_saveinfo_zip(
 		const char* fname, std::string& name, std::unique_ptr<Shape_file>& map,
-		SaveGame_Details& details, std::vector<SaveGame_Party>& party) {
+		SaveGame_Details& details, std::vector<SaveGame_Party>& party,
+		std::unique_ptr<Palette>& palette) {
 	// If a flex, so can't read it
 	if (Flex::is_flex(fname)) {
 		return false;
@@ -1052,6 +1060,21 @@ bool GameDat::get_saveinfo_zip(
 		if (unzCloseCurrentFile(unzipfile) == UNZ_OK) {
 			IBufferDataView ds(buf.data(), file_info.uncompressed_size);
 			map = std::make_unique<Shape_file>(&ds);
+		}
+	}
+	// Palette
+	if (unzLocateFile(unzipfile, remove_dir(GPALETTE), 2) == UNZ_OK) {
+		unzGetCurrentFileInfo(
+				unzipfile, &file_info, nullptr, 0, nullptr, 0, nullptr, 0);
+
+		std::vector<char> buf(file_info.uncompressed_size);
+		unzOpenCurrentFile(unzipfile);
+		unzReadCurrentFile(unzipfile, buf.data(), file_info.uncompressed_size);
+		if (unzCloseCurrentFile(unzipfile) == UNZ_OK) {
+			IBufferDataView ds(buf.data(), file_info.uncompressed_size);
+			palette= std::make_unique<Palette>();
+			palette->Deserialize(ds);
+
 		}
 	}
 
