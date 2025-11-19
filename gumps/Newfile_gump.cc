@@ -499,8 +499,12 @@ void Newfile_gump::load() {
 	// Aborts if unsuccessful.
 	if (selected_slot >= SavegameSlots && selected_slot <= LastSlot()) {
 		gamedat->Extractgame(
-				(*games)[selected_slot - SavegameSlots].filename().c_str(),
-				!restore_mode);
+				(*games)[selected_slot - SavegameSlots].filename().c_str(),!restore_mode);		
+	}
+	else if (selected_slot == GamedatSlot)
+	{
+		gamedat->Extractgame(nullptr,!restore_mode);		
+		
 	}
 
 	// Set Done
