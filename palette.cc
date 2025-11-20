@@ -105,8 +105,8 @@ namespace Cache {
 }    // namespace Cache
 
 Palette::Palette()
-		: win(Game_window::get_instance()->get_win()), palette(-1), brightness(100), max_val(63), border255(false),
-		  faded_out(false), fades_enabled(true) {
+		: win(Game_window::get_instance()->get_win()), palette(-1), is_palettes_flx(false), brightness(100), max_val(63),
+		  border255(false), faded_out(false), fades_enabled(true) {
 	memset(pal1, 0, 768);
 	memset(pal2, 0, 768);
 }
@@ -116,10 +116,11 @@ Palette::Palette(Palette* pal) : win(Game_window::get_instance()->get_win()), ma
 }
 
 void Palette::take(Palette* pal) {
-	palette       = pal->palette;
-	brightness    = pal->brightness;
-	faded_out     = pal->faded_out;
-	fades_enabled = pal->fades_enabled;
+	palette         = pal->palette;
+	is_palettes_flx = pal->is_palettes_flx;
+	brightness      = pal->brightness;
+	faded_out       = pal->faded_out;
+	fades_enabled   = pal->fades_enabled;
 	memcpy(pal1, pal->pal1, 768);
 	memcpy(pal2, pal->pal2, 768);
 }
@@ -141,7 +142,11 @@ void Palette::fade(
 
 	border255 = (palette >= 0 && palette <= 12) && palette != 9;
 
-	load(PALETTES_FLX, PATCH_PALETTES, pal_num);
+	// If pal_num is still -1 here can't load a palette and must just use the
+	// currently loaded palette regardless of what it is
+	if (pal_num != -1) {
+		load(PALETTES_FLX, PATCH_PALETTES, pal_num);
+	}
 	if (inout) {
 		fade_in(cycles);
 	} else {
@@ -187,8 +192,10 @@ void Palette::set(
 		return;    // In the black.
 	}
 
-	// could throw!
-	load(PALETTES_FLX, PATCH_PALETTES, palette);
+	// If palette number is -1 do not try to load from disk
+	if (palette != -1) {
+		load(PALETTES_FLX, PATCH_PALETTES, palette);
+	}
 	set_brightness(brightness);
 	apply(repaint);
 }
@@ -204,7 +211,8 @@ void Palette::set(
 	this->border255 = border255;
 	memcpy(pal1, palnew, 768);
 	memset(pal2, 0, 768);
-	palette = -1;
+	palette         = -1;
+	is_palettes_flx = false;
 	if (new_brightness > 0) {
 		brightness = new_brightness;
 	}
@@ -313,6 +321,11 @@ void Palette::ClearCache() {
  */
 void Palette::load(const File_spec& fname0, int index, const char* xfname, int xindex) {
 	set_loaded(Cache::Load(fname0, "", "", index), xfname, xindex);
+
+	is_palettes_flx = fname0.name == PALETTES_FLX;
+	if (is_palettes_flx) {
+		palette = index;
+	}
 }
 
 /**
@@ -325,8 +338,12 @@ void Palette::load(const File_spec& fname0, int index, const char* xfname, int x
  *  @param xindex   Optional xform index.
  */
 void Palette::load(const File_spec& fname0, const File_spec& fname1, int index, const char* xfname, int xindex) {
-	const U7multiobject pal(fname0, fname1, index);
 	set_loaded(Cache::Load(fname0, fname1, "", index), xfname, xindex);
+
+	is_palettes_flx = fname0.name == PALETTES_FLX;
+	if (is_palettes_flx) {
+		palette = index;
+	}
 }
 
 /**
@@ -342,30 +359,53 @@ void Palette::load(const File_spec& fname0, const File_spec& fname1, int index, 
 void Palette::load(
 		const File_spec& fname0, const File_spec& fname1, const File_spec& fname2, int index, const char* xfname, int xindex) {
 	set_loaded(Cache::Load(fname0, fname1, fname2, index), xfname, xindex);
+	std::array<std::string_view, 1> fnames = {};
+	is_palettes_flx                        = fname0.name == PALETTES_FLX;
+	if (is_palettes_flx) {
+		palette = index;
+	}
 }
 
-void Palette::Serialize(ODataSource& ds) {
-	// Save out the entire object in declared order
-	// except fades_enabled as that is a user settings
-	ds.write(pal1, sizeof(pal1));
-	ds.write(pal2, sizeof(pal2));
+void Palette::Serialize(ODataSource& ds, bool force_include_pals) const {
+	// Only write out palettes if asked to do or palette not from palettes.flx
+	if (palette == -1 || force_include_pals || !is_palettes_flx) {
+		ds.write(pal1, sizeof(pal1));
+		ds.write(pal2, sizeof(pal2));
+	}
 	// Using write 4 for ints
 	ds.write4(palette);
 	ds.write4(brightness);
 	ds.write4(max_val);
 	ds.write1(border255);
 	ds.write1(faded_out);
+	ds.write1(is_palettes_flx);
 }
 
 void Palette::Deserialize(IDataSource& ds) {
-	// Read the entire object
-	ds.read(pal1, sizeof(pal1));
-	ds.read(pal2, sizeof(pal2));
-	palette    = ds.read4();
-	brightness = ds.read4();
-	max_val    = ds.read4();
-	border255  = ds.read1();
-	faded_out  = ds.read1();
+	if (ds.getAvail() >= sizeof(pal1) + sizeof(pal2)) {
+		// Read the palettes
+		ds.read(pal1, sizeof(pal1));
+		ds.read(pal2, sizeof(pal2));
+		// try to read fields or use defaults
+		palette         = ds.getAvail() >= 4 ? ds.read4() : -1;
+		brightness      = ds.getAvail() >= 4 ? ds.read4() : 100;
+		max_val         = ds.getAvail() >= 4 ? ds.read4() : 63;
+		border255       = ds.getAvail() >= 1 ? ds.read1() : true;
+		faded_out       = ds.getAvail() >= 1 ? ds.read1() : false;
+		is_palettes_flx = ds.getAvail() >= 1 ? ds.read1() : false;
+	} else {
+		// Only read needed field
+		palette    = ds.read4();
+		brightness = ds.read4();
+		max_val    = ds.read4();
+		border255  = ds.read1();
+		faded_out  = ds.read1();
+		// skip is_palettes_flx as it's must be true and load will set it.
+		ds.skip(1);
+
+		// Load the palette from palettes.flx
+		load(PALETTES_FLX, PATCH_PALETTES, palette);
+	}
 }
 
 void Palette::set_brightness(int bright) {
