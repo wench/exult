@@ -39,6 +39,7 @@
 #include "actors.h"
 #include "exult.h"
 #include "game.h"
+#include "gameclk.h"
 #include "gamewin.h"
 #include "gump_utils.h"
 #include "items.h"
@@ -694,6 +695,14 @@ bool Gump_manager::handle_modal_gump_event(Modal_gump* gump, SDL_Event& event) {
 		break;
 	}
 	return true;
+}
+
+const Palette* Gump_manager::get_pal() {
+	const Palette* pal = gwin->get_clock()->GetCurrentPalette();
+	if (!pal) {
+		pal = gwin->get_pal();
+	}
+	return pal;
 }
 
 /*
