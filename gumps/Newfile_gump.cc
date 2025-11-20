@@ -1471,33 +1471,34 @@ void Newfile_gump::SelectSlot(int slot) {
 		// We have a palette so create a palette map
 		if (screenshot && (*games)[savegame_index].palette) {
 			std::unique_ptr<Palette> newpal;
+			const Palette*           gumppal = gumpman->get_pal();
 			// It's faded out so create a partly faded intermediate
 			if ((*games)[savegame_index].palette->is_faded_out()) {
 				newpal = (*games)[savegame_index]
 								 .palette->create_fadeintermediate(3, 1);
 			}
-			// Palette is not same as current and is not 0, Create intermediate palette between this 
-			// one and palette 0 palette to brighten it up slightly
+			// Palette is -1 or is not same as current and is not 0 , Create intermediate palette between this 
+			// one and current so it looks better
 			else if (
+					((*games)[savegame_index].palette->get_palette_index() == -1 ||
 					(*games)[savegame_index].palette->get_palette_index()
-							!= gwin->get_pal()->get_palette_index()
-					&& (*games)[savegame_index].palette->get_palette_index() !=0) {
-
-				Palette palette0;
-				palette0.load(PALETTES_FLX, PATCH_PALETTES, 0);
+							!= gumppal->get_palette_index())
+					&& (*games)[savegame_index].palette->get_palette_index()
+							   != 0) {
 
 				newpal = (*games)[savegame_index].palette->create_intermediate(
-						palette0 , 3, 1,false);
+						*gumppal , 3, 1,false);
 			
 			}
 			palette_map = sg_palette_map;
 			if (newpal) {
-				newpal->create_palette_map(gwin->get_pal(), sg_palette_map,true);
-			} else if (
-					(*games)[savegame_index].palette->get_palette_index()
-					!= gwin->get_pal()->get_palette_index()) {
+				newpal->create_palette_map(gumppal, sg_palette_map, true);
+			} else if ((*games)[savegame_index].palette->get_palette_index() == -1
+					|| (*games)[savegame_index].palette->get_palette_index()
+							   != gumppal->get_palette_index()) {
+
 				(*games)[savegame_index].palette->create_palette_map(
-						gwin->get_pal(), sg_palette_map,true);
+						gumppal, sg_palette_map, true);
 			}
 			else
 			{

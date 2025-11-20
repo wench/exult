@@ -52,6 +52,7 @@ class Palette {
 	unsigned char  pal1[768];
 	unsigned char  pal2[768];
 	int            palette;    // Palette #.
+	bool           is_palettes_flx;
 	int            brightness;
 	int            max_val;
 	bool           border255;
@@ -110,7 +111,7 @@ public:
 			int xindex = -1);
 
 	// Serialize palette object to datasource (for savegames)
-	void Serialize(ODataSource& ds);
+	void Serialize(ODataSource& ds, bool force_include_pals=false) const;
 	// Deseralize Palette object from DataSource (for savegames)
 	void Deserialize(IDataSource& ds);
 
@@ -237,6 +238,14 @@ public:
 
 	Palette* get_current_palette() const {
 		return current.get();
+	}
+
+	const Palette* get_end() const {
+		return &end;
+	}
+
+	const Palette* get_start() const {
+		return &start;
 	}
 };
 

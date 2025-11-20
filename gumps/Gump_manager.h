@@ -51,6 +51,8 @@ class Game_window;
 class Modal_gump;
 class Paintable;
 
+class Palette;
+
 class Gump_manager : public Game_singletons {
 	struct Gump_list {
 		Gump*      gump = nullptr;
@@ -180,6 +182,10 @@ public:
 	GumpListIterator end() {
 		return GumpListIterator();
 	}
+
+	// Get Palette used by Gumps
+	// May not be the same as gwin->get_pal()
+	const Palette* get_pal();
 };
 
 #endif    // GUMP_MANAGER_INCLUDED

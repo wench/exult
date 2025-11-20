@@ -137,6 +137,14 @@ public:
 	void set_time_rate(int i) {
 		time_rate = i > 0 ? i : 1;
 	}
+
+	const Palette* GetEndPalette() const {
+		return transition ? transition->get_end() : nullptr;
+	}
+	const Palette* GetCurrentPalette() const {
+		return transition ? transition->get_current_palette() : nullptr;
+	}
+
 };
 
 #endif /* INCL_GAMECLK */
