@@ -26,14 +26,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "palette.h"
 #include "singles.h"
 #include "tqueue.h"
+#include "vgafile.h"
 
 #include <array>
+#include <chrono>
+#include <cstddef>
 #include <deque>
 #include <future>
 #include <memory>
 #include <memory_resource>
 #include <mutex>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -42,12 +46,31 @@ class IDataSource;
 class Flex_writer;
 class unzFile;
 class zipFile;
+class zipFile;
 class Shape_file;
 
 #define MAX_SAVEGAME_NAME_LEN 0x50
 
 class GameDat : protected Game_singletons {
 public:
+	struct Strings {
+		static auto AutoSave() {
+			return get_text_msg(0x6E1 - msg_file_start);
+		}
+
+		static auto QuickSave() {
+			return get_text_msg(0x6E2 - msg_file_start);
+		}
+
+		static auto CrashSave() {
+			return get_text_msg(0x6E3 - msg_file_start);
+		}
+
+		static auto Save() {
+			return get_text_msg(0x6E4 - msg_file_start);
+		}
+	};
+
 	struct SaveGame_Details {
 		bool good = false;
 
@@ -157,7 +180,7 @@ public:
 			NUM_TYPES
 		} type = Type::UNKNOWN;
 
-		static const int NUM_TYPES = static_cast<int>(Type::NUM_TYPES);
+		constexpr static int NUM_TYPES = static_cast<int>(Type::NUM_TYPES);
 
 		// const getter for filename
 		const std::string& filename() const {
@@ -171,21 +194,53 @@ public:
 		}
 	};
 
-	int save_count;
+	int save_count = 0;
 
-	std::vector<SaveInfo>                save_infos;
-	std::array<int, SaveInfo::NUM_TYPES> first_free;
-	std::array<int, SaveInfo::NUM_TYPES> oldest;
-	std::string                          save_mask;
-	std::shared_future<void>             saveinfo_future;
-	std::recursive_mutex                 save_info_mutex;
+	std::vector<SaveInfo>                           save_infos      = {};
+	std::array<int, int(SaveInfo::Type::NUM_TYPES)> first_free      = {};
+	std::array<int, SaveInfo::NUM_TYPES>            oldest          = {};
+	std::string                                     save_mask       = "";
+	std::shared_future<void>                        saveinfo_future = {};
+	std::recursive_mutex                            save_info_mutex = {};
+
+	constexpr static size_t MAX_SAVE_BUFFER = 64 * 1024;    // 64 KB
+
+	struct GamedatInMemory {
+		std::recursive_mutex mutex = {};
+
+		bool active = false;
+
+		// Current Gamedat in memory files
+		std::unordered_map<std::string, std::vector<unsigned char>> files = {};
+		// Previous gamedat in memory files
+		std::unordered_map<std::string, std::vector<unsigned char>> oldfiles = {};
+
+		// Initial capacity for new savegame memory files
+		// 512 bytes seems like a good initial size in testing as the IREG
+		// files are usually at least this big and there are hundreds of those
+		// so preallocating this much isn't very wasteful
+		static const size_t initial_vcapacity = 512;
+
+		std::unique_ptr<char[]> save_buffer;
+
+		std::recursive_mutex& get_mutex() {
+			return mutex;
+		}
+
+		GamedatInMemory();
+		void clear();
+		bool enable();
+		void disable();
+	}
+
+	gamedat_in_memory;
 
 	static void init() {
 		gamedat = new GameDat();
 	}
 
 public:
-	friend class Game_Window;
+	friend class Game_window;
 	GameDat();
 
 	static GameDat* get() {
@@ -202,6 +257,7 @@ public:
 	void wait_for_saveinfo_read();
 
 	// Get the filename for savegame num of specified SaveInfo:Type
+
 	std::string get_save_filename(int num, SaveInfo::Type type);
 
 	// Emergency save Creates a new save in the next available index
@@ -210,18 +266,53 @@ public:
 	// miniscreenshot
 	void MakeEmergencySave(const char* savename = nullptr);
 
+	// Wite gamedat files to memory in order to save the game. Do not hold
+	// gamedat_in_memory lock before waiting on returned future returned future
+	// waits for disk writing to complete if todisk argument is true
+
+	std::future<void> writetoMemory(bool todisk, bool nopaint, bool screenshot);
+
+	auto Open_ODataSource(const char* fname) {
+		return ODataSourceFileOrVector(get_memory_file(fname, true), fname);
+	}
+
+	std::unique_ptr<std::ostream> Open_ostream(const char* fname) {
+		auto memfile = get_memory_file(fname, true);
+		if (!memfile) {
+			return U7open_out(fname, false);
+		}
+
+		return std::make_unique<ODataSource_ostream>(std::make_unique<OVectorDataSource>(memfile));
+	}
+
+private:
 	void write_saveinfo(bool screenshot = true);    // Write the save info to gamedat
+
+	std::vector<unsigned char>* get_memory_file(std::string fname, bool create);
+
+	std::unique_ptr<IDataSource> Open_IDataSource(std::string& fname) {
+		auto memfile = get_memory_file(fname, false);
+		if (memfile) {
+			return std::make_unique<IBufferDataView>(memfile->data(), memfile->size());
+		} else {
+			return std::make_unique<IFileDataSource>(U7open_in(fname.c_str(), false));
+		}
+	}
+
 	// Explode a savegame into "gamedat".
 	void restore_gamedat(const char* fname);
 
-	// Save "gamedat".
-	void save_gamedat(const char* fname, const char* savename);
-
+	// Save "gamedat" to a new savegame with the given filename
+	void save_gamedat(const std::string& fname, const char* savename);
 	// Save gamedat to a new savegame of the specified SaveInfo:Type with the
 	// given name
 	void save_gamedat(SaveInfo::Type type, const char* savename);
-	void read_saveinfo();                // Read the save info from gamedat
-	void read_saveinfo(bool newgame);    // Read the save info from gamedat
+
+	// Save Gamedat to a savegame asyncronously
+	// Savegame thread will block while gamedat_in_memory is locked so do not
+	// wait on the returned future if holding the gamedat_in_memory lock
+	std::shared_future<void>& save_gamedat_async(std::variant<SaveInfo::Type, const char*> type_or_filename, const char* savename);
+	void                      read_saveinfo(bool newgame);    // Read the save info from gamedat
 
 	void restore_flex_files(IDataSource& in, const char* basepath);
 
@@ -231,27 +322,37 @@ public:
 
 	void clear_saveinfos();
 
-	void SavefileFromDataSource(
-			Flex_writer& flex,
-			IDataSource& source,    // read from here
-			const char*  fname      // store data using this filename
+	void SaveToFlex(
+			Flex_writer&      flex,
+			std::string& fname    // Name of file to save.
 	);
-	void Savefile(
-			Flex_writer& flex,
-			const char*  fname    // Name of file to save.
-	);
-	void save_gamedat_chunks(Game_map* map, Flex_writer& flex);
+	void save_chunks_to_flex(Game_map* map, Flex_writer& flex);
 
 	bool read_saveinfo(IDataSource* in, SaveGame_Details& details, std::vector<SaveGame_Party>& party);
+	bool fileExists(const std::string& fname);
+
+	bool fileExists(const char* fname) {
+		return fileExists(std::string(fname));
+	}
 #ifdef HAVE_ZIP_SUPPORT
 	bool get_saveinfo_zip(
 			const char* fname, std::string& name, std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
 			std::vector<SaveGame_Party>& party, std::unique_ptr<Palette>& palette);
-	bool save_gamedat_zip(const char* fname, const char* savename);
+	bool save_gamedat_zip(const std::string& fname, const char* savename);
 	bool Restore_level2(unzFile& unzipfile, const char* dirname, int dirlen);
 	bool restore_gamedat_zip(const char* fname);
-	bool Save_level2(zipFile& zipfile, const char* fname);
-	bool Save_level1(zipFile& zipfile, const char* fname, bool rquired = true);
+	bool Save_level2(zipFile& zipfile, const std::string& fname, bool required = true);
+
+	bool Save_level2(zipFile& zipfile, const char* fname, bool required = true) {
+		return Save_level2(zipfile, std::string(fname), required);
+	}
+
+	bool Save_level1(zipFile& zipfile, const std::string& fname, bool required = true);
+
+	bool Save_level1(zipFile& zipfile, const char* fname, bool required = true) {
+		return Save_level1(zipfile, std::string(fname), required);
+	}
+
 	bool Begin_level2(zipFile& zipfile, int mapnum);
 	bool End_level2(zipFile& zipfile);
 #endif
@@ -269,10 +370,14 @@ public:
 
 	void Quicksave();
 
-	void Savegame(const char* fname, const char* savename);
-	void Savegame(const char* savename);
+	void Savegame(const char* fname, const char* savename, bool no_paint, bool screenshot);
+	void Savegame(const char* savename, bool no_paint, bool screenshot);
 
 	void Extractgame(const char* fname, bool doread);
+
+	void Load() {
+		Extractgame(nullptr, true);
+	}
 
 	void ResortSaveInfos();
 
@@ -280,5 +385,4 @@ public:
 	// vectors
 	void DeleteSaveGame(const std::string& fname);
 };
-
 #endif    // SAVEINFO_H_INCLUDED
