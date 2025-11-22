@@ -22,9 +22,11 @@
 
 #include "keyring.h"
 
+#include "databuf.h"
 #include "endianio.h"
 #include "exceptions.h"
 #include "fnames.h"
+#include "gamedat.h"
 #include "utils.h"
 
 #include <fstream>
@@ -58,14 +60,17 @@ void Keyring::read() {
 }
 
 void Keyring::write() {
-	auto pOut = U7open_out(KEYRINGDAT);
-	if (!pOut) {
+	auto out = GameDat::get()->Open_ODataSource(KEYRINGDAT);
+	if (!out) {
 		throw file_open_exception(KEYRINGDAT);
 	}
-	auto& out = *pOut;
 
+	// preallocate space
+	if (!out.ensure_space(keys.size() * 2)) {
+		throw exult_exception("Keyring::write: unable to allocate space");
+	}
 	for (const int key : keys) {
-		little_endian::Write2(out, key);
+		out.write2(key);
 	}
 }
 
