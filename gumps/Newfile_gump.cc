@@ -503,8 +503,7 @@ void Newfile_gump::load() {
 	}
 	else if (selected_slot == GamedatSlot)
 	{
-		gamedat->Extractgame(nullptr,!restore_mode);		
-		
+		gamedat->Extractgame(nullptr, !restore_mode);		
 	}
 
 	// Set Done
@@ -550,12 +549,12 @@ void Newfile_gump::save() {
 	// Now write to savegame file
 	if (selected_slot >= SavegameSlots && selected_slot <= LastSlot()) {
 		if (!info || info->filename().empty()) {
-			gamedat->Savegame(newname);
+			gamedat->Savegame(newname,false,true);
 		} else {
-			gamedat->Savegame(info->filename().c_str(), newname);
+			gamedat->Savegame(info->filename().c_str(), newname,false,true);
 		}
 	} else if (selected_slot == EmptySlot) {
-		gamedat->Savegame(newname);
+		gamedat->Savegame(newname, false,true);
 	} else if (selected_slot == QuicksaveSlot) {
 		gamedat->Quicksave();
 	}
@@ -589,14 +588,11 @@ void Newfile_gump::delete_file() {
 	filename    = nullptr;
 	is_readable = false;
 
-	cout << "Deleted Save game #" << selected_slot << " ("
-		 << (*games)[selected_slot].filename() << ") successfully." << endl;
-
 	// Reset everything
+	SelectSlot(NoSlot);
 	FreeSaveGameDetails();
 	LoadSaveGameDetails();
 	gwin->set_all_dirty();
-	SelectSlot(NoSlot);
 }
 
 void Newfile_gump::toggle_settings(int state) {
@@ -1564,8 +1560,8 @@ void Newfile_gump::LoadSaveGameDetails() {
 		// Fill in any missing old_games slots
 		for (int i = 0; i < fieldcount; ++i) {
 			if (old_games[i].num != i) {
-				old_games[i] = SaveInfo(
-						gamedat->get_save_filename(i, SaveInfo::Type::REGULAR));
+				old_games[i] = SaveInfo(std::string(gamedat->get_save_filename(
+						i, SaveInfo::Type::REGULAR)));
 			}
 		}
 

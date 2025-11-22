@@ -1243,10 +1243,7 @@ static int Play() {
 		Handle_events();
 		if (quitting_time == QUIT_TIME_RESTART) {
 			Mouse::mouse()->hide();    // Turn off mouse.
-			gwin->read();              // Restart
-									   /////gwin->setup_game();
-			//// setup_game is already being called from inside
-			//// of gwin->read(), so no need to call it here, I hope...
+			GameDat::get()->Load();    // Reload Gamedat
 		}
 	} while (quitting_time == QUIT_TIME_RESTART);
 

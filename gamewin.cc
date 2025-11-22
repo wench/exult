@@ -581,7 +581,7 @@ void Game_window::abort(const char* msg, ...) {
 	vsnprintf(buf, sizeof(buf), msg, ap);    // Format the message.
 	va_end(ap);
 	cerr << "Exult (fatal): " << buf << endl;
-	delete this;
+	//delete this;
 	throw quit_exception(-1);
 }
 
@@ -1502,7 +1502,8 @@ void Game_window::read() {
  */
 
 void Game_window::write_gwin() {
-	OFileDataSource gout(GWINDAT);
+	auto gout= GameDat::get()->Open_ODataSource(GWINDAT);
+
 	// Start with scroll coords (in tiles).
 	gout.write2(get_scrolltx());
 	gout.write2(get_scrollty());
@@ -1633,8 +1634,8 @@ void Game_window::write_map() {
 			map->write_static();    // Write ifix, map files.
 		}
 	}
-	write();    // Write out to 'gamedat' too.
-	GameDat::get()->save_gamedat(PATCH_INITGAME, "Saved map");
+	// Save out gamedat to initgame as a savegame. No screenahot in initgame
+	GameDat::get()->Savegame(PATCH_INITGAME, "Saved map",false,false);
 }
 
 /*

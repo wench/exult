@@ -40,6 +40,7 @@
 #include "exceptions.h"
 #include "fnames.h"
 #include "game.h"
+#include "gamedat.h"
 #include "gamewin.h" /* With some work, could get rid of this. */
 #include "ios_state.hpp"
 #include "items.h"
@@ -756,20 +757,27 @@ int Game_map::write_string(
 void Game_map::write_ireg() {
 	// Write each superchunk to Iregxx.
 	for (int schunk = 0; schunk < c_num_schunks * c_num_schunks; schunk++) {
-		// Only write what we've read.
+		// Only write if we have something to write.
+		// If it's not loaded the file in GAMEDAT is already current
+		if (!schunk_read[schunk] && schunk_cache[schunk].empty()) {
+			continue;
+		}
+		char fname[128];    // Set up name.
+		auto ireg_ds = GameDat::get()->Open_ODataSource(
+				get_schunk_file_name(U7IREG, schunk, fname));
+
 		if (!schunk_cache[schunk].empty()) {
-			// It's loaded in a memory buffer
-			char fname[128];    // Set up name.
-			auto ireg_stream
-					= U7open_out(get_schunk_file_name(U7IREG, schunk, fname));
-			if (ireg_stream) {
-				ireg_stream->write(
-						reinterpret_cast<char*>(schunk_cache[schunk].data()),
+			// It's cached to a memory buffer
+			if (ireg_ds) {
+				ireg_ds.write(
+						schunk_cache[schunk].data(),
 						schunk_cache[schunk].size());
 			}
-		} else if (schunk_read[schunk]) {
+
+		} else {
 			// It's active
-			write_ireg_objects(schunk);
+			write_ireg_objects(schunk, &ireg_ds);
+			ireg_ds.flush();
 		}
 	}
 }
@@ -1892,23 +1900,21 @@ void Game_map::cache_out_schunk(int schunk) {
 	// Go through chunks and get all the items
 	for (cy = 0; cy < 16; cy++) {
 		for (cx = 0; cx < 16; cx++) {
-			get_chunk_unsafe(scx + cx, scy + cy)->get_obj_actors(removes, actors);
-
+			get_chunk_unsafe(scx + cx, scy + cy)
+					->get_obj_actors(removes, actors);
 		}
 	}
 
 	schunk_read[schunk] = false;
 	++caching_out;
 
-	OVectorDataSource ds{std::move(schunk_cache[schunk])};
+	OVectorDataSource ds{&schunk_cache[schunk]};
 
 	write_ireg_objects(schunk, &ds);
 
 #ifdef DEBUG
 	std::cout << "Wrote " << ds.getPos() << " bytes" << std::endl;
 #endif
-
-	schunk_cache[schunk]       = ds.move_data();
 
 	// Now remove the objects
 	for (auto* remove : removes) {

@@ -27,6 +27,7 @@
 #include "databuf.h"
 #include "fnames.h"
 #include "game.h"
+#include "gamedat.h"
 #include "gamewin.h"
 #include "miscinf.h"
 #include "monsters.h"
@@ -146,7 +147,7 @@ void Game_window::read_npcs() {
 void Game_window::write_npcs() {
 	const int num_npcs = npcs.size();
 	{
-		OFileDataSource nfile(NPC_DAT);
+		auto nfile = GameDat::get()->Open_ODataSource(NPC_DAT);
 
 		nfile.write2(num_npcs1);    // Start with counts.
 		nfile.write2(num_npcs - num_npcs1);
@@ -163,7 +164,8 @@ void Game_window::write_npcs() {
 	write_schedules();    // Write schedules
 	{
 		// Now write out monsters in world.
-		OFileDataSource nfile(MONSNPCS);
+		auto nfile = GameDat::get()->Open_ODataSource(MONSNPCS);
+
 		int             cnt = 0;
 		nfile.write2(0);    // Write 0 as a place holder.
 		for (Monster_actor* mact = Monster_actor::get_first_in_world(); mact;
@@ -299,7 +301,9 @@ void Game_window::write_schedules() {
 	// So do I allow for all NPCs (type1 and type2) - Yes i will
 	num = npcs.size();
 
-	OFileDataSource            sfile(GSCHEDULE);
+	auto sfile = GameDat::get()->Open_ODataSource(GSCHEDULE);
+
+
 	const vector<std::string>& script_names
 			= Schedule_change::get_script_names();
 

@@ -32,6 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "exult_flx.h"
 #include "fnames.h"
 #include "game.h"
+#include "gamedat.h"
 #include "gameclk.h"
 #include "gamewin.h"
 #include "items.h"
@@ -866,8 +867,12 @@ void Notebook_gump::add_new_with_line_breaks(const string& text, int gflag) {
  */
 
 void Notebook_gump::write() {
-	auto pOut = U7open_out(NOTEBOOKXML);
-	if (!pOut) {
+
+
+	auto pOut = GameDat::get()->Open_ostream(NOTEBOOKXML);
+
+	if (!pOut || !pOut->good() ) {
+
 		return;
 	}
 	auto& out = *pOut;

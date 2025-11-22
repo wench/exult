@@ -19,6 +19,7 @@
 
 #include "U7obj.h"
 #include "endianio.h"
+#include "ignore_unused_variable_warning.h"
 #include "utils.h"
 
 #include <cassert>
@@ -203,7 +204,9 @@ class IFileDataSource : public IStreamDataSource {
 	std::shared_ptr<std::istream> pFin;
 
 public:
-	explicit IFileDataSource(const File_spec& spec, bool is_text = false)
+	IFileDataSource() : IStreamDataSource(nullptr) {}
+
+	explicit IFileDataSource(const File_spec &spec, bool is_text = false)
 			: IStreamDataSource(nullptr) {
 		if (U7exists(spec.name)) {
 			pFin = U7open_in(spec.name, is_text);
@@ -447,12 +450,19 @@ public:
 	virtual void write4(uint32)             = 0;
 	virtual void write4high(uint32)         = 0;
 	virtual void write(const void*, size_t) = 0;
-	virtual void write(const std::string&)  = 0;
+	virtual void write(const std::string_view&)  = 0;
 
 	virtual void   seek(size_t)         = 0;
 	virtual void   skip(std::streamoff) = 0;
 	virtual size_t getSize() const      = 0;
 	virtual size_t getPos() const       = 0;
+
+	// Make sure there is enough space for needed_space bytes
+	virtual bool ensure_space(size_t needed_space) {
+		ignore_unused_variable_warning(needed_space);
+		// First make sure object is in a good state,
+		return good();
+	}
 
 	virtual void flush() {}
 
@@ -461,6 +471,10 @@ public:
 	}
 
 	virtual void clear_error() {}
+
+	operator bool() const {
+		return good();
+	}
 };
 
 /**
@@ -474,59 +488,89 @@ public:
 	explicit OStreamDataSource(std::ostream* data_stream) : out(data_stream) {}
 
 	void write1(uint32 val) final {
-		Write1(out, static_cast<uint16>(val));
+		if (out) {
+			Write1(out, static_cast<uint16>(val));
+		}
 	}
 
 	void write2(uint16 val) final {
-		little_endian::Write2(out, val);
+		if (out) {
+			little_endian::Write2(out, val);
+		}
 	}
 
 	void write2high(uint16 val) final {
-		big_endian::Write2(out, val);
+		if (out) {
+			big_endian::Write2(out, val);
+		}
 	}
 
 	void write4(uint32 val) final {
-		little_endian::Write4(out, val);
+		if (out) {
+			little_endian::Write4(out, val);
+		}
 	}
 
 	void write4high(uint32 val) final {
-		big_endian::Write4(out, val);
+		if (out) {
+			big_endian::Write4(out, val);
+		}
 	}
 
 	void write(const void* b, size_t len) final {
-		out->write(static_cast<const char*>(b), len);
+		if (out) {
+			out->write(static_cast<const char*>(b), len);
+		}
 	}
 
-	void write(const std::string& s) final {
-		out->write(s.data(), s.size());
+	void write(const std::string_view& s) final {
+		if (out) {
+			out->write(s.data(), s.size());
+		}
 	}
 
 	void seek(size_t pos) final {
-		out->seekp(pos);
+		if (out) {
+			out->seekp(pos);
+		}
 	}
 
 	void skip(std::streamoff pos) final {
-		out->seekp(pos, std::ios::cur);
+		if (out) {
+			out->seekp(pos, std::ios::cur);
+		}
 	}
 
 	size_t getSize() const final {
-		return out->tellp();
+		if (out) {
+			return size_t(out->tellp());
+		} else {
+			return 0;
+		}
 	}
 
 	size_t getPos() const final {
-		return out->tellp();
+		if (out) {
+			return size_t(out->tellp());
+		} else {
+			return 0;
+		}
 	}
 
 	void flush() final {
-		out->flush();
+		if (out) {
+			out->flush();
+		}
 	}
 
 	bool good() const final {
-		return out->good();
+		return out && out->good();
 	}
 
 	void clear_error() final {
-		out->clear();
+		if (out) {
+			out->clear();
+		}
 	}
 };
 
@@ -537,6 +581,8 @@ class OFileDataSource : public OStreamDataSource {
 	std::shared_ptr<std::ostream> fout;
 
 public:
+	OFileDataSource() : OStreamDataSource(nullptr) {}
+
 	explicit OFileDataSource(const File_spec& spec, bool is_text = false)
 			: OStreamDataSource(nullptr) {
 		fout = U7open_out(spec.name, is_text);
@@ -589,7 +635,7 @@ public:
 	// Ensure buffer has enough space, increasing buffer size if supported
 	// Sets bad flag and retuns false if there is no space and the buffer can't
 	// be resized Always returns false if bad flag was already set
-	virtual bool ensure_space(size_t needed_space) {
+	bool ensure_space(size_t needed_space) override {
 		// First make sure object is in a good state,
 		if (!good()) {
 			setbad();
@@ -650,7 +696,7 @@ public:
 		buf_ptr += len;
 	}
 
-	void write(const std::string& s) final {
+	void write(const std::string_view& s) final {
 		if (!ensure_space(s.size())) {
 			return;
 		}
@@ -659,6 +705,7 @@ public:
 
 	void seek(size_t pos) final {
 		if (pos > size && !ensure_space(pos - size)) {
+			bad = true;
 			return;
 		}
 		buf_ptr = buf + pos;
@@ -666,6 +713,7 @@ public:
 
 	void skip(std::streamoff pos) final {
 		if (pos > 0 && !ensure_space(pos)) {
+			bad = true;
 			return;
 		}
 		buf_ptr += pos;
@@ -734,21 +782,47 @@ inline void IBufferDataView::copy_to(ODataSource& dest) {
 }
 
 // Automatically resizing OBufferDataSpan backed by a vector
+template <typename Alloc = std::allocator<unsigned char>>
 class OVectorDataSource : public OBufferDataSpan {
-	std::vector<unsigned char> data;
+	std::vector<unsigned char, Alloc>  owneddata;
+	std::vector<unsigned char, Alloc>* data;
 
 public:
-	explicit OVectorDataSource(size_t initial) : OBufferDataSpan(nullptr, 0) {
-		data.reserve(initial);
-		ensure_space(0);
+	explicit OVectorDataSource(size_t initial)
+			: OBufferDataSpan(nullptr, 0), data(&owneddata) {
+		ensure_space(initial);
 	}
 
-	explicit OVectorDataSource(std::vector<unsigned char>&& existing)
-			: OBufferDataSpan(nullptr, 0), data(std::move(existing)) {
-		ensure_space(0);
+	explicit OVectorDataSource(
+			std::vector<unsigned char, Alloc>* existing, bool append = false)
+			: OBufferDataSpan(nullptr, 0), data(existing) {
+		if (data) {
+			if (append) {
+				ensure_space(0);
+				skip(data->size());
+			} else {
+				data->clear();
+				ensure_space(0);
+			}
+		}
 	}
 
-	OVectorDataSource() : OBufferDataSpan(nullptr, 0) {
+	explicit OVectorDataSource(
+			std::vector<unsigned char, Alloc>&& existing, bool append = false)
+			: OBufferDataSpan(nullptr, 0), owneddata(std::move(existing)),
+			  data(&owneddata) {
+		if (data) {
+			if (append) {
+				ensure_space(0);
+				skip(data->size());
+			} else {
+				data->clear();
+				ensure_space(0);
+			}
+		}
+	}
+
+	OVectorDataSource() : OBufferDataSpan(nullptr, 0), data(&owneddata) {
 		ensure_space(0);
 	}
 
@@ -759,7 +833,7 @@ public:
 		buf_ptr = buf = nullptr;
 		size          = 0;
 		bad           = false;
-		return std::move(std::move(data));
+		return std::move(std::move(*data));
 	}
 
 	bool ensure_space(size_t needed_space) final {
@@ -773,20 +847,245 @@ public:
 			needed_space += current_pos;
 
 			// Resize data if needed
-			if (needed_space > data.size()) {
-				data.resize(needed_space);
+			if (needed_space > data->size()) {
+				data->resize(needed_space);
 			}
 
 			// Recreate the buffer pointers
-			buf     = data.data();
+			buf     = data->data();
 			buf_ptr = buf + current_pos;
-			size    = data.size();
+			size    = data->size();
 		} catch (std::exception&) {
 			setbad();
 			return false;
 		}
 
 		return true;
+	}
+};
+
+class ODataSourceODataSource : public ODataSource {
+protected:
+	ODataSource* ds;
+
+public:
+	bool good() const final {
+		return ds && ds->good();
+	}
+
+	bool ensure_space(size_t needed_space) override {
+		if (!ds) {
+			return false;
+		}
+		return ds->ensure_space(needed_space);
+	}
+
+	void write1(uint32 val) final {
+		if (!ds) {
+			return;
+		}
+		ds->write1(val);
+	}
+
+	void write2(uint16 val) final {
+		if (!ds) {
+			return;
+		}
+		ds->write2(val);
+	}
+
+	void write2high(uint16 val) final {
+		if (!ds) {
+			return;
+		}
+		ds->write2high(val);
+	}
+
+	void write4(uint32 val) final {
+		if (!ds) {
+			return;
+		}
+		ds->write4(val);
+	}
+
+	void write4high(uint32 val) final {
+		if (!ds) {
+			return;
+		}
+		ds->write4high(val);
+	}
+
+	void write(const void* b, size_t len) final {
+		if (!ds) {
+			return;
+		}
+		ds->write(b, len);
+	}
+
+	void write(const std::string_view& s) final {
+		if (!ds) {
+			return;
+		}
+		ds->write(s);
+	}
+
+	void seek(size_t pos) final {
+		if (!ds) {
+			return;
+		}
+		ds->seek(pos);
+	}
+
+	void skip(std::streamoff pos) final {
+		if (!ds) {
+			return;
+		}
+		ds->skip(pos);
+	}
+
+	size_t getSize() const final {
+		if (!ds) {
+			return 0;
+		}
+		return ds->getSize();
+	}
+
+	size_t getPos() const final {
+		if (!ds) {
+			return 0;
+		}
+		return ds->getPos();
+	}
+};
+
+template <template <typename> typename Allocator >
+class ODataSourceFileOrVector : public ODataSourceODataSource
+{
+	OVectorDataSource<Allocator<unsigned char>> vec_ds;
+	OFileDataSource                           file_ds;
+
+public:
+	ODataSourceFileOrVector() : ODataSourceODataSource(&vec_ds) {}
+
+	ODataSourceFileOrVector(
+			std::vector<unsigned char, Allocator<unsigned char> >* vec,
+			std::basic_string<char,std::char_traits<char>,Allocator<char>> fname)
+			: vec_ds(vec),
+			  file_ds(vec ? nullptr : U7open_out(fname, false)) {
+		if (vec) {
+			ds = &vec_ds;
+		} else {
+			ds = &file_ds;
+		}
+	}
+
+	~ODataSourceFileOrVector() noexcept override = default;
+};
+
+// ostream adapter for ODataSource
+class ODataSource_ostream : public std::ostream {
+public:
+	using Traits      = std::ostream::traits_type;
+	using traits_type = std::ostream::traits_type;
+	using int_type    = std::ostream::int_type;
+	using char_type   = std::ostream::char_type;
+	using pos_type    = std::ostream::pos_type;
+	using off_type    = std::ostream::off_type;
+
+private:
+	class streambuf : public std::basic_streambuf<char_type, traits_type> {
+		ODataSource* ds;
+
+	std::shared_ptr<ODataSource> shared;
+
+	public:
+		streambuf(ODataSource* ds)
+				: std::basic_streambuf<char_type, traits_type>(), ds(ds) {}
+
+		streambuf(std::shared_ptr<ODataSource> shared)
+				: std::basic_streambuf<char_type, traits_type>(), ds(shared.get()),shared(shared) {}
+
+		std::streamsize xsputn(
+				const char_type* s, std::streamsize count) override {
+			if (!ds || !ds->ensure_space(count)) {
+				return 0;
+			}
+			ds->write(s, count);
+			return ds->good() ? count : 0;
+		}
+
+		int_type overflow(int_type ch = Traits::eof()) override {
+			if (ch == Traits::eof() || !ds || !ds->ensure_space(1)) {
+				return Traits::eof();
+			}
+			ds->write1(ch);
+
+			return ds->good() ? ch : Traits::eof();
+		}
+
+		int sync() override {
+			if (!ds || !ds->good()) {
+				return -1;
+			}
+			ds->flush();
+			return 0;
+		}
+
+		pos_type seekpos(
+				pos_type                pos,
+				std::ios_base::openmode which = std::ios_base::out) override {
+			if (!ds || !ds->good()) {
+				return pos_type(off_type(-1));
+			}
+			if (which != std::ios_base::out) {
+				return pos_type(off_type(-1));
+			}
+
+			ds->seek(pos);
+			return pos;
+		}
+
+		pos_type seekoff(
+				off_type off, std::ios_base::seekdir dir,
+				std::ios_base::openmode which = std::ios_base::out) override {
+			if (!ds || !ds->good()) {
+				return pos_type(off_type(-1));
+			}
+			if (which != std::ios_base::out || off < 0) {
+				return pos_type(off_type(-1));
+			}
+
+			switch (dir) {
+			case std::ios_base::beg:
+				ds->seek(off);
+				break;
+
+			case std::ios_base::cur:
+				ds->skip(off);
+				break;
+
+			default:
+			case std::ios_base::end:
+				return pos_type(off_type(-1));
+				break;
+			}
+			return ds->good() ? pos_type(ds->getPos()) : pos_type(off_type(-1));
+		}
+	} dsbuf;
+
+public:
+	ODataSource_ostream() : std::ostream(nullptr), dsbuf(nullptr) {
+		init(nullptr);
+	}
+
+	explicit ODataSource_ostream(ODataSource* ds)
+			: std::ostream(nullptr), dsbuf(ds) {
+		init(&dsbuf);
+	}
+
+	explicit ODataSource_ostream(std::shared_ptr<ODataSource> ds)
+			: std::ostream(nullptr), dsbuf(ds) {
+		init(&dsbuf);
 	}
 };
 #endif
