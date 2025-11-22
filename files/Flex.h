@@ -28,6 +28,7 @@
 #include <cstring>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <vector>
 
 struct Flex_header {
@@ -120,19 +121,21 @@ using FlexBuffer = U7DataBuffer<Flex>;
  *  This is for writing out a whole Flex file.
  */
 class Flex_writer {
-	Flex_writer*       parent=nullptr;    // If nested, this is non-null.
-	ODataSource&       dout;
-	const size_t             count;    // # entries.
-	const size_t             start_pos;
-	size_t                   cur_start;    // Start of cur. entry being written.
-	std::unique_ptr<uint8[]> table;        // Table of offsets & lengths.
-	uint8*                   tptr;         // ->into table.
-	void finish_object();                  // Finished writing out a section.
+	Flex_writer* parent = nullptr;    // If nested, this is non-null.
+	ODataSource& dout;
+	const size_t count;    // # entries.
+	const size_t start_pos;
+	size_t       cur_start;    // Start of cur. entry being written.
+	std::unique_ptr<uint8[]> uptable;
+	uint8*                   table;    // Table of offsets & lengths.
+	uint8*                   tptr;     // ->into table.
+	void finish_object();              // Finished writing out a section.
 
 public:
 	Flex_writer(
 			ODataSource& o, const char* title, size_t cnt,
-			Flex_header::Flex_vers vers = Flex_header::orig);
+			Flex_header::Flex_vers vers   = Flex_header::orig,
+			uint8*                 buffer = nullptr);
 	Flex_writer(const Flex_writer&) noexcept            = delete;
 	Flex_writer& operator=(const Flex_writer&) noexcept = delete;
 	Flex_writer(Flex_writer&&) noexcept                 = default;
@@ -147,6 +150,19 @@ private:
 		this->parent = parent;
 	}
 
+public:
+	constexpr static size_t BufferSize(size_t count) {
+		return 2 * count * 4;
+	}
+
+private:
+	Flex_writer(
+			Flex_writer* parent, ODataSource& o, const char* title, size_t cnt,
+			Flex_header::Flex_vers vers   = Flex_header::orig,
+			uint8*                 buffer = nullptr)
+			: Flex_writer(o, title, cnt, vers, buffer) {
+		this->parent = parent;
+	}
 
 public:
 	std::string base_name(std::string fullname) {
@@ -162,10 +178,32 @@ public:
 		return fullname.substr(pos + 1);
 	}
 
+	std::string_view base_name(std::string_view fullname) {
+		// Remove trailing (back)slash, if any
+		if (fullname.back() == '/' || fullname.back() == '\\') {
+			fullname.remove_suffix(1);
+		}
+		// Get actual basename
+		auto pos = fullname.find_last_of("/\\");
+		if (pos == std::string_view::npos) {
+			return fullname;
+		}
+		return fullname.substr(pos + 1);
+	}
+
 	void write_name(const std::string& fullname) {
 		std::string name = base_name(fullname);
 		name.resize(8 + 1 + 3 + 1, 0);    // DOS filename
 		dout.write(name);
+	}
+
+	void write_name(const std::string_view& fullname) {
+		std::string_view name = base_name(fullname);
+		dout.write(name);
+		for (int extra = (8 + 1 + 3 + 1) - int(name.size()); extra > 0;
+			 --extra) {
+			dout.write1(0);
+		}
 	}
 
 	void write_object(const File_spec& spec) {
@@ -210,14 +248,23 @@ public:
 		write_object(std::forward<Ts>(ts)...);
 	}
 
+	template <typename... Ts>
+	void write_file(std::string_view filename, Ts&&... ts) {
+		write_name(filename);
+		write_object(std::forward<Ts>(ts)...);
+	}
+
 	void empty_object() {
 		finish_object();
 	}
 
-	Flex_writer start_nested_flex(const char* filename, size_t cnt)
-		{
-		write_name(filename);		
-		return Flex_writer(this, dout, filename, cnt);
+	template <typename... Ts>
+	Flex_writer start_nested_flex(
+			const char* filename, size_t cnt,
+			Flex_header::Flex_vers vers   = Flex_header::orig,
+			uint8*                 buffer = nullptr) {
+		write_name(std::string_view(filename));
+		return Flex_writer(this, dout, filename, cnt, vers, buffer);
 	}
 
 	void flush();
