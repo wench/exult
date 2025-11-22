@@ -262,40 +262,47 @@ constexpr static const std::array bgsavefiles{GEXULTVER, GNEWGAMEVER, GPALETTE, 
 constexpr static const std::array sisavefiles{GEXULTVER, GNEWGAMEVER, GPALETTE, NPC_DAT,   MONSNPCS,   USEVARS,
 											  USEDAT,    FLAGINIT,    GWINDAT,  GSCHEDULE, KEYRINGDAT, NOTEBOOKXML};
 
-void GameDat::SavefileFromDataSource(
-		Flex_writer& flex,
-		IDataSource& source,    // read from here
-		const char*  fname      // store data using this filename
+void GameDat::SaveToFlex(
+		Flex_writer&      flex,
+		std::pmr::string& fname    // Name of file to save.
 ) {
-	flex.write_file(fname, source);
-}
+	if (gamedat_in_memory.active) {
+		// Save from memory
 
-/*
- *  Save a single file into an IFF repository.
- */
+		auto it = gamedat_in_memory.files->find(fname);
 
-void GameDat::Savefile(
-		Flex_writer& flex,
-		const char*  fname    // Name of file to save.
-) {
-	IFileDataSource source(fname);
+		if (it != gamedat_in_memory.files->end()) {
+			flex.write_file(fname, it->second.data(), it->second.size());
+			return;
+		}
+	}
+	auto source = IFileDataSource(U7open_in(fname));
 	if (!source.good()) {
 		if (Game::is_editing()) {
 			return;    // Newly developed game.
 		}
 		throw file_read_exception(fname);
 	}
-	SavefileFromDataSource(flex, source, fname);
+	size_t size = source.getSize();
+	if (size <= MAX_SAVE_BUFFER) {
+		source.read(gamedat_in_memory.save_buffer.get(), size);
+		flex.write_file(fname, gamedat_in_memory.save_buffer.get(), size);
+		return;
+	} else {
+		// File too big for buffer, let flex read it
+		flex.write_file(fname, source);
+	}
 }
 
-inline void GameDat::save_gamedat_chunks(Game_map* map, Flex_writer& flex) {
+inline void GameDat::save_chunks_to_flex(Game_map* map, Flex_writer& flex) {
 	for (int schunk = 0; schunk < 12 * 12; schunk++) {
 		char iname[128];
 		// Check to see if the ireg exists before trying to
 		// save it; prevents crash when creating new maps
 		// for existing games
-		if (U7exists(map->get_schunk_file_name(U7IREG, schunk, iname))) {
-			Savefile(flex, iname);
+		std::pmr::string iname_pmr(map->get_schunk_file_name(U7IREG, schunk, iname));
+		if (fileExists(iname_pmr)) {
+			SaveToFlex(flex, iname_pmr);
 		} else {
 			flex.empty_object();    // TODO: Get rid of this by making it
 									// redundant.
@@ -310,15 +317,18 @@ inline void GameDat::save_gamedat_chunks(Game_map* map, Flex_writer& flex) {
  */
 
 void GameDat::save_gamedat(
-		const char* fname,      // File to create.
-		const char* savename    // User's savegame name.
+		const std::pmr::string& fname,      // File to create.
+		const char*             savename    // User's savegame name.
 ) {
-	// First check for compressed save game
+	// Lock gamedat in memory for duration of save
+	std::lock_guard lock(gamedat_in_memory.mutex);
 
 #ifdef HAVE_ZIP_SUPPORT
 	// Try to save as a zip file
 	if (Settings::get().disk.save_compression_level > 0 && save_gamedat_zip(fname, savename)) {
+		gamedat_in_memory.disable();
 		read_save_infos_async(true);
+
 		return;
 	}
 #endif
@@ -342,44 +352,57 @@ void GameDat::save_gamedat(
 		}
 	}
 	// Use samename for title.
-	OFileDataSource out(fname);
-	Flex_writer     flex(out, savename, count);
+	OFileDataSource out(U7open_out(fname, false));
+	auto            flex_buffer = std::pmr::polymorphic_allocator<uint8_t>().allocate(Flex_writer::BufferSize(count));
+	Flex_writer     flex(out, savename, count, Flex_header::orig, flex_buffer);
 
 	// We need to explicitly save these as they are no longer included in
 	// savefiles span and must be first
 	// Screenshot and Saveinfo are optional
 	// Identity is required
-	if (U7exists(GSCRNSHOT)) {
-		Savefile(flex, GSCRNSHOT);
+	std::pmr::string pmrname(GSCRNSHOT);
+	if (fileExists(pmrname)) {
+		SaveToFlex(flex, pmrname);
 	}
-	if (U7exists(GSAVEINFO)) {
-		Savefile(flex, GSAVEINFO);
+	pmrname = GSAVEINFO;
+	if (fileExists(pmrname)) {
+		SaveToFlex(flex, pmrname);
 	}
-	Savefile(flex, IDENTITY);
+	pmrname = IDENTITY;
+	SaveToFlex(flex, pmrname);
 
 	for (const auto* savefile : savefiles) {
-		Savefile(flex, savefile);
+		std::pmr::string savefile_pmr(savefile);
+		SaveToFlex(flex, savefile_pmr);
 	}
 	// Now the Ireg's.
+	auto map_buffer = std::pmr::polymorphic_allocator<uint8_t>().allocate(Flex_writer::BufferSize(12 * 12));
+
+	std::pmr::vector<uint8_t> outbuf;
+	outbuf.reserve(1024 * 512);    // preallocate 512KB for map flex files.144 superchunks
+								   // can be expected to be in this order of size.
 	for (auto* map : gwin->get_maps()) {
 		if (!map) {
 			continue;
 		}
 		if (!map->get_num()) {
 			// Map 0 is a special case.
-			save_gamedat_chunks(map, flex);
+			save_chunks_to_flex(map, flex);
 		} else {
 			// Multimap directory entries. Each map is stored in their
 			// own flex file contained inside the general gamedat flex.
 			{
-				char dname[32];
+				char dname[128];
 				map->get_mapped_name(GAMEDAT, dname);
-				Flex_writer mapflex = flex.start_nested_flex(dname, 12 * 12);
+				Flex_writer mapflex = flex.start_nested_flex(dname, 12 * 12, Flex_header::orig, map_buffer);
 				// Save chunks to nested flex
-				save_gamedat_chunks(map, mapflex);
+				save_chunks_to_flex(map, mapflex);
 			}
 		}
 	}
+	// Done with gamedat in memory so disable it before reading save infos
+	gamedat_in_memory.disable();
+
 	read_save_infos_async(true);
 }
 
@@ -405,9 +428,9 @@ void GameDat::DeleteSaveGame(const std::string& fname) {
 	}
 }
 
-std::string GameDat::get_save_filename(int num, SaveInfo::Type type) {
+std::pmr::string GameDat::get_save_filename(int num, SaveInfo::Type type) {
 	// preallocate string to a size that should be big enough
-	std::string fname(std::size(SAVENAME3) + 3, 0);
+	std::pmr::string fname(std::size(SAVENAME3) + 4, 0);
 	for (;;) {
 		auto needed = snprintf(
 				fname.data(), fname.size(), SAVENAME3, num,
@@ -438,7 +461,19 @@ std::string GameDat::get_save_filename(int num, SaveInfo::Type type) {
 	return "";
 }
 
-void GameDat::save_gamedat(SaveInfo::Type type, const char* savename) {
+void GameDat::save_gamedat(
+		SaveInfo::Type type,
+		const char*    savename    // User's savegame name.
+) {
+	// Lock gamedat in memory during save
+	std::unique_lock memlock(gamedat_in_memory.get_mutex());
+
+	// Lock save_info during save as it will be updated after save
+	std::lock_guard si_lock(save_info_mutex);
+
+	if (type <= SaveInfo::Type::UNKNOWN || type >= SaveInfo::Type::NUM_TYPES) {
+		throw exult_exception("Invalid save type");
+	}
 	int index = first_free[int(type)];
 	int limit = INT_MAX;
 	if (type == SaveInfo::Type::QUICKSAVE) {
@@ -449,7 +484,7 @@ void GameDat::save_gamedat(SaveInfo::Type type, const char* savename) {
 	}
 
 	if (limit == 0) {
-		std::cerr << "Attempted to make " << (type == SaveInfo::Type::AUTOSAVE ? "AutoSave" : "QuickSave") << " while disabled"
+		std::cerr << "Attempted to make " << (type == SaveInfo::Type::QUICKSAVE ? "QuickSave" : "AutoSave") << " while disabled"
 				  << std::endl;
 		return;    // Autosaves or quicksaves disabled
 	} else if (index >= limit) {
@@ -462,13 +497,13 @@ void GameDat::save_gamedat(SaveInfo::Type type, const char* savename) {
 	if (!savename || !*savename) {
 		const time_t t = time(nullptr);
 		if (type == SaveInfo::Type::AUTOSAVE) {
-			strcpy(name, "AutoSave ");
+			strcpy(name, Strings::AutoSave());
 		} else if (type == SaveInfo::Type::QUICKSAVE) {
-			strcpy(name, "QuickSave ");
+			strcpy(name, Strings::QuickSave());
 		} else if (type == SaveInfo::Type::CRASHSAVE) {
-			strcpy(name, "CrashSave ");
+			strcpy(name, Strings::CrashSave());
 		} else {
-			strcpy(name, "Save ");
+			strcpy(name, Strings::Save());
 		}
 		size_t len = strlen(name);
 		if (strftime(name + len, sizeof(name) - len, "%F %T", localtime(&t)) == 0) {
@@ -478,10 +513,48 @@ void GameDat::save_gamedat(SaveInfo::Type type, const char* savename) {
 		savename = name;
 	}
 
-	std::string fname = get_save_filename(index, type);    // Set up name.
-	save_gamedat(fname.c_str(), savename);
+	std::pmr::string fname = get_save_filename(index, type);    // Set up name.
+	save_gamedat(fname, savename);
+}
 
-	// Update save_info
+std::shared_future<void>& GameDat::save_gamedat_async(
+		std::variant<SaveInfo::Type, const char*> type_or_filename, const char* savename) {
+	// Lock gamedat in memory during save
+	std::unique_lock gimlock(gamedat_in_memory.get_mutex());
+
+	// Always Make a copy of savename in gamedat memory pool just in case
+	GamedatInMemory::pool_t::Deleter<char[]> savename_deleter;
+	savename = gamedat_in_memory.pool.strdup(savename, savename_deleter);
+
+	const char**      p_filename = std::get_if<const char*>(&type_or_filename);
+	std::pmr::string* filename
+			= p_filename && *p_filename ? gamedat_in_memory.pool.new_object<std::pmr::string>(*p_filename) : nullptr;
+	SaveInfo::Type type = !p_filename ? std::get<SaveInfo::Type>(type_or_filename) : SaveInfo::Type::UNKNOWN;
+
+	// Future of async save in progress or last save
+	static std::shared_future<void> save_future = {};
+
+	// Wait for last save to finish
+	if (save_future.valid()) {
+		save_future.wait();
+	}
+	gimlock.unlock();
+	save_future = std::async(std::launch::async, [this, type, savename, savename_deleter, filename]() {
+		try {
+			std::cout << "Starting async gamedat save..." << std::endl;
+			if (type != SaveInfo::Type::UNKNOWN) {
+				save_gamedat(type, savename);
+			} else if (filename) {
+				save_gamedat(*filename, savename);
+			}
+			std::cout << "Finished async gamedat save." << std::endl;
+		} catch (const std::exception& e) {
+			std::cerr << "Error saving gamedat async: " << e.what() << std::endl;
+		}
+		savename_deleter(const_cast<char*>(savename));
+	});
+
+	return save_future;
 }
 
 void GameDat::ResortSaveInfos() {
@@ -490,7 +563,14 @@ void GameDat::ResortSaveInfos() {
 	std::lock_guard lock(save_info_mutex);
 
 	if (save_infos.size()) {
-		std::sort(save_infos.begin(), save_infos.end());
+		saveinfo_future = std::async(std::launch::async, [this]() {
+			std::lock_guard lock2(save_info_mutex);
+			try {
+				std::sort(save_infos.begin(), save_infos.end());
+			} catch (const std::exception& e) {
+				std::cerr << "Error resorting save infos: " << e.what() << std::endl;
+			}
+		});
 	}
 }
 
@@ -499,6 +579,9 @@ void GameDat::ResortSaveInfos() {
  */
 void GameDat::read_save_infos() {
 	std::lock_guard lock(save_info_mutex);
+
+	// wait for the memory lock to be released
+	std::unique_lock memlock(gamedat_in_memory.get_mutex());
 
 	char mask[256];
 	snprintf(mask, sizeof(mask), SAVENAME2, GAME_BG ? "bg" : GAME_SI ? "si" : "dev");
@@ -575,6 +658,8 @@ void GameDat::read_save_infos() {
 	if (save_infos.size()) {
 		std::sort(save_infos.begin(), save_infos.end());
 	}
+
+	gamedat_in_memory.disable();
 }
 
 void GameDat::read_save_infos_async(bool force) {
@@ -616,7 +701,7 @@ void GameDat::write_saveinfo(bool screenshot) {
 	const int party_size = partyman->get_count() + 1;
 
 	{
-		OFileDataSource out(GSAVEINFO);    // Open file; throws an exception - Don't care
+		auto out = Open_ODataSource(GSAVEINFO);
 
 		const time_t t        = time(nullptr);
 		tm*          timeinfo = localtime(&t);
@@ -678,32 +763,42 @@ void GameDat::write_saveinfo(bool screenshot) {
 		}
 	}
 
+	// Delete any existing screenshot
+	if (U7exists(GSCRNSHOT)) {
+		// Delete the old one if it exists
+		U7remove(GSCRNSHOT);
+	}
 	if (screenshot) {
 		std::cout << "Creating screenshot for savegame" << std::endl;
 		// Save Shape
-		std::unique_ptr<Shape_file> map = gwin->create_mini_screenshot();
-		// Open file; throws an exception - Don't care
-		OFileDataSource out(GSCRNSHOT);
-		map->save(&out);
-	} else if (U7exists(GSCRNSHOT)) {
-		// Delete the old one if it exists
-		U7remove(GSCRNSHOT);
+		try {
+			std::unique_ptr<Shape_file> map = gwin->create_mini_screenshot();
+			ODataSourceFileOrVector     out = Open_ODataSource(GSCRNSHOT);
+
+			map->save(&out);
+		} catch (const std::exception& e) {
+			std::cerr << "Error creating screenshot: " << e.what() << std::endl;
+			// delete partial screenshot if there was an error
+			U7remove(GSCRNSHOT);
+		}
 	}
 
 	{
 		// Current Exult version
-		// Open file; throws an exception - Don't care
-		auto out_stream = U7open_out(GEXULTVER);
-		if (out_stream) {
-			getVersionInfo(*out_stream);
+		{
+			auto stream = Open_ostream(GEXULTVER);
+
+			if (!stream || !stream->good()) {
+				return;
+			}
+			getVersionInfo(*stream);
+			stream->flush();
 		}
 	}
 
-	// Exult version that started this game
-	if (!U7exists(GNEWGAMEVER)) {
-		OFileDataSource out(GNEWGAMEVER);
-		const string    unkver("Unknown");
-		out.write(unkver);
+	// Exult version that started this game is missing
+	if (!fileExists(GNEWGAMEVER)) {
+		Open_ODataSource(GNEWGAMEVER).write("Unknown");
 	}
 }
 
@@ -796,6 +891,10 @@ bool GameDat::read_saveinfo(IDataSource* in, SaveGame_Details& details, std::vec
 	}
 	details.good = true;
 	return true;
+}
+
+bool GameDat::fileExists(const std::pmr::string& fname) {
+	return (gamedat_in_memory.active && gamedat_in_memory.files->find(fname) != gamedat_in_memory.files->end()) || U7exists(fname);
 }
 
 bool GameDat::get_saveinfo(
@@ -1034,11 +1133,11 @@ bool GameDat::get_saveinfo_zip(
 		unzReadCurrentFile(unzipfile, buf.data(), file_info.uncompressed_size);
 		if (unzCloseCurrentFile(unzipfile) == UNZ_OK) {
 			IBufferDataView ds(buf.data(), buf.size());
-			read_saveinfo(&ds, details, party);
+			return read_saveinfo(&ds, details, party);
 		}
 	}
 
-	return true;
+	return false;
 }
 
 // Level 2 Compression
@@ -1271,21 +1370,53 @@ bool GameDat::restore_gamedat_zip(const char* fname    // Name of savegame file.
 }
 
 // Level 1 Compression
-bool GameDat::Save_level1(zipFile& zipfile, const char* fname, bool required) {
-	IFileDataSource ds(fname);
-	if (!ds.good()) {
-		if (Game::is_editing() || !required) {
-			return false;    // Newly developed game. or file is not required
+bool GameDat::Save_level1(zipFile& zipfile, const std::pmr::string& fname, bool required) {
+	IFileDataSource ds;
+	auto*           vec = get_memory_file(fname, false);
+
+	if (!vec) {
+		ds = IFileDataSource(U7open_in(fname));
+		if (!ds.good()) {
+			if (Game::is_editing() || !required) {
+				return true;    // Newly developed game. or file is not
+								// required. Missing file is ok.
+			}
+			throw file_read_exception(fname);
 		}
-		throw file_read_exception(fname);
+		// std::cout << "Saving file " << fname << " size " << ds.getSize()
+		//	  << " reading from disk."
+		//   << std::endl;
 	}
 
-	const size_t size = ds.getSize();
-	const auto   buf  = ds.readN(size);
+	const size_t size = vec ? vec->size() : ds.getSize();
+	if (size > 0xFFFFFFFF) {
+		throw file_read_exception(fname);    // File too large for zip file
+	}
 
-	zipOpenNewFileInZip(zipfile, remove_dir(fname), nullptr, nullptr, 0, nullptr, 0, nullptr, Z_DEFLATED, Z_BEST_COMPRESSION);
+	if (zipOpenNewFileInZip(
+				zipfile, remove_dir(fname.c_str()), nullptr, nullptr, 0, nullptr, 0, nullptr, Z_DEFLATED, Z_BEST_COMPRESSION)
+		!= ZIP_OK) {
+		return false;
+	}
 
-	zipWriteInFileInZip(zipfile, buf.get(), size);
+	if (vec) {
+		zipWriteInFileInZip(zipfile, vec->data(), vec->size());
+	} else {
+		for (size_t readsofar = 0; readsofar < size;) {
+			const size_t towrite = std::min(size - readsofar, MAX_SAVE_BUFFER);
+			if (!towrite) {
+				break;
+			}
+			ds.read(gamedat_in_memory.save_buffer.get(), towrite);
+			if (ds.fail()) {
+				return false;
+			}
+			if (zipWriteInFileInZip(zipfile, gamedat_in_memory.save_buffer.get(), towrite) != ZIP_OK) {
+				return false;
+			}
+			readsofar += towrite;
+		}
+	}
 
 	return zipCloseFileInZip(zipfile) == ZIP_OK;
 }
@@ -1306,46 +1437,62 @@ bool GameDat::Begin_level2(zipFile& zipfile, int mapnum) {
 	return zipOpenNewFileInZip(zipfile, oname, nullptr, nullptr, 0, nullptr, 0, nullptr, Z_DEFLATED, Z_BEST_COMPRESSION) == ZIP_OK;
 }
 
-bool GameDat::Save_level2(zipFile& zipfile, const char* fname) {
-	IFileDataSource ds(fname);
-	if (!ds.good()) {
-		if (Game::is_editing()) {
-			return false;    // Newly developed game.
+bool GameDat::Save_level2(zipFile& zipfile, const std::pmr::string& fname, bool required) {
+	IFileDataSource ds;
+	auto*           vec = get_memory_file(fname, false);
+
+	if (!vec) {
+		ds = IFileDataSource(U7open_in(fname));
+		if (!ds.good()) {
+			if (Game::is_editing() || !required) {
+				return true;    // Newly developed game. or file is not
+								// required. Missing file is ok.
+			}
+			throw file_read_exception(fname);
 		}
-		throw file_read_exception(fname);
 	}
 
-	const size_t      size = ds.getSize();
-	std::vector<char> buf(std::max<size_t>(13, size), 0);
+	const size_t size = vec ? vec->size() : ds.getSize();
+	if (size > 0xFFFFFFFF) {
+		throw file_read_exception(fname);    // File too large for level 2 compression
+	}
 
 	// Filename first
-	const char* fname2 = strrchr(fname, '/');
-	if (!fname2) {
-		fname2 = strchr(fname, '\\');
+	std::memset(gamedat_in_memory.save_buffer.get(), 0, 12);
+	get_filename_from_path(fname).copy(gamedat_in_memory.save_buffer.get(), 12);
+
+	if (zipWriteInFileInZip(zipfile, gamedat_in_memory.save_buffer.get(), 12) != ZIP_OK) {
+		return false;
 	}
-	if (fname2) {
-		fname2++;
-	} else {
-		fname2 = fname;
-	}
-	strncpy(buf.data(), fname2, 13);
-	int err = zipWriteInFileInZip(zipfile, buf.data(), 12);
 
 	// Size of the file
-	if (err == ZIP_OK) {
-		// Must be platform independent
-		auto* ptr = buf.data();
-		little_endian::Write4(ptr, size);
-		err = zipWriteInFileInZip(zipfile, buf.data(), 4);
+	// Must be platform independent
+	auto* ptr = gamedat_in_memory.save_buffer.get();
+	little_endian::Write4(ptr, size);
+	if (zipWriteInFileInZip(zipfile, ptr, 4) != ZIP_OK) {
+		return false;
 	}
 
-	// Now the actual file
-	if (err == ZIP_OK) {
-		ds.read(buf.data(), size);
-		err = zipWriteInFileInZip(zipfile, buf.data(), size);
+	if (vec) {
+		zipWriteInFileInZip(zipfile, vec->data(), vec->size());
+	} else {
+		for (size_t readsofar = 0; readsofar < size;) {
+			const size_t towrite = std::min(size - readsofar, MAX_SAVE_BUFFER);
+			if (!towrite) {
+				break;
+			}
+			ds.read(gamedat_in_memory.save_buffer.get(), towrite);
+			if (ds.fail()) {
+				return false;
+			}
+			if (zipWriteInFileInZip(zipfile, gamedat_in_memory.save_buffer.get(), towrite) != ZIP_OK) {
+				return false;
+			}
+			readsofar += towrite;
+		}
 	}
 
-	return err == ZIP_OK;
+	return true;
 }
 
 bool GameDat::End_level2(zipFile& zipfile) {
@@ -1364,8 +1511,8 @@ bool GameDat::End_level2(zipFile& zipfile) {
 }
 
 bool GameDat::save_gamedat_zip(
-		const char* fname,      // File to create.
-		const char* savename    // User's savegame name.
+		const std::pmr::string& fname,      // File to create.
+		const char*             savename    // User's savegame name.
 ) {
 	char iname[128];
 	// If no compression return
@@ -1382,17 +1529,22 @@ bool GameDat::save_gamedat_zip(
 	}
 
 	// Name
-	{
-		auto out = U7open_out(fname);
-		if (out) {
-			std::string title(savename);
-			title.resize(0x50, '\0');
-			out->write(title.data(), title.size());
+
+	auto out = U7open_out(fname);
+	if (out) {
+		std::string title(savename);
+		title.resize(0x50, '\0');
+		out->write(title.data(), title.size());
+		if (!out->good()) {
+			throw file_write_exception(fname);
 		}
 	}
 
-	const auto filestr = get_system_path(fname);
-	zipFile    zipfile = zipOpen(filestr.c_str(), 1);
+	zipFile zipfile = zipOpen(std::allocate_shared<OFileDataSource>(std::pmr::polymorphic_allocator<char>(), std::move(out)));
+
+	if (!zipfile) {
+		throw file_write_exception(fname.c_str());
+	}
 
 	// We need to explicitly save these as they are no longer included in
 	// savefiles span and they should always be stored first and as level 1
@@ -1419,8 +1571,9 @@ bool GameDat::save_gamedat_zip(
 				// Check to see if the ireg exists before trying to
 				// save it; prevents crash when creating new maps
 				// for existing games
-				if (U7exists(map->get_schunk_file_name(U7IREG, schunk, iname))) {
-					if (!Save_level1(zipfile, iname)) {
+				std::pmr::string iname_pmr(map->get_schunk_file_name(U7IREG, schunk, iname));
+				if (fileExists(iname_pmr)) {
+					if (!Save_level1(zipfile, iname_pmr)) {
 						throw file_write_exception(fname);
 					}
 				}
@@ -1455,8 +1608,9 @@ bool GameDat::save_gamedat_zip(
 				// Check to see if the ireg exists before trying to
 				// save it; prevents crash when creating new maps
 				// for existing games
-				if (U7exists(map->get_schunk_file_name(U7IREG, schunk, iname))) {
-					if (!Save_level2(zipfile, iname)) {
+				std::pmr::string iname_pmr(map->get_schunk_file_name(U7IREG, schunk, iname));
+				if (fileExists(iname_pmr)) {
+					if (!Save_level2(zipfile, iname_pmr)) {
 						throw file_write_exception(fname);
 					}
 				}
@@ -1471,79 +1625,475 @@ bool GameDat::save_gamedat_zip(
 	if (zipfile.close(savename) != ZIP_OK) {
 		throw file_write_exception(fname);
 	}
-
+	read_save_infos_async(true);
 	return true;
 }
 
 #endif
 
 void GameDat::MakeEmergencySave(const char* savename) {
-	// Using mostly std::filesystem here insteaf of U7 functions to avoid
-	// repeated looking up paths
-
 	// Set default savegame name
 	if (!savename) {
-		savename = "Crash Save";
+		savename = "";
 	}
 	std::cerr << "Trying to create an emergency save named \"" << savename << "\"" << std::endl;
 
-	// Get the gamedat path and the crashtemp path
-	std::string gamedatpath(get_system_path("<GAMEDAT>"));
-	std::string crashtemppath(get_system_path("<GAMEDAT>.crashtemp"));
+	// Write out current gamestate to gamedat in memory
+	// Making the Screenshot necessaily uses unique_ptrs and can't allocate it
+	// with the temporary allocator so as the process is unstable we skip making
+	// the screenshot
+	writetoMemory(false, true, false);
 
-	// change <GAMEDAT> to point to crashtemp
-	add_system_path("<GAMEDAT>", crashtemppath);
-
-	// Remove old crashtemp if it exists
-	std::filesystem::remove_all(crashtemppath);
-
-	// create dorectory for crashtemp
-	std::filesystem::create_directory(crashtemppath);
-
-	// Copy the files from gamedat to crashtemp by iterating the directory
-	// manually so we can continue on failure
-	// std::filesystem::copy_all crashes on the exultserver file
-	for (const auto& entry : std::filesystem::directory_iterator(gamedatpath)) {
-		auto newpath = crashtemppath + "/" + entry.path().filename().string();
-
-		// Copy files ignoring errors
-		std::error_code ec;
-		std::filesystem::copy_file(entry.path(), newpath, ec);
-	}
-
-	// Write out current gamestate to gamedat
-	std::cerr << " attempting to save current gamestate to gamedat" << std::endl;
-	gwin->write(true);
-
-	// save it as the save
-	std::cerr << " attempting to save gamedat as \"" << savename << "\"" << std::endl;
 	save_gamedat(SaveInfo::Type::CRASHSAVE, savename);
-
-	// Remove crashtemp
-	std::filesystem::remove_all(crashtemppath);
-
-	// Put <GAMEDAT> back to how it was
-	add_system_path("<GAMEDAT>", gamedatpath);
 }
 
 GameDat::GameDat() {}
 
+std::future<void> GameDat::writetoMemory(bool todisk, bool nopaint, bool screenshot) {
+	// Promise to return if no waiting for disk writeneeded
+	std::promise<void> p;
+	p.set_value();
+#ifdef DEBUG
+	std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
+#endif
+	// Save it all to memory first
+	if (cheat.in_map_editor()) {
+		// In map editor, just do normal write
+		gwin->write(true);
+		GameDat::get()->write_saveinfo(screenshot);
+		return p.get_future();
+	}
+
+	std::unique_lock memlock(gamedat_in_memory.get_mutex());
+	// Starting save so clear
+	gamedat_in_memory.enable();
+
+	gwin->write(nopaint);
+	write_saveinfo(screenshot);
+
+#ifdef DEBUG
+	std::chrono::steady_clock::time_point end_time        = std::chrono::steady_clock::now();
+	std::chrono::duration<double>         elapsed_seconds = end_time - start_time;
+	std::cerr << "Gamedat saved to memory in " << elapsed_seconds.count() << " seconds\n";
+#endif
+	if (todisk) {
+		// Unlock so the async thread doesn't immediately block assming our caller doesn't also hold the lock
+		// If caller holds the lock they will deadlock if they wait on the future before releasing the lock
+		memlock.unlock();
+		// Now write it all out to disk in a separate thread
+		return std::async(std::launch::async, [this]() {
+			std::unique_lock memlock(gamedat_in_memory.get_mutex());
+			if (gamedat_in_memory.active) {
+#ifdef DEBUG
+				std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
+#endif
+				// Write out all files to disk
+				std::pmr::string fname_str;
+				for (const auto& [fname, data] : *(gamedat_in_memory.files)) {
+					fname_str = fname;
+					auto out  = U7open_out(fname_str, false);
+					if (out->good()) {
+						out->write(reinterpret_cast<const char*>(data.data()), data.size());
+					}
+				}
+#ifdef DEBUG
+				std::chrono::steady_clock::time_point end_time        = std::chrono::steady_clock::now();
+				std::chrono::duration<double>         elapsed_seconds = end_time - start_time;
+				std::cerr << "Gamedat saved to disk in " << elapsed_seconds.count() << " seconds\n";
+#endif
+			}
+		});
+	}
+	return p.get_future();
+}
+
+std::pmr::vector<unsigned char>* GameDat::get_memory_file(std::pmr::string fname, bool create) {
+	if (!gamedat_in_memory.mutex.try_lock()) {
+		// Another thread accessing gamedat in memory; disallow access
+		return nullptr;
+	}
+
+	std::lock_guard lock(gamedat_in_memory.mutex, std::adopt_lock);
+
+	if (!gamedat_in_memory.active) {
+		return nullptr;
+	}
+	// Must be a gamedat file
+	if (Pentagram::strncasecmp(fname.c_str(), GAMEDAT, std::size(GAMEDAT) - 1)) {
+		return nullptr;
+	}
+	auto it = gamedat_in_memory.files->find(fname);
+	if (it != gamedat_in_memory.files->end()) {
+		return &it->second;
+	}
+	if (!create) {
+		return nullptr;
+	}
+
+	auto vec = &(gamedat_in_memory.files->emplace(std::move(fname), std::pmr::vector<unsigned char>()).first->second);
+
+	vec->reserve(gamedat_in_memory.initial_vcapacity);
+	return vec;
+}
+
+template <size_t pool_size>
+void GameDat::GamedatInMemory::BlockPoolResource<pool_size>::release() {
+#ifdef DEBUG
+	if (allocated != 0) {
+		std::cout << "Warning: allocated was " << allocated << " when BlockPoolResource::release() was called" << std::endl;
+	}
+#endif
+	high_water_mark = 0;
+	free_list.size  = 0;
+	allocated       = 0;
+	// Freelist is circular so when empty the start node points to itself in both direction
+	free_list.next = free_list.prev = &free_list;
+
+	// Create a block covering the whole range
+
+	uintptr new_block_addr = AlignAddress(uintptr(buffer) + pool_size - sizeof(Block), alignof(Block), false);
+
+	Block* block = new (reinterpret_cast<void*>(new_block_addr)) Block(new_block_addr - uintptr(buffer));
+
+	// Put the block in the free list
+	free_list.Insert(block);
+
+	// Preallocate some small blocks to avoid fragmentation
+	for (int i = 0; i < 256; ++i) {
+		// Shrink block by 64 bytes and split off a new block
+		block->ShrinkAndSplit(block->size - (64 + sizeof(Block)), 0);
+	}
+}
+
+template <size_t pool_size>
+char* GameDat::GamedatInMemory::BlockPoolResource<pool_size>::strdup(const char* src, Deleter<char[]>& deleter) {
+	if (!src) {
+		return nullptr;
+	}
+	const size_t len = strlen(src);
+
+	char* copy = new_array<char>(len + 1, false);
+	memcpy(copy, src, len + 1);
+	deleter = Deleter<char[]>(this, len + 1);
+	return copy;
+}
+
+template <size_t pool_size>
+uintptr GameDat::GamedatInMemory::BlockPoolResource<pool_size>::Block::ShrinkAndSplit(size_t new_size, size_t new_alignment) {
+	if (new_size > size) {
+		throw std::invalid_argument("new_size is larger than current size");
+	}
+
+	if (!is0orPow2(new_alignment)) {
+		throw std::invalid_argument("alignment is not a power of 2");
+	}
+
+	uintptr newaddr = GetAlignedAddressForBlockBuffer(new_size, new_alignment);
+	if (!newaddr) {
+		return 0;
+	}
+
+	uintptr origaddr = uintptr(this) - size;
+	new_size         = uintptr(this) - newaddr;
+
+	uintptr new_block = AlignAddress(newaddr - sizeof(Block), alignof(Block), false);
+
+	size_t new_block_size = new_block > origaddr ? new_block - origaddr : 0;
+
+	// There is enough space for a new block
+	if (new_block_size > minsplit) {
+		size  = new_size;
+		check = calculate_check();
+		Insert(new (reinterpret_cast<void*>(new_block)) Block(new_block_size), false);
+
+	} else {
+		// Not enough space for a new block leave existing unchanged
+	}
+	return newaddr;
+}
+
+template <size_t pool_size>
+bool GameDat::GamedatInMemory::BlockPoolResource<pool_size>::Block::TryMergeBlocks(Block* block1, Block* block2) {
+	// Make sure actually have valid blocks as input
+	if (!block1 || !block2 || block1 == block2 || !block1->size || !block2->size) {
+		return false;
+	}
+
+	uintptr end1   = uintptr(block1) + sizeof(Block);
+	uintptr start2 = uintptr(block2) - block2->size;
+
+	// Block2's buffer is directly after Block1 so we can resize block2 to include all of block1
+	if (end1 == start2) {
+		// Insert 2 after 1
+		if (!block1->Insert(block2, false)) {
+			block2->Insert(block1, true);
+		}
+
+		block2->size += block1->size + sizeof(Block);
+		block2->check = block2->calculate_check();
+
+		// Explicitly Call destructor ending lifetime of block1
+		// This probably doesn't need to be done but it is a good idea to avoid UB when the buffer is reused and it cleans up the
+		// list pointers
+		block1->~Block();
+
+		// Try to merge this block with the previous one or if that failed try merging with the next
+		if (!TryMergeBlocks(block2->prev, block2)) {
+			TryMergeBlocks(block2, block2->next);
+		}
+		return true;
+	}
+	return false;
+}
+
+template <size_t pool_size>
+typename GameDat::GamedatInMemory::BlockPoolResource<pool_size>::Block* GameDat::GamedatInMemory::BlockPoolResource<
+		pool_size>::Block::FromAddress(uintptr addr, size_t size, size_t alignment) {
+	// The block is at the aligned address after the end of the buffer
+	Block* block = reinterpret_cast<Block*>(AlignAddress(addr + size, std::max(alignment, alignof(Block)), true));
+
+	assert(block->validate_check());
+
+	// Just a simple check block's size should always be bigger or equal than the buffer size
+	if (block->size < size) {
+		throw std::invalid_argument("block->size < size");
+	}
+	return block;
+}
+
+template <size_t pool_size>
+uintptr GameDat::GamedatInMemory::BlockPoolResource<pool_size>::Block::GetAlignedAddressForBlockBuffer(
+		size_t size, size_t alignment) {
+	// Make sure block is big enough and required alignment is valid
+	if (size > this->size) {
+		return 0;
+	}
+
+	if (!is0orPow2(alignment)) {
+		return 0;
+	}
+	uintptr bufstartaddr = uintptr(this) - size;
+	// Fix alignment problems here if bufstartaddr isn't aligned
+	uintptr aligned = AlignAddress(bufstartaddr, std::max(alignment, alignof(Block)), false);
+
+	// Make sure there is enough space left after alignmet
+	size_t actual_size = uintptr(this) - aligned;
+
+	// Actual_size must be not be larger than the actual buffer size
+	if (actual_size > this->size) {
+		return 0;
+	}
+
+	uintptr_t check = AlignAddress(aligned + size, alignof(Block), true);
+
+	// Pointer to block must be recoverable from the aligned address of the buffer pointer added to the size of the requested buffer
+	// size
+	assert(check == uintptr(this));
+
+	return aligned;
+}
+
+template <size_t pool_size>
+void* GameDat::GamedatInMemory::BlockPoolResource<pool_size>::do_allocate(size_t bytes, size_t alignment) {
+	// One thread at a time
+	auto lock = std::lock_guard(mutex);
+
+	// Non power of 2 alignment is not allowed but don't care if bytes is not a
+	// multiple of alignment
+	if (!is0orPow2(alignment)) {
+		return nullptr;
+	}
+	// If size is zero actually allocate alignnment bytes or 1 if alignment is 0
+	if (bytes == 0) {
+		bytes = std::max<size_t>(alignment, 1);
+	}
+
+	Block* smallest = nullptr;
+	for (Block* b = free_list.next; b != &free_list; b = b->next) {
+		if (!smallest || (b->size < smallest->size && b->size >= bytes)) {
+			if (b->GetAlignedAddressForBlockBuffer(bytes, alignment)) {
+				smallest = b;
+			}
+		}
+	}
+
+	// Didn't find a free block big enough, try next in chain, allocating it if needed
+	if (!smallest) {
+		// Desired size is larger than maximum allowed by next in chain
+		if (bytes > next_size) {
+			// Can't satisfy large allocation
+			throw std::bad_alloc();
+		}
+		if (!next_in_chain) {
+			// Create next in chain
+			std::cout << "BufferPoolResource: Creating next in "
+						 "chain of size "
+					  << next_size << " bytes" << std::endl;
+			next_in_chain = std::make_unique<BlockPoolResource<next_size>>();
+		}
+		return next_in_chain->allocate(bytes, alignment);
+	}
+	// We only track how much we actually allocated
+	allocated += bytes;
+	high_water_mark = std::max(high_water_mark, allocated);
+	uintptr aligned = smallest->ShrinkAndSplit(bytes, alignment);
+	if (!aligned) {
+		return nullptr;
+	}
+	smallest->RemoveThis();
+	return reinterpret_cast<void*>(aligned);
+}
+
+template <size_t pool_size>
+void GameDat::GamedatInMemory::BlockPoolResource<pool_size>::do_deallocate(void* p, size_t bytes, size_t alignment) {
+	// One thread at a time
+	auto lock = std::lock_guard(mutex);
+
+	// If size is zero actually allocated alignnment bytes or 1 if alignment is 0
+	if (bytes == 0) {
+		bytes = std::max<size_t>(alignment, 1);
+	}
+
+	// the incoming pointer is from us
+	if (is_from_this(p, false)) {
+		// Lookup the block for the incoming pointer
+		Block* block = Block::FromAddress(uintptr_t(p), bytes, alignment);
+
+		if (!block) {
+			std::cerr << "Failed to get block from address." << std::endl;
+			// Not allowed to throw in deallocate functions so abort
+			std::abort();
+		}
+		allocated -= bytes;
+
+		// Go through free and try to merge this block with all of them.
+		bool forward = bytes > 64;
+		for (Block* b = forward ? free_list.next : free_list.prev; b != &free_list; b = forward ? b->next : b->prev) {
+			if (Block::TryMergeBlocks(b, block)) {
+				// Blocks merged so return immediately
+				return;
+			}
+		}
+		// Got here couldn't merge the block, just add it to the free list small blocks added to end, big blocks to start
+		free_list.Insert(block, !forward);
+	} else if (next_in_chain) {
+		next_in_chain->deallocate(p, bytes, alignment);
+	}
+}
+
+template <size_t pool_size>
+GameDat::GamedatInMemory::BlockPoolResource<pool_size>::BlockPoolResource() {
+	auto lock = std::lock_guard(mutex);
+	release();
+}
+
+// Explicit template instantiations
+template class GameDat::GamedatInMemory::BlockPoolResource<GameDat::GamedatInMemory::pool_size>;
+template class GameDat::GamedatInMemory::BlockPoolResource<
+		GameDat::GamedatInMemory::BlockPoolResource<GameDat::GamedatInMemory::pool_size>::next_size>;
+
+GameDat::GamedatInMemory::GamedatInMemory() : pool(), active(false), files(), save_buffer() {
+#if 0
+	mt_test();
+#endif
+}
+
+void GameDat::GamedatInMemory::clear() {
+	std::unique_lock lock(mutex);
+#ifdef DEBUG
+	if (active) {
+		std::cout << "GamedatInMemory::clear() high water mark was " << pool.get_high_water_mark() << std::endl;
+	}
+
+#endif
+	disable();
+
+	save_buffer.reset();
+	files.reset();
+
+	// Release all the pool memory. No one should be using it at this point.
+	pool.release();
+
+	// Recreate the files map and save buffer
+
+	files       = pool.make_unique<std::pmr::unordered_map<std::pmr::string, std::pmr::vector<unsigned char>>>(&pool);
+	save_buffer = pool.make_unique_for_overwrite<char[]>(MAX_SAVE_BUFFER);
+}
+
+bool GameDat::GamedatInMemory::enable() {
+	if (!mutex.try_lock()) {
+		// Another thread accessing gamedat in memory; disallow access
+		return false;
+	}
+
+	std::lock_guard lock(mutex, std::adopt_lock);
+
+	// Already active do nothing return success
+	if (active) {
+		return true;
+	}
+
+	// Clear everything before enabling
+	clear();
+	std::pmr::set_default_resource(&pool);
+	active = true;
+	return true;
+}
+
+void GameDat::GamedatInMemory::disable() {
+	std::unique_lock lock(mutex);
+
+	// Reset the default resource back to the runitme default
+	std::pmr::set_default_resource(nullptr);
+	active = false;
+}
+
+void GameDat::GamedatInMemory::mt_test() {
+	std::pmr::vector<std::future<void>> futures;
+
+	for (int j = 0; j < 256; j += 16) {
+		auto p = pool.allocate(j, 8);
+		pool.deallocate(p, j, 8);
+	}
+	for (int i = 0; i < 3; i++) {
+		futures.emplace_back(std::async([]() {
+			for (int j = 0; j < 65536; j++) {
+				std::pmr::string str;
+				str.resize(j, ' ');
+			}
+		}));
+	}
+	enable();
+
+	for (auto& f : futures) {
+		f.wait();
+	}
+	clear();
+	disable();
+}
+
 void GameDat::Quicksave() {
-	gwin->write();
-	save_gamedat(SaveInfo::Type::QUICKSAVE, nullptr);
+	gamedat_in_memory.clear();
+	auto f = writetoMemory(true, false, true);
+
+	save_gamedat_async(SaveInfo::Type::QUICKSAVE, "").wait();
+	f.wait();
 }
 
-void GameDat::Savegame(const char* fname, const char* savename) {
-	gwin->write();
-	save_gamedat(fname, savename);
+void GameDat::Savegame(const char* fname, const char* savename, bool no_paint, bool screenshot) {
+	auto f = writetoMemory(true, no_paint, screenshot);
+	save_gamedat_async(fname, savename).wait();
+	f.wait();
 }
 
-void GameDat::Savegame(const char* savename) {
-	gwin->write();
-	save_gamedat(SaveInfo::Type::REGULAR, savename);
+void GameDat::Savegame(const char* savename, bool no_paint, bool screenshot) {
+	auto f = writetoMemory(true, no_paint, screenshot);
+	save_gamedat_async(SaveInfo::Type::REGULAR, savename).wait();
+	f.wait();
 }
 
 void GameDat::Extractgame(const char* fname, bool doread) {
+	gamedat_in_memory.clear();
 	// Only restore if a filename is given
 	if (fname && *fname) {
 		restore_gamedat(fname);
@@ -1552,6 +2102,7 @@ void GameDat::Extractgame(const char* fname, bool doread) {
 	if (doread) {
 		gwin->read();
 	}
+	gamedat_in_memory.clear();
 }
 
 // Move Costructor from a std::string filename

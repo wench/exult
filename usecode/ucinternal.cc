@@ -44,6 +44,7 @@
 #include "fnames.h"
 #include "font_map.h"
 #include "game.h"
+#include "gamedat.h"
 #include "gamemap.h"
 #include "gamewin.h"
 #include "ios_state.hpp"
@@ -3177,11 +3178,13 @@ void Usecode_internal::write() {
 
 	{
 		compact_global_flags();
-		OFileDataSource out(FLAGINIT);
+		auto out = gamedat->Open_ODataSource(FLAGINIT);
+
 		out.write(gflags.data(), gflags.size());
 	}
 	{
-		OFileDataSource out(USEDAT);
+		auto out = gamedat->Open_ODataSource(USEDAT);
+
 		out.write2(partyman->get_count());    // Write party.
 		for (int i = 0; i < EXULT_PARTY_MAX; i++) {
 			out.write2(partyman->get_member(i));
@@ -3202,7 +3205,7 @@ void Usecode_internal::write() {
 		out.write2(saved_map);    // Write saved map.
 	}
 	// Static variables. 1st, globals.
-	OFileDataSource nfile(USEVARS);
+	auto nfile = gamedat->Open_ODataSource(USEVARS);
 	nfile.write4(statics.size());    // # globals.
 	for (auto& it : statics) {
 		if (!it.save(&nfile)) {

@@ -451,6 +451,12 @@
 0x6DE:Real Time
 0x6DF: Name
 
+#Gamedat
+0x6E1:AutoSave 
+0x6E2:QuickSave 
+0x6E3:CrashSave 
+0x6E4:Save 
+
 #Misc
 # SI copy protection failed
 0x6F0:Oink!
