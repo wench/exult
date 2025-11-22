@@ -118,7 +118,7 @@ void Flex::index_file() {
 		f.offset = data->read4() + start_pos;
 		f.size   = data->read4();
 #if DEBUGFLEX
-		cout << "Item " << c << ": " << f.size << " bytes @ " << f.offset
+		cout << "Item " << c << ": " << f.count << " bytes @ " << f.offset
 			 << endl;
 #endif
 		object_list.push_back(f);
@@ -158,14 +158,19 @@ Flex_writer::Flex_writer(
 		ODataSource&     o,        ///< Where to write.
 		const char*            title,    ///< Flex title.
 		size_t                 cnt,      ///< Number of entries we'll write.
-		Flex_header::Flex_vers vers      ///< Version of flex file.
-		)
+		Flex_header::Flex_vers vers,     ///< Version of flex file.
+		uint8*                 buffer )
 		: dout(o), count(cnt), start_pos(dout.getPos()) {
 	// Write out header.
 	Flex_header::write(&dout, title, count, vers);
 	// Create table.
-	table     = std::make_unique<uint8[]>(2 * count * 4);
-	tptr      = table.get();
+	if (buffer) {
+		table = buffer;
+	} else {
+		uptable = std::make_unique<uint8[]>(2 * count * 4);
+		table =  uptable.get();
+	}
+	tptr      = table;            // Pointer into table.
 	cur_start = dout.getPos();    // Store start of 1st entry.
 }
 
@@ -181,9 +186,10 @@ void Flex_writer::flush() {
 	if (table) {
 		// Seek to table position offset from start_pos
 		dout.seek(start_pos + Flex_header::FLEX_HEADER_LEN);    																
-		dout.write(table.get(), 2 * count * 4);    // Write table.
+		dout.write(table, 2 * count * 4);    // Write table.
 		dout.flush();
-		table.reset();
+		table = nullptr;
+		uptable.reset();
 		// Restore position in case the flex is nested. cur_start is set to the end of the last object.
 		// which will be the end of this flex file.
 		dout.seek(cur_start);
