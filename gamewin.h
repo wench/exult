@@ -189,7 +189,7 @@ public:
 		return game_window;
 	}
 
-	void abort(const char* msg, ...) ATTR_PRINTF(2, 3);    // Fatal error.
+	[[noreturn]] void abort(const char* msg, ...) ATTR_PRINTF(2, 3);    // Fatal error.
 	/*
 	 *  Display:
 	 */
