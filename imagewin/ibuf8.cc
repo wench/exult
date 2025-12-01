@@ -106,8 +106,26 @@ void Image_buffer8::put(
 		Image_buffer* src,      // Copy from here.
 		int destx, int desty    // Copy to here.
 ) {
-	Image_buffer8::copy8(
-			src->bits, src->get_width(), src->get_height(), destx, desty);
+	//Image_buffer8::copy8(
+	//		src->bits, src->get_width(), src->get_height(), destx, desty);
+
+	int       srcx      = 0;
+	int       srcy      = 0;
+	int       srcw      = src->get_width();
+	int       srch      = src->get_height();
+	const int src_width = src->get_line_width();    // Save full source width.
+	// Constrain to window's space.
+	if (!clip(srcx, srcy, srcw, srch, destx, desty)) {
+		return;
+	}
+
+	uint8*       to   = bits + desty * line_width + destx;
+	const uint8* from = src->get_bits() + srcy * src_width + srcx;
+	while (srch--) {
+		std::memcpy(to, from, srcw);
+		from += src_width;
+		to += line_width;
+	}
 }
 
 /*
