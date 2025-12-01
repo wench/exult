@@ -62,9 +62,6 @@ Boston, MA  02111-1307, USA.
 #	pragma GCC diagnostic pop
 #endif    // __GNUC__
 
-bool SaveIMG_RW(
-		SDL_Surface* saveme, SDL_IOStream* dst, bool freedst, int guardband);
-
 using std::cerr;
 using std::cout;
 using std::endl;
