@@ -450,7 +450,7 @@
 0x6DD:Autosaves write to Gamedat:
 0x6DE:Real Time
 0x6DF: Name
-
+0x6E0:Cheats Used
 #Gamedat
 0x6E1:AutoSave 
 0x6E2:QuickSave 

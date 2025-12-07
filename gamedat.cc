@@ -780,9 +780,9 @@ void GameDat::write_saveinfo(bool screenshot) {
 		out.write2(save_count);
 		out.write1(party_size);
 
-		out.write1(0);    // Unused
+		out.write1(cheat.has_cheated()); 
 
-		out.write1(timeinfo->tm_sec);    // 15
+		out.write1(timeinfo->tm_sec);    
 
 		// Packing for the rest of the structure
 		for (size_t j = offsetof(SaveGame_Details, reserved0);
@@ -864,9 +864,10 @@ void GameDat::write_saveinfo(bool screenshot) {
 void GameDat::read_saveinfo(bool newgame) {
 	// if newgame, reset save count just in case the initgame file contains saveinfo.dat 
 	// U6 mod has one and it should be ignored so save count starts at 0 for players
+	save_count = 0;
+	cheat.set_cheated(false);
 	if (newgame)
 	{
-		save_count = 0;
 		return;
 		// Remove the saveinfo if exists to prevent reading it in the future
 		if (U7exists(GSAVEINFO)) {
@@ -877,8 +878,13 @@ void GameDat::read_saveinfo(bool newgame) {
 	if (ds.good()) {
 		ds.skip(10);    // Skip 10 bytes.
 		save_count = ds.read2();
-	} else {
+		ds.skip(1);
+		cheat.set_cheated(ds.read1() != 0);
+
+	}
+	if (!ds.good()) {
 		save_count = 0;
+		cheat.set_cheated(false);
 	}
 }
 
@@ -908,9 +914,9 @@ bool GameDat::read_saveinfo(
 	details.save_count = in->read2();
 	auto party_size    = in->read1();
 
-	details.unused = in->read1();    // Unused
+	details.cheated = in->read1()!=0;
 
-	details.real_second = in->read1();    // 15
+	details.real_second = in->read1(); 
 
 	// Packing for the rest of the structure
 	in->skip(sizeof(SaveGame_Details) - offsetof(SaveGame_Details, reserved0));
@@ -1060,6 +1066,7 @@ void GameDat::get_saveinfo(
 			// Current Details
 
 			details.save_count = save_count;
+			details.cheated    = cheat.has_cheated();
 
 			auto clock = gwin->get_clock();
 

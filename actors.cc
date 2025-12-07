@@ -1020,6 +1020,13 @@ void Actor::say_hunger_message() {
  */
 
 void Actor::use_food() {
+
+	// If we get here and food cheat is enabled always flag cheats used
+	if (cheat.GetFoodUse() != Cheat::FoodUse::Manual)
+	{
+		cheat.set_cheated();
+	}
+
 	if (get_info().does_not_eat() || (gear_powers & Frame_flags::doesnt_eat)
 		|| cheat.GetFoodUse() == Cheat::FoodUse::Disabled) {
 		return;
