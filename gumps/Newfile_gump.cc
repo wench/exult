@@ -233,6 +233,9 @@ public:
 	static auto Name() {
 		return get_text_msg(0x6DF - msg_file_start);
 	}
+	static auto CheatsUsed() {
+		return get_text_msg(0x6E0 - msg_file_start);
+	}
 };
 
 //
@@ -849,6 +852,12 @@ void Newfile_gump::paint_normal() {
 
 		font->paint_text_box(
 				ibuf, msg, x + 270 - tw / 2, y + 30 - th / 2, tw, th, 0, false,
+				true);
+	}
+	if (details && details->cheated)
+	{
+		sman->paint_text_box(
+				5, Strings::CheatsUsed(), x + 222, y + 54, 96, 8, 0, false,
 				true);
 	}
 	// Draw details background

@@ -120,6 +120,7 @@ void Cheat::init() {
 	std::string cheating;
 	config->value("config/gameplay/cheat", cheating, "no");
 	enabled = cheating == "yes";
+	cheated = false;
 
 	std::string feeding;
 	config->value("config/gameplay/feeding", feeding, "manual");
@@ -157,6 +158,7 @@ void Cheat::toggle_god() {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	god_mode = !god_mode;
 	if (god_mode) {
@@ -175,6 +177,7 @@ void Cheat::toggle_wizard() {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	wizard_mode = !wizard_mode;
 	if (wizard_mode) {
@@ -188,6 +191,7 @@ void Cheat::toggle_map_editor() {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	map_editor = !map_editor;
 	if (map_editor) {
@@ -286,11 +290,13 @@ void Cheat::toggle_tile_grid() {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 	tile_grid = !tile_grid;
 	gwin->set_all_dirty();
 }
 
 void Cheat::set_edit_mode(Map_editor_mode md) {
+	set_cheated();
 	edit_mode = md;
 	if (edit_mode != select_chunks) {
 		clear_chunksel();
@@ -299,6 +305,7 @@ void Cheat::set_edit_mode(Map_editor_mode md) {
 }
 
 void Cheat::clear_chunksel() {
+	set_cheated();
 	if (chunksel_right >= 0 && chunksel_bottom >= 0) {
 		const int startx = chunksel_left;
 		const int stopx  = chunksel_right + 1;
@@ -316,6 +323,7 @@ void Cheat::clear_chunksel() {
 }
 
 void Cheat::add_chunksel(Map_chunk* chunk, bool extend) {
+	set_cheated();
 	ignore_unused_variable_warning(extend);
 	chunk->set_selected(true);
 	const int cx = chunk->get_cx();
@@ -337,6 +345,7 @@ void Cheat::add_chunksel(Map_chunk* chunk, bool extend) {
 
 /*  Move a given chunk. */
 void Cheat::move_chunk(Map_chunk* chunk, int dx, int dy) {
+	set_cheated();
 	// Figure dest. with wrapping.
 	const int  tox     = (chunk->get_cx() + dx + c_num_chunks) % c_num_chunks;
 	const int  toy     = (chunk->get_cy() + dy + c_num_chunks) % c_num_chunks;
@@ -385,6 +394,7 @@ void Cheat::move_chunk(Map_chunk* chunk, int dx, int dy) {
 
 /*  Move all the selected chunks. */
 void Cheat::move_selected_chunks(int dx, int dy) {
+	set_cheated();
 	int startx;
 	int stopx;
 	int dirx;
@@ -429,6 +439,7 @@ void Cheat::set_edit_lift(int lift) {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 	edit_lift = lift;
 	gwin->set_all_dirty();
 }
@@ -442,6 +453,7 @@ void Cheat::toggle_infravision() {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	infravision = !infravision;
 	if (infravision) {
@@ -456,6 +468,7 @@ void Cheat::toggle_pickpocket() {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	pickpocket = !pickpocket;
 	if (pickpocket) {
@@ -470,6 +483,7 @@ void Cheat::toggle_hack_mover() {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	hack_mover = !hack_mover;
 	if (hack_mover) {
@@ -483,6 +497,7 @@ void Cheat::change_gender() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	if (gwin->get_main_actor()->get_type_flag(Actor::tf_sex)) {
 		gwin->get_main_actor()->clear_type_flag(Actor::tf_sex);
@@ -498,6 +513,7 @@ void Cheat::toggle_eggs() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	gwin->paint_eggs = !gwin->paint_eggs;
 	if (gwin->paint_eggs) {
@@ -512,6 +528,7 @@ void Cheat::toggle_Petra() const {
 	if (!enabled || (Game::get_game_type() != SERPENT_ISLE)) {
 		return;
 	}
+	set_cheated();
 
 	if (gwin->get_main_actor()->get_flag(Obj_flags::petra)) {
 		gwin->get_main_actor()->clear_flag(Obj_flags::petra);
@@ -525,6 +542,7 @@ void Cheat::toggle_naked() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	if (gwin->get_main_actor()->get_flag(Obj_flags::naked)) {
 		gwin->get_main_actor()->clear_flag(Obj_flags::naked);
@@ -538,6 +556,7 @@ void Cheat::change_skin() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	int        color = gwin->get_main_actor()->get_skin_color();
 	const bool sex   = gwin->get_main_actor()->get_type_flag(Actor::tf_sex);
@@ -551,6 +570,7 @@ void Cheat::levelup_party() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	Actor* party[9];
 	bool   leveledup = false;
@@ -578,6 +598,7 @@ void Cheat::fake_time_period() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	if (!map_editor) {
 		std::ostringstream s;
@@ -592,6 +613,7 @@ void Cheat::dec_skip_lift() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	if (gwin->skip_lift == 16) {
 		gwin->skip_lift = 11;
@@ -611,6 +633,7 @@ void Cheat::set_skip_lift(int skip) const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	if ((skip >= 1 && skip <= 11) || skip == 16) {
 		gwin->skip_lift = skip;
@@ -640,6 +663,7 @@ void Cheat::send_select_status() {
  *  Add an object to the selected list without checking.
  */
 void Cheat::append_selected(Game_object* obj) {
+	set_cheated();
 	selected.push_back(obj->shared_from_this());
 	if (selected.size() == 1) {    // First one?
 		send_select_status();
@@ -650,6 +674,7 @@ void Cheat::append_selected(Game_object* obj) {
  *  Toggle the selection of an object.
  */
 void Cheat::toggle_selected(Game_object* obj) {
+	set_cheated();
 	if (!obj->get_owner()) {
 		gwin->add_dirty(obj);
 	} else {
@@ -676,6 +701,7 @@ void Cheat::toggle_selected(Game_object* obj) {
  *  Clear out selection.
  */
 void Cheat::clear_selected() {
+	set_cheated();
 	if (selected.empty()) {
 		return;
 	}
@@ -694,6 +720,7 @@ void Cheat::clear_selected() {
  *  Delete all selected objects.
  */
 void Cheat::delete_selected() {
+	set_cheated();
 	if (selected.empty()) {
 		return;
 	}
@@ -715,6 +742,7 @@ void Cheat::delete_selected() {
  *  treated as being at the location of their owner.
  */
 void Cheat::move_selected_objs(int dx, int dy, int dz) {
+	set_cheated();
 	if (selected.empty()) {
 		return;    // Nothing to do.
 	}
@@ -761,6 +789,7 @@ void Cheat::move_selected_objs(int dx, int dy, int dz) {
 
 /*  Move selected objects/chunks. */
 void Cheat::move_selected(int dx, int dy, int dz) {
+	set_cheated();
 	if (edit_mode == select_chunks) {
 		move_selected_chunks(dx, dy);
 	} else {
@@ -772,6 +801,7 @@ void Cheat::move_selected(int dx, int dy, int dz) {
  *  Cycle the frame of the selected objects.
  */
 void Cheat::cycle_selected_frame(int direction) {
+	set_cheated();
 	if (selected.empty()) {
 		return;
 	}
@@ -797,6 +827,7 @@ void Cheat::cycle_selected_frame(int direction) {
  *  Rotate the frame of the selected objects.
  */
 void Cheat::rotate_selected_frame() {
+	set_cheated();
 	if (selected.empty()) {
 		return;
 	}
@@ -843,6 +874,7 @@ void Cheat::cut(bool copy) {
 	if (selected.empty()) {
 		return;    // Nothing selected.
 	}
+	set_cheated();
 	const bool clip_was_empty = clipboard.empty();
 	// Clear out old clipboard.
 	clipboard.resize(0);
@@ -918,6 +950,7 @@ void Cheat::paste(
 	if (clipboard.empty()) {
 		return;    // Nothing there.
 	}
+	set_cheated();
 	// Use lowest/south/east for position.
 	const Tile_coord hot = clipboard[0]->get_tile();
 	clear_selected();    // Remove old selected.
@@ -952,6 +985,7 @@ void Cheat::paste(
  */
 
 void Cheat::paste() {
+	set_cheated();
 	if (clipboard.empty()) {
 		return;
 	}
@@ -1019,6 +1053,7 @@ void Cheat::map_teleport() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 	Gump_manager* gumpman = gwin->get_gump_man();
 	if (touchui != nullptr) {
 		touchui->hideGameControls();
@@ -1056,6 +1091,7 @@ void Cheat::cursor_teleport() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	int        x = Mouse::mouse()->get_mousex();
 	int        y = Mouse::mouse()->get_mousey();
@@ -1068,6 +1104,7 @@ void Cheat::cursor_teleport() const {
 }
 
 void Cheat::next_map_teleport() const {
+	set_cheated();
 	const int curmap = gwin->get_map()->get_num();
 	int       newmap = Find_next_map(curmap + 1, 4);    // Look forwards by 4.
 	if (newmap == -1) {                                 // Not found?
@@ -1088,6 +1125,7 @@ void Cheat::create_coins() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	gwin->get_main_actor()->add_quantity(100, 644);
 	eman->center_text("Added 100 gold coins");
@@ -1097,6 +1135,7 @@ void Cheat::create_last_shape() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	int current_shape = 0;
 	int current_frame = 0;
@@ -1121,6 +1160,7 @@ void Cheat::delete_object() {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	int          x = Mouse::mouse()->get_mousex();
 	int          y = Mouse::mouse()->get_mousey();
@@ -1144,6 +1184,7 @@ void Cheat::heal_party() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	int            i;    // for MSVC
 	Party_manager* partyman = gwin->get_party_man();
@@ -1202,6 +1243,7 @@ void Cheat::shape_browser() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	browser->browse_shapes();
 	gwin->paint();
@@ -1212,6 +1254,7 @@ bool Cheat::get_browser_shape(int& shape, int& frame) const {
 	if (!enabled) {
 		return false;
 	}
+	set_cheated();
 
 	return browser->get_shape(shape, frame);
 }
@@ -1220,6 +1263,7 @@ void Cheat::sound_tester() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	tester->test_sound();
 	gwin->paint();
@@ -1229,6 +1273,7 @@ void Cheat::cheat_screen() const {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	cscreen->show_screen();
 	gwin->set_all_dirty();
@@ -1239,6 +1284,7 @@ void Cheat::toggle_grab_actor() {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	grab_actor = !grab_actor;
 	if (grab_actor) {
@@ -1252,6 +1298,7 @@ void Cheat::set_grabbed_actor(Actor* actor) const {
 	if (!enabled || !cscreen) {
 		return;
 	}
+	set_cheated();
 
 	cscreen->SetGrabbedActor(actor);
 }
@@ -1260,6 +1307,7 @@ void Cheat::clear_this_grabbed_actor(Actor* actor) const {
 	if (!enabled || !cscreen) {
 		return;
 	}
+	set_cheated();
 
 	cscreen->ClearThisGrabbedActor(actor);
 }
@@ -1268,6 +1316,7 @@ void Cheat::toggle_number_npcs() {
 	if (!enabled) {
 		return;
 	}
+	set_cheated();
 
 	npc_numbers = !npc_numbers;
 	if (npc_numbers) {
