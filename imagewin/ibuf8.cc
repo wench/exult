@@ -933,14 +933,17 @@ void Image_buffer8::draw_beveled_box(
 		int x, int y, int w, int h, int depth, uint8 colfill, uint8 coltop,
 		uint8 coltr, uint8 colbottom,
 		uint8 colbl,std::optional<uint8> coltlbr) {
+	if (depth <= 0 || w <= 0 || h <= 0 || depth >= std::min(w, h) / 2) {
+		return;
+	}
 	// Need to shrink by 1 so lines are drawn in the right places
 	w--;
 	h--;
-	// draw beveled edge
+	uint8 tlbr = coltlbr.value_or(colfill);
 
+	// draw beveled edge
 	while (depth--) {
 		// corner pixels
-		uint8 tlbr = coltlbr.value_or(colfill);
 		if (tlbr != 0xff) {
 			// top left
 			put_pixel8(tlbr, x, y);
