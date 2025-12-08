@@ -872,10 +872,10 @@ void Notebook_gump::write() {
 	auto pOut = GameDat::get()->Open_ostream(NOTEBOOKXML);
 
 	if (!pOut || !pOut->good() ) {
-
 		return;
 	}
 	auto& out = *pOut;
+
 	out << "<notebook>" << endl;
 	if (initialized) {
 		for (auto* note : notes) {
@@ -913,15 +913,13 @@ void Notebook_gump::read() {
 			int d;
 			int h;
 			int m;
-			sscanf(notend.second.c_str(), "%d:%d:%d", &d, &h, &m);
-			if (note) {
+			if (note && sscanf(notend.second.c_str(), "%d:%d:%d", &d, &h, &m)==3) {
 				note->set_time(d, h, m);
 			}
 		} else if (notend.first == "note/place") {
 			int x;
 			int y;
-			sscanf(notend.second.c_str(), "%d:%d", &x, &y);
-			if (note) {
+			if (note && sscanf(notend.second.c_str(), "%d:%d", &x, &y) == 2) {
 				note->set_loc(x, y);
 			}
 		} else if (notend.first == "note/text") {
@@ -931,8 +929,7 @@ void Notebook_gump::read() {
 			}
 		} else if (notend.first == "note/gflag") {
 			int gf;
-			sscanf(notend.second.c_str(), "%d", &gf);
-			if (note) {
+			if (note && sscanf(notend.second.c_str(), "%d", &gf) == 1) {
 				note->set_gflag(gf);
 			}
 		}
