@@ -679,6 +679,14 @@ bool Gump_manager::handle_modal_gump_event(Modal_gump* gump, SDL_Event& event) {
 			}
 		}
 		break;
+
+	case SDL_EVENT_WINDOW_FOCUS_GAINED:
+		gwin->get_focus();
+		break;
+	case SDL_EVENT_WINDOW_FOCUS_LOST:
+		gwin->lose_focus();
+		break;
+
 	default:
 		if (event.type == TouchUI::eventType) {
 			if (event.user.code == TouchUI::EVENT_CODE_TEXT_INPUT) {
