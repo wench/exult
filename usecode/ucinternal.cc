@@ -2715,6 +2715,7 @@ int Usecode_internal::run() {
 					FLAG_ERROR(offset);
 				} else {
 					if (flagvalue) {
+						gamedat->Queue_Autosave(offset);
 						Notebook_gump::add_gflag_text(offset);
 #ifdef DEBUG
 						cout << "Setting global flag: " << offset << endl;

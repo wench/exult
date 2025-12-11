@@ -2941,11 +2941,18 @@ void Game_window::lose_focus() {
 		Audio::get_ptr()->pause_audio();
 	}
 
+	bool wantsave = win->is_fullscreen();
+
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID)
-	// Quick saving to make sure no game progress gets lost
-	// when the app goes into background.
-	write();
+	wantsave = true;
 #endif
+
+	// Auto saving to make sure no game progress gets lost
+	// when the app goes into background on mobile or loses focus when fullscreen
+	// but only if ingame and have main_actor
+	if (wantsave && main_actor) {
+		GameDat::get()->Autosave_Now(GameDat::Strings::LostFocus());
+	}
 
 	focus = false;
 	tqueue->pause(Game::get_ticks());

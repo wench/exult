@@ -449,13 +449,17 @@
 0x6DC:Group Saves By Type:
 0x6DD:Autosaves write to Gamedat:
 0x6DE:Real Time
-0x6DF: Name
+0x6DF:Name
 0x6E0:Cheats Used
+0x6E1:Global Flag Autosave Count:
+
 #Gamedat
-0x6E1:AutoSave 
-0x6E2:QuickSave 
-0x6E3:CrashSave 
-0x6E4:Save 
+0x6EA:AutoSave 
+0x6EB:QuickSave 
+0x6EC:CrashSave 
+0x6ED:Save 
+0x6EE:Lost focus
+0x6EF:Autosave GF: 
 
 #Misc
 # SI copy protection failed

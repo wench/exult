@@ -49,6 +49,7 @@
 #include "frflags.h"
 #include "game.h"
 #include "gameclk.h"
+#include "gamedat.h"
 #include "gamemap.h"
 #include "gamewin.h"
 #include "ignore_unused_variable_warning.h"
@@ -4983,6 +4984,19 @@ void Main_actor::switched_chunks(
 		} else {
 			yfrom = newcy > 0 ? newcy - 1 : newcy;
 			yto   = newcy < c_num_chunks - 1 ? newcy + 1 : newcy;
+		}
+	
+		int oldsc = (oldcy / c_chunks_per_schunk) * c_num_schunks
+					   + (oldcx / c_chunks_per_schunk);
+		int newsc = (newcy / c_chunks_per_schunk) * c_num_schunks
+					   + (newcx / c_chunks_per_schunk);
+		int oldmap = olist->get_map()->get_num();
+		int newmap = nlist->get_map()->get_num();
+
+		// Superchunk change queue an auto-save.
+		// not in map edit mode
+		if ((oldmap != newmap || oldsc != newsc) && !cheat.in_map_editor()) {
+			GameDat::get()->Queue_Autosave(-1, oldmap, newmap, oldsc, newsc);
 		}
 	}
 	for (int y = yfrom; y <= yto; y++) {

@@ -49,44 +49,50 @@ class Shape_file;
 #define MAX_SAVEGAME_NAME_LEN 0x50
 
 class GameDat : protected Game_singletons {
-
 public:
 	struct Strings {
 		static auto AutoSave() {
-			return get_text_msg(0x6E1 - msg_file_start);
+			return get_text_msg(0x6EA - msg_file_start);
 		}
 
 		static auto QuickSave() {
-			return get_text_msg(0x6E2 - msg_file_start);
+			return get_text_msg(0x6EB - msg_file_start);
 		}
 
 		static auto CrashSave() {
-			return get_text_msg(0x6E3 - msg_file_start);
+			return get_text_msg(0x6EC - msg_file_start);
 		}
 
 		static auto Save() {
-			return get_text_msg(0x6E4 - msg_file_start);
+			return get_text_msg(0x6ED - msg_file_start);
 		}
 
+		static auto LostFocus() {
+			return get_text_msg(0x6EE - msg_file_start);
+		}
+
+		static auto AutosaveGF() {
+			return get_text_msg(0x6EF - msg_file_start);
+		}
 	};
 
-struct SaveGame_Details {
-	bool good = false;
+	struct SaveGame_Details {
+		bool good = false;
 
-	operator bool() const {
-		return good;
-	}
+		operator bool() const {
+			return good;
+		}
 
-	// Time that the game was saved (needed????)
-	char  real_minute;    // 1
-	char  real_hour;      // 2
-	char  real_day;       // 3
-	char  real_month;     // 4
-	short real_year;      // 6
+		// Time that the game was saved (needed????)
+		char  real_minute;    // 1
+		char  real_hour;      // 2
+		char  real_day;       // 3
+		char  real_month;     // 4
+		short real_year;      // 6
 
-	// The Game Time that the save was done at
-	char  game_minute;    // 7
-	char  game_hour;      // 8
+		// The Game Time that the save was done at
+		char  game_minute;    // 7
+		char  game_hour;      // 8
 		short game_day;       // 10
 
 		short save_count;       // 12
@@ -95,50 +101,50 @@ struct SaveGame_Details {
 
 		bool cheated;   // 14 has the player used a cheat
 
-	char real_second;    // 15
+		char real_second;    // 15
 
-	// Incase we want to add more later
-	char reserved0;        // 16
-	char reserved1[48];    // 64
+		// Incase we want to add more later
+		char reserved0;        // 16
+		char reserved1[48];    // 64
 
-		// Compare functions for display sorting Newer comes first 
-	int CompareRealTime(const SaveGame_Details& other) const noexcept;
-	int CompareGameTime(const SaveGame_Details& other) const noexcept;
-};
+		// Compare functions for display sorting Newer comes first
+		int CompareRealTime(const SaveGame_Details& other) const noexcept;
+		int CompareGameTime(const SaveGame_Details& other) const noexcept;
+	};
 
-struct SaveGame_Party {
-	char         name[18];    // 18
-	short        shape;       // 20
-	unsigned int exp;         // 24
-	unsigned int flags;       // 28
-	unsigned int flags2;      // 32
+	struct SaveGame_Party {
+		char         name[18];    // 18
+		short        shape;       // 20
+		unsigned int exp;         // 24
+		unsigned int flags;       // 28
+		unsigned int flags2;      // 32
 
-	unsigned char food;        // 33
-	unsigned char str;         // 34
-	unsigned char combat;      // 35
-	unsigned char dext;        // 36
-	unsigned char intel;       // 37
-	unsigned char magic;       // 38
-	unsigned char mana;        // 39
-	unsigned char training;    // 40
-	short         health;      // 42
+		unsigned char food;        // 33
+		unsigned char str;         // 34
+		unsigned char combat;      // 35
+		unsigned char dext;        // 36
+		unsigned char intel;       // 37
+		unsigned char magic;       // 38
+		unsigned char mana;        // 39
+		unsigned char training;    // 40
+		short         health;      // 42
 
-	short shape_file;    // 44
+		short shape_file;    // 44
 
-	// Incase we want to add more later
-	int reserved1;    // 48
-	int reserved2;    // 52
-	int reserved3;    // 56
-	int reserved4;    // 60
-	int reserved5;    // 64
-};
+		// Incase we want to add more later
+		int reserved1;    // 48
+		int reserved2;    // 52
+		int reserved3;    // 56
+		int reserved4;    // 60
+		int reserved5;    // 64
+	};
 
-class SaveInfo {
-	// No direct access to filename
-	std::string filename_;
+	class SaveInfo {
+		// No direct access to filename
+		std::string filename_;
 
-public:
-	int num = -1;
+	public:
+		int num = -1;
 
 		std::string                 savename;
 		bool                        readable = false;
@@ -147,46 +153,49 @@ public:
 		std::unique_ptr<Shape_file> screenshot = nullptr;
 		std::unique_ptr<Palette>    palette    = nullptr;
 
-	// Default constructor is allowed
-	SaveInfo() {}
+		// Default constructor is allowed
+		SaveInfo() {}
 
-	// Move Costructor from a std::string filename
-	SaveInfo(std::string&& filename);
+		// Move Constructor from a std::string filename
+		SaveInfo(std::string&& filename);
 
-	// No copy constructor as screenshot can't be copied because Shape_file has
-	// no copy constructor
+		// No copy constructor as screenshot can't be copied because Shape_file
+		// has no copy constructor
 
-	SaveInfo(const SaveInfo&) = delete;
-	SaveInfo(SaveInfo&&)      = default;
+		SaveInfo(const SaveInfo&) = delete;
+		SaveInfo(SaveInfo&&)      = default;
 
-	// Copy from exising object but with move for a Screenshot
-	SaveInfo(const SaveInfo& other, std::unique_ptr<Shape_file>&& newscreenshot)
-			: filename_(other.filename_), num(other.num),
-			  savename(other.savename), readable(other.readable),
-			  details(other.details), party(other.party),
-			  screenshot(std::move(newscreenshot)) {
-		// Copy the party
-	}
+		// Copy from exising object but with move for a Screenshot
+		SaveInfo(
+				const SaveInfo&               other,
+				std::unique_ptr<Shape_file>&& newscreenshot)
+				: filename_(other.filename_), num(other.num),
+				  savename(other.savename), readable(other.readable),
+				  details(other.details), party(other.party),
+				  screenshot(std::move(newscreenshot)) {
+			// Copy the party
+		}
 
-	// No copy assignment operator, only move
-	SaveInfo& operator=(const SaveInfo&) = delete;
-	SaveInfo& operator=(SaveInfo&&)      = default;
- 
-	enum class Type {
-		UNKNOWN = -1,
-		REGULAR = 0,
-		AUTOSAVE,
-		QUICKSAVE,
-		CRASHSAVE,
-		NUM_TYPES
-	} type = Type::UNKNOWN;
+		// No copy assignment operator, only move
+		SaveInfo& operator=(const SaveInfo&) = delete;
+		SaveInfo& operator=(SaveInfo&&)      = default;
+
+		enum class Type {
+			UNKNOWN = -1,
+			REGULAR = 0,
+			AUTOSAVE,
+			FLAG_AUTOSAVE,
+			QUICKSAVE,
+			CRASHSAVE,
+			NUM_TYPES
+		} type = Type::UNKNOWN;
 
 	constexpr static int NUM_TYPES = static_cast<int>(Type::NUM_TYPES);
 
-	// const getter for filename
-	const std::string& filename() const {
-		return filename_;
-	}
+		// const getter for filename
+		const std::string& filename() const {
+			return filename_;
+		}
 
 		int compare(const SaveInfo& other) const noexcept;
 
@@ -301,8 +310,7 @@ public:
 	} gamedat_in_memory;
 
 	static void init() {
-	gamedat = new GameDat();
-
+		gamedat = new GameDat();
 	}
 
 public:
@@ -320,6 +328,8 @@ public:
 
 	// Get Vector of all savegame info
 	const std::vector<SaveInfo>* GetSaveGameInfos(bool force);
+
+	bool are_save_infos_loaded();
 
 	void wait_for_saveinfo_read();
 
@@ -461,18 +471,31 @@ private:
 
 	void read_save_infos();
 
+	class Autosave_Event : public Time_sensitive {
+	public:
+		int map_from = -1;
+		int map_to   = -1;
+		int sc_from  = -1;
+		int sc_to    = -1;
+		int gflag    = -1;
+
+		void handle_event(unsigned long curtime, uintptr udata) override;
+
+	} autosave_event;
 
 public:
 	// Queue an autosave to occur at the next possible time. Safe to call at any
-	// time including during usecode execution
+	// time and from other threads.
+	// Only one Autosave can be queued at a time
 	void Queue_Autosave(
 			int gflag = -1, int map_from = -1, int map_to = -1,
 			int sc_from = -1, int sc_to = -1);
 
+	// Do an immediate Autosave. Should Only be called from main thread
 	void Autosave_Now(
-			bool write_gamedat = false, const char* savemessage = nullptr,
-			int gflag = -1, int map_from = -1, int map_to = -1,
-			int sc_from = -1, int sc_to = -1);
+			const char* savemessage = nullptr, int gflag = -1,
+			int map_from = -1, int map_to = -1, int sc_from = -1,
+			int sc_to = -1, bool wait = true, bool screenshot = false);
 
 	void Quicksave();
 

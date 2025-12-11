@@ -236,6 +236,10 @@ public:
 	static auto CheatsUsed() {
 		return get_text_msg(0x6E0 - msg_file_start);
 	}
+
+	static auto GlobalFlagAutosaveCount_() {
+		return get_text_msg(0x6E1 - msg_file_start);
+	}
 };
 
 //
@@ -322,6 +326,11 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 						widgets.data() + id_normal_start,
 						id_settings_start - id_normal_start),
 				9);
+		HorizontalArrangeWidgets(
+				tcb::span(
+						widgets.data() + id_normal_start,
+						id_settings_start - id_normal_start),
+				9);
 
 		HorizontalArrangeWidgets(
 				tcb::span(
@@ -389,25 +398,39 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 		int amaxval = Settings::get().disk.autosave_count;
 		if (amaxval < 100) {
 			amaxval = 100;
-		} else {
+		} else if (amaxval < 1000) {
 			amaxval = std::max(1000, amaxval);
+		}
+		int fmaxval = Settings::get().disk.flagautosave_count;
+		if (fmaxval < 100) {
+			fmaxval = 100;
+		} else if (fmaxval < 1000) {
+			fmaxval = std::max(1000, fmaxval);
 		}
 		int qmaxval = Settings::get().disk.quicksave_count;
 		if (qmaxval < 100) {
 			qmaxval = 100;
-		} else {
+		} else if (qmaxval < 1000) {
 			qmaxval = std::max(1000, qmaxval);
 		}
 
 		int num_width = std::max(
 				font->get_text_width(std::to_string(amaxval).c_str()),
-				font->get_text_width(std::to_string(qmaxval).c_str()));
+				std::max(font->get_text_width(std::to_string(fmaxval).c_str()),
+				font->get_text_width(std::to_string(qmaxval).c_str())));
 
 		widgets[id_slider_autocount] = std::make_unique<Slider_widget>(
 				this, get_button_pos_for_label(Strings::AutosaveCount_()),
 				yForRow(yindex++) - 12, std::nullopt, std::nullopt,
 				std::nullopt, Settings::get().disk.autosave_count.get_min(),
 				amaxval, 1, Settings::get().disk.autosave_count, 64, font,
+				num_width, true, false);
+
+		widgets[id_slider_flagautocount] = std::make_unique<Slider_widget>(
+				this, get_button_pos_for_label(Strings::GlobalFlagAutosaveCount_()),
+				yForRow(yindex++) - 12, std::nullopt, std::nullopt,
+				std::nullopt, Settings::get().disk.flagautosave_count.get_min(),
+				fmaxval, 1, Settings::get().disk.flagautosave_count, 64, font,
 				num_width, true, false);
 
 		widgets[id_slider_quickcount] = std::make_unique<Slider_widget>(
@@ -444,7 +467,7 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 								Strings::AutosavesWriteToGamedat_()),
 						yForRow(yindex++) - 2, 64, 0);
 
-		RightAlignWidgets(tcb::span(widgets.data() + id_slider_autocount, 5));
+		RightAlignWidgets(tcb::span(widgets.data() + id_slider_autocount, 6));
 		// RightAlignWidgets(tcb::span(widgets.data() + id_button_sortbyname,
 		// 3),num_width+4);
 	}
@@ -464,7 +487,8 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 	scroll->set_line_height(fieldh + fieldgap, false);
 	widgets[id_scroll] = std::move(scroll);
 
-	LoadSaveGameDetails();
+
+	gamedat->read_save_infos_async(false);
 	SelectSlot(NoSlot);
 	if (touchui != nullptr) {
 		touchui->hideGameControls();
@@ -565,8 +589,6 @@ void Newfile_gump::save() {
 	cout << "Saved game #" << selected_slot << " successfully." << endl;
 
 	// Reset everything
-	FreeSaveGameDetails();
-	LoadSaveGameDetails();
 	gwin->set_all_dirty();
 	gwin->got_bad_feeling(4);
 	SelectSlot(NoSlot);
@@ -593,8 +615,6 @@ void Newfile_gump::delete_file() {
 
 	// Reset everything
 	SelectSlot(NoSlot);
-	FreeSaveGameDetails();
-	LoadSaveGameDetails();
 	gwin->set_all_dirty();
 }
 
@@ -640,6 +660,7 @@ void Newfile_gump::toggle_settings(int state) {
 void Newfile_gump::apply_settings() {
 	auto& settings            = Settings::get().disk;
 	settings.autosave_count   = widgets[id_slider_autocount]->getselection();
+	settings.flagautosave_count   = widgets[id_slider_flagautocount]->getselection();
 	settings.quicksave_count  = widgets[id_slider_quickcount]->getselection();
 	settings.savegame_sort_by = widgets[id_button_sortby]->getselection();
 	settings.savegame_group_by_type
@@ -654,6 +675,7 @@ void Newfile_gump::apply_settings() {
 void Newfile_gump::revert_settings() {
 	auto& settings = Settings::get().disk;
 	widgets[id_slider_autocount]->setselection(settings.autosave_count);
+	widgets[id_slider_flagautocount]->setselection(settings.flagautosave_count);
 	widgets[id_slider_quickcount]->setselection(settings.quicksave_count);
 	widgets[id_button_sortby]->setselection(settings.savegame_sort_by);
 	widgets[id_button_groupbytype]->setselection(
@@ -672,6 +694,17 @@ bool Newfile_gump::run() {
 		}
 	}
 
+	if (!games &&gamedat-> are_save_infos_loaded())
+	{
+		LoadSaveGameDetails();
+		need_repaint = true;
+		// Repaint the save list of the page turn effect as it just changed
+		if (page_turn_effect && page_turn_effect->isStarted()) {
+			Image_buffer8* ibuf    = page_turn_effect->getBuffer1();
+			auto           restore = Shape_frame::set_to_render_safe(ibuf);
+			paint_normal();
+		}
+	}
 	return need_repaint;
 }
 
@@ -832,6 +865,7 @@ void Newfile_gump::paint_normal() {
 			btn->paint();
 		}
 	}
+
 
 	// If in old style mode, don't paint the savegame details
 	if (old_style_mode) {
@@ -1053,6 +1087,9 @@ void Newfile_gump::paint_settings() {
 			ibuf, Strings::AutosaveCount_(), sx + label_margin,
 			sy + yForRow(y_index));
 	font->paint_text(
+			ibuf, Strings::GlobalFlagAutosaveCount_(), sx + label_margin,
+			sy + yForRow(++y_index));
+	font->paint_text(
 			ibuf, Strings::QuicksaveCount_(), sx + label_margin,
 			sy + yForRow(++y_index));
 	font->paint_text(
@@ -1262,6 +1299,7 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 	if (restore_mode && chr != SDLK_RETURN) {
 		return false;
 	}
+
 
 	switch (chr) {
 	case SDLK_RETURN: {
@@ -1538,6 +1576,20 @@ void Newfile_gump::SelectSlot(int slot) {
 	SetWidgetEnabled(id_delete, want_delete);
 
 	gwin->set_all_dirty();    // Repaint.
+}
+
+void Newfile_gump::SaveGameDetailsChanging() {
+	if (gumpman) {
+		for (Gump* g : *gumpman) {
+			Newfile_gump* nfg = dynamic_cast<Newfile_gump*>(g);
+			if (nfg) {
+				nfg->FreeSaveGameDetails();
+				if (nfg->selected_slot >= SavegameSlots) {
+					nfg->SelectSlot(NoSlot);
+				}
+			}
+		}
+	}
 }
 
 void Newfile_gump::LoadSaveGameDetails() {
