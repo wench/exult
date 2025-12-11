@@ -41,6 +41,7 @@
 #include "gameclk.h"
 #include "gamemap.h"
 #include "gamewin.h"
+#include "istring.h"
 #include "listfiles.h"
 #include "mouse.h"
 #include "party.h"
@@ -49,6 +50,7 @@
 #include "utils.h"
 #include "version.h"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -91,6 +93,7 @@ using std::time_t;
 using std::tm;
 
 void GameDat::clear_saveinfos() {
+	Newfile_gump::SaveGameDetailsChanging();
 	std::lock_guard lock(save_info_mutex);
 	save_infos.clear();
 	saveinfo_future = std::shared_future<void>();
@@ -440,13 +443,19 @@ void GameDat::DeleteSaveGame(const std::string& fname) {
 		int itype = static_cast<int>(it->type);
 
 		// Update first_free if needed
-		if (first_free[itype] > it->num) {
+		if (itype > 0 && itype<SaveInfo::NUM_TYPES &&
+			first_free[itype]> it->num) {
 			first_free[itype] = it->num;
 		}
 
+		Newfile_gump::SaveGameDetailsChanging();
 		save_infos.erase(it);
+	} else {
+		// This shouldn't happen unless someone called this function 
+		// with a filename that wasn't a save game
+		// But just incase reload all the save infos
+		read_save_infos_async(true);
 	}
-
 }
 
 std::pmr::string GameDat::
@@ -462,6 +471,7 @@ std::pmr::string GameDat::
 				: Game::get_game_type() == SERPENT_ISLE ? "si"
 														: "dev",
 				type == SaveInfo::Type::AUTOSAVE    ? "_a"
+				: type == SaveInfo::Type::FLAG_AUTOSAVE    ? "_f"
 				: type == SaveInfo::Type::QUICKSAVE ? "_q"
 				: type == SaveInfo::Type::CRASHSAVE ? "_c"
 													: ""
@@ -505,8 +515,15 @@ void GameDat::save_gamedat(
 	if (type == SaveInfo::Type::QUICKSAVE) {
 		limit = Settings::get().disk.quicksave_count;
 	}
+	if (type == SaveInfo::Type::FLAG_AUTOSAVE) {
+		limit = Settings::get().disk.flagautosave_count;
+	}
 	if (type == SaveInfo::Type::AUTOSAVE) {
 		limit = Settings::get().disk.autosave_count;
+	}
+	// This should not happen
+	if (index == -1) {
+		index = limit;
 	}
 
 	if (limit == 0) {
@@ -524,7 +541,7 @@ void GameDat::save_gamedat(
 	// Create default savename wuth ISO date and Time if none given.
 	if (!savename || !*savename) {
 		const time_t t = time(nullptr);
-		if (type == SaveInfo::Type::AUTOSAVE) {
+		if (type == SaveInfo::Type::AUTOSAVE ||type == SaveInfo::Type::FLAG_AUTOSAVE) {
 			strcpy(name, Strings::AutoSave());
 		} else if (type == SaveInfo::Type::QUICKSAVE) {
 			strcpy(name, Strings::QuickSave());
@@ -653,7 +670,6 @@ void GameDat::read_save_infos() {
 		save_infos.emplace_back(std::string(filename));
 	}
 
-	
 	first_free.fill(-1);
 	oldest.fill(0);
 
@@ -695,12 +711,10 @@ void GameDat::read_save_infos() {
 
 				last[itype] = saveinfo.num;
 			}
-
-			
 		}
 	}
-	// If no gaps found set forst free of each type to last +1
-	for (int type = 0; type < int(SaveInfo::Type::NUM_TYPES); ++type) {
+	// If no gaps found set first free of each type to last +1
+	for (int type = 0; type < SaveInfo::NUM_TYPES; ++type) {
 		if (first_free[type] == -1) {
 			first_free[type] = last[type] + 1;
 		}
@@ -748,6 +762,10 @@ const std::vector<GameDat::SaveInfo>* GameDat::GetSaveGameInfos(bool force) {
 	wait_for_saveinfo_read();
 
 	return &save_infos;
+}
+
+bool GameDat::are_save_infos_loaded() {
+	return saveinfo_future.valid();
 }
 
 void GameDat::write_saveinfo(bool screenshot) {
@@ -1464,7 +1482,17 @@ bool GameDat::Save_level1(
 	auto*           vec = get_memory_file(fname, false);
 
 	if (!vec) {
-		ds = IFileDataSource(U7open_in(fname));
+		try {
+			ds = IFileDataSource(U7open_in(fname));
+		}
+		catch (file_open_exception &)
+		{
+			if (Game::is_editing() || !required) {
+				return true;    // Newly developed game. or file is not
+								// required. Missing file is ok.
+			}
+			throw;
+		}
 		if (!ds.good()) {
 			if (Game::is_editing() || !required) {
 				return true;    // Newly developed game. or file is not
@@ -2070,13 +2098,12 @@ void GameDat::GamedatInMemory::clear() {
 }
 
 bool GameDat::GamedatInMemory::enable() {
-	if (!mutex.try_lock()) {
+		if (!mutex.try_lock()) {
 		// Another thread accessing gamedat in memory; disallow access
 		return false;
 	}
 
 	std::lock_guard lock(mutex, std::adopt_lock);
-
 	// Already active do nothing return success
 	if (active)
 	{
@@ -2096,6 +2123,88 @@ void GameDat::GamedatInMemory::disable() {
 	// Reset the default resource back to the runitme default
 	std::pmr::set_default_resource(nullptr);
 	active = false;
+}
+
+void GameDat::Queue_Autosave(
+		int gflag, int map_from, int map_to, int sc_from, int sc_to) {
+	auto tqueue = gwin->get_tqueue();
+	auto lock   = tqueue->get_lock();
+	if (autosave_event.in_queue()) {
+		// An autosave is already queued
+		return;
+	}
+	autosave_event.gflag    = gflag;
+	autosave_event.map_from = map_from;
+	autosave_event.map_to   = map_to;
+	autosave_event.sc_from  = sc_from;
+	autosave_event.sc_to    = sc_to;
+
+	// Queue the autosave event to happen immediately at next opportunity
+	tqueue->add(0, &autosave_event);
+}
+
+void GameDat::Autosave_Now(
+		const char* savemessage, int gflag, int map_from, int map_to,
+		int sc_from, int sc_to, bool wait, bool screenshot) {
+
+	gamedat_in_memory.clear();
+	SaveInfo::Type type = SaveInfo::Type::AUTOSAVE;
+
+	char autosave_name[100] = "";
+
+	// Decrement save count so the Autosave does not count when write_saveinfo
+	// incremets it
+	save_count--;
+
+	if (savemessage) {
+		// caller defined autosave message
+		cout << "Want to Autosave with message: " << savemessage << std::endl;
+		if (Settings::get().disk.autosave_count == 0) {
+			std::cout << "Autosaves disabled, skipping autosave." << std::endl;
+			return;
+		}
+		snprintf(
+				autosave_name, sizeof(autosave_name), "%s%s",
+				Strings::AutoSave(),savemessage);
+	} else if (gflag != -1) {
+		std::cout << "Want to Autosave for gflag " << gflag << std::endl;
+		if (Settings::get().disk.flagautosave_count == 0) {
+			
+			std::cout << "Flag autosaves disabled, skipping autosave."
+					  << std::endl;
+			return;
+		}
+		snprintf(
+				autosave_name, sizeof(autosave_name), "%s%02d",
+				Strings::AutosaveGF(), gflag);
+		type = SaveInfo::Type::FLAG_AUTOSAVE;
+	} else if (sc_from != -1 && sc_to != -1) {
+		std::cout << "Want to Autosave moving from schunk " << sc_from
+				  << " in map " << map_from << " to schunk " << sc_to << " in map " << map_to << std::endl;
+		if (Settings::get().disk.autosave_count == 0) {
+			std::cout << "Autosaves disabled, skipping autosave." << std::endl;
+			return;
+		}
+		int from_x = sc_from % c_num_schunks;
+		int from_y = sc_from / c_num_schunks;
+		int to_x   = sc_to % c_num_schunks;
+		int to_y   = sc_to / c_num_schunks;
+		snprintf(
+				autosave_name, sizeof(autosave_name),
+				"%s%02d,%02d,%d->%02d,%02d,%d", Strings::AutoSave(), 
+				from_x,	from_y,	map_from, 
+				to_x, to_y, map_to);
+	}
+
+	auto wtm_f = gamedat->writetoMemory(
+			Settings::get().disk.autosaves_write_to_gamedat, true, screenshot);
+
+	auto &sg_f = save_gamedat_async(type, autosave_name);
+	// If wait requested, wait on both futures
+	if (wait) {
+		sg_f.wait();
+		wtm_f.wait();
+	}
 }
 
 void GameDat::Quicksave() {
@@ -2134,6 +2243,12 @@ void GameDat::Extractgame(const char* fname, bool doread) {
 	gamedat_in_memory.clear();
 }
 
+void GameDat::Autosave_Event::handle_event(
+		unsigned long curtime, uintptr udata) {
+	ignore_unused_variable_warning(curtime);
+	ignore_unused_variable_warning(udata);
+	gamedat->Autosave_Now(nullptr, gflag, map_from, map_to, sc_from, sc_to,false, true);
+}
 
 // Move Costructor from a std::string filename
 GameDat::SaveInfo::SaveInfo(std::string&& filename)
@@ -2171,7 +2286,10 @@ GameDat::SaveInfo::SaveInfo(std::string&& filename)
 			// autosaves have 'a' at the end
 		} else if (std::tolower(filename_[filename_.size() - 5]) == 'a') {
 			type = Type::AUTOSAVE;
-			// crashsaves have 'a' at the end
+			// Flag Autosaves have 'f' at the end
+		} else if (std::tolower(filename_[filename_.size() - 5]) == 'f') {
+			type = Type::FLAG_AUTOSAVE;
+			// crashsaves have 'c' at the end
 		} else if (std::tolower(filename_[filename_.size() - 5]) == 'c') {
 			type = Type::CRASHSAVE;
 		}
@@ -2191,12 +2309,22 @@ GameDat::SaveInfo::SaveInfo(std::string&& filename)
 }
 
 int GameDat::SaveInfo::compare(const SaveInfo& other) const noexcept {
-	if (type != other.type && Settings::get().disk.savegame_group_by_type) {
-		return int(other.type) - int(type);
+	SaveInfo::Type t = type;
+	SaveInfo::Type ot = other.type;
+
+	// Treat flag autosaves the same as regular autosaves
+	if (t == SaveInfo::Type::FLAG_AUTOSAVE) {
+		t = SaveInfo::Type::AUTOSAVE;
+	}
+	if (ot == SaveInfo::Type::FLAG_AUTOSAVE) {
+		ot = SaveInfo::Type::AUTOSAVE;
 	}
 
-	if (Settings::get().disk.savegame_sort_by
-		== Settings::Disk::SORTBY_NAME) {
+	if (t != ot && Settings::get().disk.savegame_group_by_type) {
+		return int(ot) - int(t);
+	}
+
+	if (Settings::get().disk.savegame_sort_by == Settings::Disk::SORTBY_NAME) {
 		int namecomp = Pentagram::strcasecmp(
 				this->savename.c_str(), other.savename.c_str());
 
@@ -2208,22 +2336,18 @@ int GameDat::SaveInfo::compare(const SaveInfo& other) const noexcept {
 	if (details && other.details) {
 		// Sort by time
 
-
-		if (Settings::get().disk.savegame_sort_by == Settings::Disk::SORTBY_GAMETIME)
-		{
+		if (Settings::get().disk.savegame_sort_by
+			== Settings::Disk::SORTBY_GAMETIME) {
 			int datecomp = details.CompareGameTime(other.details);
 			if (datecomp != 0) {
 				return datecomp;
 			}
+		}
 
-		} 
-
-			int datecomp
-				= details.CompareRealTime(other.details);
+		int datecomp = details.CompareRealTime(other.details);
 		if (datecomp != 0) {
 			return datecomp;
 		}
-
 
 	} else if (details) {    // If the other doesn't have details we are
 							 // first
@@ -2239,17 +2363,16 @@ int GameDat::SaveInfo::compare(const SaveInfo& other) const noexcept {
 int GameDat::SaveGame_Details::CompareRealTime(
 		const SaveGame_Details& other) const noexcept {
 	if (real_year != other.real_year) {
-		return other.real_year-real_year ;
+		return other.real_year - real_year;
 	}
 
 	if (real_month != other.real_month) {
-		return other.real_month-real_month;
+		return other.real_month - real_month;
 	}
 
 	if (real_day != other.real_day) {
 		return other.real_day - real_day;
 	}
-
 
 	if (real_hour != other.real_hour) {
 		return other.real_hour - real_hour;
