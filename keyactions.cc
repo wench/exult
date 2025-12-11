@@ -115,7 +115,7 @@ void ActionQuicksave(const int* params) {
 	ignore_unused_variable_warning(params);
 	Game_window* gwin = Game_window::get_instance();
 	try {
-		GameDat::get()->Quicksave();
+				GameDat::get()->Quicksave();
 	} catch (exult_exception& /*e*/) {
 		gwin->get_effects()->center_text("Saving game failed!");
 		return;
