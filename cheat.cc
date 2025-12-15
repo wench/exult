@@ -1282,7 +1282,6 @@ void Cheat::clear_this_grabbed_actor(Actor* actor) const {
 	if (!enabled || !cscreen) {
 		return;
 	}
-	set_cheated();
 
 	cscreen->ClearThisGrabbedActor(actor);
 }

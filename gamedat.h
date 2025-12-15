@@ -212,6 +212,7 @@ public:
 	std::string                                     save_mask       = "";
 	std::shared_future<void>                        saveinfo_future = {};
 	std::recursive_mutex                            save_info_mutex = {};
+	std::atomic_bool                                save_info_cancel = {};
 
 	static constexpr size_t MAX_SAVE_BUFFER = 64 * 1024;    // 64 KB
 
