@@ -120,45 +120,75 @@ public:
 			  size(data_stream ? get_file_size(*data_stream) : 0) {}
 
 	uint32 peek() final {
+		if (!in) {
+			return -1;
+		}
 		return in->peek();
 	}
 
 	uint32 read1() final {
+		if (!in) {
+			return -1;
+		}
 		return Read1(in);
 	}
 
 	uint16 read2() final {
+		if (!in) {
+			return -1;
+		}
 		return little_endian::Read2(in);
 	}
 
 	uint16 read2high() final {
+		if (!in) {
+			return -1;
+		}
 		return big_endian::Read2(in);
 	}
 
 	uint32 read4() final {
+		if (!in) {
+			return -1;
+		}
 		return little_endian::Read4(in);
 	}
 
 	uint32 read4high() final {
+		if (!in) {
+			return -1;
+		}
 		return big_endian::Read4(in);
 	}
 
 	void read(void* b, size_t len) final {
+		if (!in) {
+			return;
+		}
 		in->read(static_cast<char*>(b), len);
 	}
 
 	void read(std::string& s, size_t len) final {
 		s.resize(len);
+		if (!in) {
+			return;
+		}
 		in->read(s.data(), len);
 	}
 
 	std::unique_ptr<IDataSource> makeSource(size_t len) final;
 
 	void seek(size_t pos) final {
+		if (!in) {
+			return;
+		}
 		in->seekg(pos);
 	}
 
 	void skip(std::streamoff pos) final {
+		if (!in) {
+			return;
+		}
 		in->seekg(pos, std::ios::cur);
 	}
 
@@ -167,18 +197,30 @@ public:
 	}
 
 	size_t getPos() const final {
+		if (!in) {
+			return 0;
+		}
 		return in->tellg();
 	}
 
 	virtual bool fail() const final {
+		if (!in) {
+			return true;
+		}
 		return in->fail();
 	}
 
 	virtual bool bad() const final {
+		if (!in) {
+			return true;
+		}
 		return in->bad();
 	}
 
 	bool eof() const final {
+		if (!in) {
+			return false;
+		}
 		in->get();
 		const bool ret = in->eof();
 		if (!ret) {
@@ -192,6 +234,9 @@ public:
 	}
 
 	void clear_error() final {
+		if (!in) {
+			return;
+		}
 		in->clear();
 	}
 };
@@ -452,6 +497,34 @@ public:
 	virtual void write(const void*, size_t) = 0;
 	virtual void write(const std::string_view&)  = 0;
 
+	void writestr(const std::string_view&s) {
+		write(s);
+	}
+
+	void writestr(const std::string_view& str, size_t size)
+	{
+		if (size < str.size())
+		{
+			write(str.data(), size);
+			return;
+		}
+		write(str.data(), str.size());
+		size -= str.size();
+		if (!size) {
+			return;
+		}
+
+		// Write padding zeros after string
+
+		const char zeros[16] = {};
+		while (size>=std::size(zeros))
+		{
+			write(zeros, std::size(zeros));
+			size -= std::size(zeros);
+		}
+		write(zeros, size);
+	}
+
 	virtual void   seek(size_t)         = 0;
 	virtual void   skip(std::streamoff) = 0;
 	virtual size_t getSize() const      = 0;
@@ -583,11 +656,18 @@ class OFileDataSource : public OStreamDataSource {
 public:
 	OFileDataSource() : OStreamDataSource(nullptr) {}
 
-	explicit OFileDataSource(const File_spec& spec, bool is_text = false)
+	explicit OFileDataSource(File_spec& spec, bool is_text = false)
 			: OStreamDataSource(nullptr) {
 		fout = U7open_out(spec.name, is_text);
 		out  = fout.get();
 	}
+
+	explicit OFileDataSource(std::string_view filename, bool is_text = false)
+			: OStreamDataSource(nullptr) {
+		fout = U7open_out(filename, is_text);
+		out  = fout.get();
+	}
+
 	explicit OFileDataSource(std::shared_ptr<std::ostream>&& shared)
 			: OStreamDataSource(nullptr), fout(std::move(shared)) {
 		if (fout) {
