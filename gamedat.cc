@@ -1377,6 +1377,7 @@ bool GameDat::restore_gamedat_zip(
 	U7remove(GEXULTVER);
 	U7remove(KEYRINGDAT);
 	U7remove(NOTEBOOKXML);
+	U7remove(GPALETTE);
 
 	cout.flush();
 
