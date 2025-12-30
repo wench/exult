@@ -104,7 +104,7 @@ void GameDat::clear_saveinfos() {
 }
 
 /*
- *  Write files from flex assuming first 13 characters of
+ *  Write files from flex assuming first Flex_writer::MAX_FILENAME_SIZE characters of
  *  each flex object are an 8.3 filename.
  */
 void GameDat::restore_flex_files(IDataSource& in, const char* basepath) {
@@ -127,14 +127,14 @@ void GameDat::restore_flex_files(IDataSource& in, const char* basepath) {
 	for (const auto& [location, length] : finfo) {    // Now read each file.
 		// Get file length.
 		size_t len = length;
-		if (len <= 13) {
+		if (len <= Flex_writer::MAX_FILENAME_SIZE) {
 			continue;
 		}
-		len -= 13;
+		len -= Flex_writer::MAX_FILENAME_SIZE;
 		in.seek(location);    // Get to it.
 		char fname[50];       // Set up name.
 		strcpy(fname, basepath);
-		in.read(&fname[baselen], 13);
+		in.read(&fname[baselen], Flex_writer::MAX_FILENAME_SIZE);
 		size_t namelen = strlen(fname);
 		// Watch for names ending in '.'.
 		if (fname[namelen - 1] == '.') {
@@ -1051,14 +1051,14 @@ bool GameDat::get_saveinfo(
 		// Get file length.
 		auto& [location, length] = finfo[i];
 		size_t len               = length;
-		if (len <= 13) {
+		if (len <= Flex_writer::MAX_FILENAME_SIZE) {
 			continue;
 		}
-		len -= 13;
+		len -= Flex_writer::MAX_FILENAME_SIZE;
 		in.seek(location);    // Get to it.
-		char fname[50];     // Set up name.
+		char fname[sizeof(GAMEDAT)-1+Flex_writer::MAX_FILENAME_SIZE];     // Set up name.
 		strcpy(fname, GAMEDAT);
-		in.read(&fname[sizeof(GAMEDAT) - 1], 13);
+		in.read(&fname[sizeof(GAMEDAT) - 1], Flex_writer::MAX_FILENAME_SIZE);
 		const size_t namelen = strlen(fname);
 		// Watch for names ending in '.'.
 		if (fname[namelen - 1] == '.') {
@@ -1259,8 +1259,9 @@ bool GameDat::Restore_level2(
 	char                    fixedname[50];    // Set up name.
 	const size_t            oname2offset = sizeof(GAMEDAT) + dirlen - 1;
 	char*                   oname2;
-	if (oname2offset + 13 > std::size(fixedname)) {
-		dynamicname = std::make_unique<char[]>(oname2offset + 13);
+	if (oname2offset + Flex_writer::MAX_FILENAME_SIZE > std::size(fixedname)) {
+		dynamicname = std::make_unique<char[]>(
+				oname2offset + Flex_writer::MAX_FILENAME_SIZE);
 		oname2      = dynamicname.get();
 	} else {
 		oname2 = fixedname;

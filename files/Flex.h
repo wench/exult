@@ -132,6 +132,8 @@ class Flex_writer {
 	void finish_object();              // Finished writing out a section.
 
 public:
+	constexpr static int MAX_FILENAME_SIZE = 8 + 1 + 3 + 1;
+
 	Flex_writer(
 			ODataSource& o, const char* title, size_t cnt,
 			Flex_header::Flex_vers vers   = Flex_header::orig,
@@ -165,18 +167,7 @@ private:
 	}
 
 public:
-	std::string base_name(std::string fullname) {
-		// Remove trailing (back)slash, if any
-		if (fullname.back() == '/' || fullname.back() == '\\') {
-			fullname.pop_back();
-		}
-		// Get actual basename
-		auto pos = fullname.find_last_of("/\\");
-		if (pos == std::string::npos) {
-			return fullname;
-		}
-		return fullname.substr(pos + 1);
-	}
+
 
 	std::string_view base_name(std::string_view fullname) {
 		// Remove trailing (back)slash, if any
@@ -191,19 +182,9 @@ public:
 		return fullname.substr(pos + 1);
 	}
 
-	void write_name(const std::string& fullname) {
-		std::string name = base_name(fullname);
-		name.resize(8 + 1 + 3 + 1, 0);    // DOS filename
-		dout.write(name);
-	}
-
 	void write_name(const std::string_view& fullname) {
 		std::string_view name = base_name(fullname);
-		dout.write(name);
-		for (int extra = (8 + 1 + 3 + 1) - int(name.size()); extra > 0;
-			 --extra) {
-			dout.write1(0);
-		}
+		dout.writestr(name, MAX_FILENAME_SIZE);
 	}
 
 	void write_object(const File_spec& spec) {
@@ -243,7 +224,7 @@ public:
 	}
 
 	template <typename... Ts>
-	void write_file(const File_spec& spec, Ts&&... ts) {
+	void write_file(File_spec& spec, Ts&&... ts) {
 		write_name(spec.name);
 		write_object(std::forward<Ts>(ts)...);
 	}
