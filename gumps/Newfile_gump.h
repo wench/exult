@@ -159,7 +159,7 @@ protected:
 	int selected_slot
 			= NoSlot;    // The savegame slot that has been selected
 	int  cursor = -1;    // The position of the cursor ( -1 is no cursor)
-	char newname[MAX_SAVEGAME_NAME_LEN];    // The new name for the game
+	char newname[GameDat::MAX_SAVEGAME_NAME_SIZE];    // The new name for the game
 
 	// Run in reduced functionality restore mode. Can only load and delete
 	// games. Loading games only Restores Gamedat
