@@ -1429,7 +1429,7 @@ void Game_window::write(bool nopaint) {
 	if (!savepal) {
 		savepal = pal;
 	}
-	OFileDataSource palette_dat(GPALETTE);	
+	auto palette_dat = GameDat::get()->Open_ODataSource(GPALETTE);	
 	savepal->Serialize(palette_dat);
 }
 

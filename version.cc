@@ -101,11 +101,11 @@ std::string_view VersionGetGitRevision(bool shortrev) {
 	return {};
 }
 
-std::string VersionGetGitInfo(bool limitedwidth) {
+std::pmr::string VersionGetGitInfo(bool limitedwidth) {
 	// Everything for this function can be known at compile time
 	// so could probably be made constexpr with a new enough c++ standard
 	// and compiler support
-	std::string result;
+	std::pmr::string result;
 	result.reserve(256);
 
 	if constexpr (!git_branch.empty()) {
@@ -125,7 +125,7 @@ std::string VersionGetGitInfo(bool limitedwidth) {
 	}
 
 	// Default to the Exult origin repo on github
-	std::string src_url = "https://github.com/exult/exult";
+	std::pmr::string src_url = "https://github.com/exult/exult";
 
 	// if the remote url was supplied in the build make sure it is git hub https
 	if constexpr (git_url.substr(0, 19) == "https://github.com/") {
@@ -350,7 +350,7 @@ void getVersionInfo(std::ostream& out) {
 #if (defined(ANDROID))
 	out << "Android";
 #elif (defined(__linux__) || defined(__linux) || defined(linux))
-	std::string ver;
+	std::pmr::string ver;
 
 	try {
 		std::ifstream procversion("/proc/version");
