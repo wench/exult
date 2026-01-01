@@ -46,10 +46,11 @@ class zipFile;
 class zipFile;
 class Shape_file;
 
-#define MAX_SAVEGAME_NAME_LEN 0x50
 
 class GameDat : protected Game_singletons {
 public:
+	static constexpr int MAX_SAVEGAME_NAME_SIZE = 0x50;
+
 	struct Strings {
 		static auto AutoSave() {
 			return get_text_msg(0x6EA - msg_file_start);
