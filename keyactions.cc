@@ -182,7 +182,7 @@ void ActionAbout(const int* params) {
 	scroll->add_text("Available under the terms of the ");
 	scroll->add_text("GNU General Public License~");
 	scroll->add_text("https://exult.info~");
-	std::string gitinfo = VersionGetGitInfo(true);
+	auto gitinfo = VersionGetGitInfo(true);
 	scroll->add_text(gitinfo.c_str());
 
 	scroll->paint();

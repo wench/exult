@@ -350,15 +350,22 @@ public:
 	// gamedat_in_memory lock before waiting on returned future returned future
 	// waits for disk writing to complete if todisk argument is true
 
-	std::future<void> writetoMemory(bool todisk, bool nopaint, bool screenshot);
+	void writetoMemory(bool nopaint, bool screenshot);
 
-	auto Open_ODataSource(const char* fname) {
+	bool writeMemorytoDisk();
+
+	
+	ODataSourceFileOrVector<std::pmr::polymorphic_allocator> Open_ODataSource(
+			const std::pmr::string& fname) {
 		return ODataSourceFileOrVector<std::pmr::polymorphic_allocator>(
-				get_memory_file(fname, true),
+				get_memory_file(fname, true), fname);
+	}	
+	auto Open_ODataSource(const char* fname) {
+		return Open_ODataSource(
 				std::pmr::string(fname));
 	}
 
-	std::shared_ptr<std::ostream> Open_ostream(const char* fname) {
+	std::shared_ptr<std::ostream> Open_ostream(const std::pmr::string &fname) {
 		auto memfile = get_memory_file(fname, true);
 		if (!memfile) {
 			return U7open_out(
@@ -379,7 +386,7 @@ private:
 			bool screenshot = true);    // Write the save info to gamedat
 
 	std::pmr::vector<unsigned char>* get_memory_file(
-			std::pmr::string fname, bool create);
+			const std::pmr::string &fname, bool create);
 
 
 	std::shared_ptr<IDataSource> Open_IDataSource(std::pmr::string& fname) {
@@ -497,7 +504,7 @@ public:
 	void Autosave_Now(
 			const char* savemessage = nullptr, int gflag = -1,
 			int map_from = -1, int map_to = -1, int sc_from = -1,
-			int sc_to = -1, bool wait = true, bool screenshot = false);
+			int sc_to = -1, bool noasync = true, bool screenshot = false);
 
 	void Quicksave();
 

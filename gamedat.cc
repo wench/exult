@@ -820,9 +820,7 @@ void GameDat::write_saveinfo(bool screenshot) {
 		}
 
 		for (auto npc : partyman->IterateWithMainActor) {
-			std::string name(npc->get_npc_name());
-			name.resize(sizeof(SaveGame_Party::name) - 1, '\0');
-			out.write(name.c_str(), sizeof(SaveGame_Party::name));
+			out.writestr(npc->get_npc_name_string(), sizeof(SaveGame_Party::name));
 			out.write2(npc->get_shapenum());
 
 			out.write4(npc->get_property(Actor::exp));
@@ -850,22 +848,23 @@ void GameDat::write_saveinfo(bool screenshot) {
 	}
 
 	// Delete any existing screenshot
-	 if (U7exists(GSCRNSHOT)) {
+	std::pmr::string screenshotfn(GSCRNSHOT, gamedat_in_memory.get_allocator());
+	 if (U7exists(screenshotfn)) {
 		// Delete the old one if it exists
-		U7remove(GSCRNSHOT);
+		U7remove(screenshotfn);
 	}
 	if (screenshot) {
 		std::cout << "Creating screenshot for savegame" << std::endl;
 		// Save Shape
 		try {
 			std::unique_ptr<Shape_file> map = gwin->create_mini_screenshot();
-			ODataSourceFileOrVector     out = Open_ODataSource(GSCRNSHOT);
+			ODataSourceFileOrVector     out = Open_ODataSource(screenshotfn);
 
 		map->save(&out);
 		} catch (const std::exception& e) {
 			std::cerr << "Error creating screenshot: " << e.what() << std::endl;
 			// delete partial screenshot if there was an error
-			U7remove(GSCRNSHOT);
+			U7remove(screenshotfn);
 		}
 
 	} 
@@ -1497,13 +1496,12 @@ bool GameDat::Save_level1(
 	if (!vec) {
 		try {
 			ds = IFileDataSource(U7open_in(fname));
-		}
-		catch (file_open_exception &)
-		{
+		} catch (file_open_exception&) {
 			if (Game::is_editing() || !required) {
 				return true;    // Newly developed game. or file is not
 								// required. Missing file is ok.
 			}
+
 			throw;
 		}
 		if (!ds.good()) {
@@ -1668,19 +1666,20 @@ bool GameDat::save_gamedat_zip(
 
 	// Name
 	
-		auto out = U7open_out(fname);
-		if (out) {
-			std::string title(savename);
-			title.resize(0x50, '\0');
-			out->write(title.data(), title.size());
-			if (!out->good()) {
-				throw file_write_exception(fname);
-			}
+	auto out = std::allocate_shared<OFileDataSource>(
+			std::pmr::polymorphic_allocator<OFileDataSource>(),
+			fname);
+
+	if (out && out->good()) {
+		out->writestr(std::string_view(savename), MAX_SAVEGAME_NAME_SIZE);
+		if (!out->good()) {
+			throw file_write_exception(fname);
 		}
+	}
+
 	
 	zipFile zipfile = zipOpen(
-				 std::allocate_shared<OFileDataSource>(
-						std::pmr::polymorphic_allocator<char>(), std::move(out)));
+				 out);
 
 	if (!zipfile) {
 		throw file_write_exception(fname.c_str());
@@ -1786,19 +1785,15 @@ void GameDat::MakeEmergencySave(const char* savename) {
 	// Making the Screenshot necessaily uses unique_ptrs and can't allocate it
 	// with the temporary allocator so as the process is unstable we skip making
 	// the screenshot
-	writetoMemory(false, true, false);
+	writetoMemory(true, false);
 
 	save_gamedat(SaveInfo::Type::CRASHSAVE, savename);
 }
 
 GameDat::GameDat() {}
 
-std::future<void> GameDat::writetoMemory(
-		bool todisk, bool nopaint, bool screenshot) {
-	// Promise to return if no waiting for disk writeneeded
-	std::promise<void> p;
-	p.set_value();
-#ifdef DEBUG
+void GameDat::writetoMemory(		bool nopaint, bool screenshot) {
+	#ifdef DEBUG
 	std::chrono::steady_clock::time_point start_time
 			= std::chrono::steady_clock::now();
 	#endif
@@ -1807,7 +1802,7 @@ std::future<void> GameDat::writetoMemory(
 		// In map editor, just do normal write
 		gwin->write(true);
 		GameDat::get()->write_saveinfo(screenshot);
-		return p.get_future();
+		return;
 	}
 
 	std::unique_lock memlock(gamedat_in_memory.get_mutex());
@@ -1824,45 +1819,39 @@ std::future<void> GameDat::writetoMemory(
 	std::cerr << "Gamedat saved to memory in " << elapsed_seconds.count()
 			  << " seconds\n";
 	#endif
-	if (todisk) {
-		// Unlock so the async thread doesn't immediately block assming our caller doesn't also hold the lock
-		// If caller holds the lock they will deadlock if they wait on the future before releasing the lock
-		memlock.unlock();
-		// Now write it all out to disk in a separate thread
-		return std::async(std::launch::async, [this]() {
+}
+
+bool GameDat::writeMemorytoDisk() {
+	if (!gamedat_in_memory.active) {
+		return false;
+	}
 			std::unique_lock memlock(gamedat_in_memory.get_mutex());
-			if (gamedat_in_memory.active) {
+	bool success = true;
 #ifdef DEBUG
 				std::chrono::steady_clock::time_point start_time
 						= std::chrono::steady_clock::now();
 #endif
 				// Write out all files to disk
-				std::pmr::string fname_str;
+				std::pmr::string fname_str(gamedat_in_memory.get_allocator());
 				for (const auto& [fname, data] : *(gamedat_in_memory.files)) {
-					fname_str = fname;
-					auto out  = U7open_out(fname_str, false);
+										auto out  = U7open_out(fname, false);
 					if (out->good()) {
-						out->write(
-								reinterpret_cast<const char*>(data.data()),
-								data.size());
+						out->write(								reinterpret_cast<const char*>(data.data()), 								data.size());
 					}
+					success &= out->good();
 				}
 #ifdef DEBUG
 				std::chrono::steady_clock::time_point end_time
 						= std::chrono::steady_clock::now();
-				std::chrono::duration<double> elapsed_seconds
-						= end_time - start_time;
-				std::cerr << "Gamedat saved to disk in "
-						  << elapsed_seconds.count() << " seconds\n";
+				std::chrono::duration<double> elapsed_seconds 						= end_time - start_time;
+				std::cerr << "Gamedat " << (!success?"failed to save":"saved") << " to disk in " 						  << elapsed_seconds.count()
+<< " seconds\n";
 #endif
-			}
-		});
-	}
-	return p.get_future();
+				return success;
 }
 
 std::pmr::vector<unsigned char>* GameDat::get_memory_file(
-		std::pmr::string fname, bool create) {
+		const std::pmr::string &fname, bool create) {
 	if (!gamedat_in_memory.mutex.try_lock()) {
 		// Another thread accessing gamedat in memory; disallow access
 		return nullptr;
@@ -2168,7 +2157,7 @@ void GameDat::Queue_Autosave(
 
 void GameDat::Autosave_Now(
 		const char* savemessage, int gflag, int map_from, int map_to,
-		int sc_from, int sc_to, bool wait, bool screenshot) {
+		int sc_from, int sc_to, bool noasync, bool screenshot) {
 
 	gamedat_in_memory.clear();
 	SaveInfo::Type type = SaveInfo::Type::AUTOSAVE;
@@ -2219,38 +2208,41 @@ void GameDat::Autosave_Now(
 				to_x, to_y, map_to);
 	}
 
-	auto wtm_f = gamedat->writetoMemory(
-			Settings::get().disk.autosaves_write_to_gamedat, true, screenshot);
+	gamedat->writetoMemory(
+true, screenshot);
 
-	auto &sg_f = save_gamedat_async(type, autosave_name);
-	// If wait requested, wait on both futures
-	if (wait) {
-		sg_f.wait();
-		wtm_f.wait();
+	if (			Settings::get().disk.autosaves_write_to_gamedat)
+	{
+		writeMemorytoDisk();
+	}
+
+	if (noasync) {
+		save_gamedat(type, autosave_name);
+	} else {
+		save_gamedat_async(type, autosave_name);
 	}
 }
 
 void GameDat::Quicksave() {
 	gamedat_in_memory.clear();
-	auto f = writetoMemory(true, false, true);
+	writetoMemory(false, true);
+	writeMemorytoDisk();
 	
-	save_gamedat_async(SaveInfo::Type::QUICKSAVE, "").wait();
-	f.wait();
+	save_gamedat(SaveInfo::Type::QUICKSAVE, "");
 }
 
 void GameDat::Savegame(
 		const char* fname, const char* savename, bool no_paint,
 		bool screenshot) {
-
-	auto f = writetoMemory(true, no_paint, screenshot);
-	save_gamedat_async(fname, savename).wait();
-	f.wait();
+writetoMemory(no_paint, screenshot);
+	writeMemorytoDisk();
+	save_gamedat(fname, savename);
 }
 
 void GameDat::Savegame(const char* savename, bool no_paint, bool screenshot) {
-	auto f = writetoMemory(true, no_paint, screenshot);
-	save_gamedat_async(SaveInfo::Type::REGULAR, savename).wait();
-	f.wait();
+	writetoMemory(no_paint, screenshot);
+	writeMemorytoDisk();
+	save_gamedat(SaveInfo::Type::REGULAR, savename);
 }
 
 void GameDat::Extractgame(const char* fname, bool doread) {

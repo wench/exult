@@ -532,7 +532,7 @@ public:
 	std::string get_name() const override;
 	std::string get_npc_name() const;
 
-	std::string get_npc_name_string() const {
+	std::string_view get_npc_name_string() const {
 		return name;
 	}
 
