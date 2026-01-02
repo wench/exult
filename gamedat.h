@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "vgafile.h"
 
 #include <array>
+#include <chrono>
 #include <deque>
 #include <future>
 #include <memory>
@@ -417,7 +418,7 @@ private:
 	std::shared_future<void>& save_gamedat_async(
 			std::variant<SaveInfo::Type, const char*> type_or_filename,
 			const char*                               savename);
-	void read_saveinfo(bool newgame);    // Read the save info from gamedat
+	void init(bool newgame);    // Read the save info from gamedat
 
 	void restore_flex_files(IDataSource& in, const char* basepath);
 
@@ -491,6 +492,8 @@ private:
 		void handle_event(unsigned long curtime, uintptr udata) override;
 
 	} autosave_event;
+
+std::chrono::steady_clock::time_point last_autosave = {};
 
 public:
 	// Queue an autosave to occur at the next possible time. Safe to call at any

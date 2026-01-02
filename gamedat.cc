@@ -889,19 +889,24 @@ void GameDat::write_saveinfo(bool screenshot) {
 	}
 }
 
-void GameDat::read_saveinfo(bool newgame) {
-	// if newgame, reset save count just in case the initgame file contains saveinfo.dat 
-	// U6 mod has one and it should be ignored so save count starts at 0 for players
-	save_count = 0;
-	cheat.set_cheated(false);
+void GameDat::init(bool newgame) {
+
+	// Reset last_autosave 
+	last_autosave = std::chrono::steady_clock::now()
+					- std::chrono::seconds(
+							Settings::get().disk.autosave_limit_time.get());
+
 	if (newgame)
 	{
-		return;
 		// Remove the saveinfo if exists to prevent reading it in the future
 		if (U7exists(GSAVEINFO)) {
 			U7remove(GSAVEINFO);
 		}
+		save_count = 0;
+		cheat.set_cheated(false);
+		return;
 	}
+	// Read save count and cheated flag from SaveInfo if it exists
 	IFileDataSource ds(GSAVEINFO);
 	if (ds.good()) {
 		ds.skip(10);    // Skip 10 bytes.
@@ -2159,6 +2164,13 @@ void GameDat::Autosave_Now(
 		const char* savemessage, int gflag, int map_from, int map_to,
 		int sc_from, int sc_to, bool noasync, bool screenshot) {
 
+	if ((last_autosave + std::chrono::seconds(Settings::get().disk.autosave_limit_time.get())) > std::chrono::steady_clock::now())
+	{
+		// Last autosave was too recent so we can't do onenow
+		return;
+	}
+	last_autosave = std::chrono::steady_clock::now();
+
 	gamedat_in_memory.clear();
 	SaveInfo::Type type = SaveInfo::Type::AUTOSAVE;
 
@@ -2263,6 +2275,22 @@ void GameDat::Autosave_Event::handle_event(
 	ignore_unused_variable_warning(curtime);
 	ignore_unused_variable_warning(udata);
 	
+
+	auto wait = std::chrono::duration_cast<std::chrono::milliseconds>(
+			gamedat->last_autosave+std::chrono::seconds(
+					Settings::get().disk.autosave_limit_time.get())
+			- std::chrono::steady_clock::now());
+	if (wait.count() > 0) {
+					
+		std::cout << "Delaying Autosave for " << wait.count() << "ms"<< std::endl;
+		// Last autosave was too recent so we can't do one now
+		auto tqueue = gwin->get_tqueue();
+		auto lock   = tqueue->get_lock();
+		// Queue the autosave event to happen again after the timout will have expired
+		tqueue->add(curtime + wait.count(), this);
+		return;
+	}
+
 	// If don't move is set delay autosave till flag is cleared
 	if (gwin->main_actor_dont_move())
 	{
