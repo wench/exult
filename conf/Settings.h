@@ -389,7 +389,14 @@ public:
 		using typename Base::valuetype;
 		using Base::operator const typename Base::valuetype &;
 
+		// save does nothing
+		virtual void save(bool) override {
+		}
+
 	private:
+		void forceSave(bool write_out = false) {
+			Base::save(write_out);
+		}
 		using Base::set;
 		using Base::operator=;
 	};
@@ -470,6 +477,10 @@ public:
 		ReadOnly<enum_like_property<bool>> use_old_style_save_load
 				= {"config/disk/use_old_style_save_load", false,
 				   Settings::boolyesnoany, true, this};
+
+		ReadOnly<int_property<>> autosave_limit_time
+				= {"config/disk/autosave_limit_time", 60, 0,
+				   std::numeric_limits<int>::max(), this};
 
 		enum SaveGame_sort {
 			SORTBY_REALTIME = 0,
