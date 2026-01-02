@@ -835,7 +835,6 @@ void Cheat::toggle_selected(Game_object* obj) {
  *  Clear out selection.
  */
 void Cheat::clear_selected() {
-	set_cheated();
 	if (selected.empty()) {
 		return;
 	}
