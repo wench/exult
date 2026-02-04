@@ -513,3 +513,178 @@
 0x772: Terrain-Editing Enabled
 0x773: Map #
 
+#keys.cc - Action description strings
+#VOLUME_MIXER
+0x800:Volume Mixer
+#QUIT
+0x801:Quit
+#SAVE_RESTORE
+0x802:Save/restore
+#QUICKSAVE
+0x803:Quick-save
+#QUICKRESTORE
+0x804:Quick-restore
+#ABOUT
+0x805:About Exult
+#HELP
+0x806:List keys
+#CLOSE_GUMPS
+0x807:Close gumps
+#CLOSE_OR_MENU
+0x808:Game menu
+#SCREENSHOT
+0x809:Take screenshot
+#GAME_MENU
+0x80a:Game Menu
+#OLD_FILE_GUMP
+0x80b:Save/restore
+#SCALEVAL_INCREASE
+0x80c:Increase scaleval
+#SCALEVAL_DECREASE
+0x80d:Decrease scaleval
+#BRIGHTER
+0x80e:Increase brightness
+#DARKER
+0x80f:Decrease brightness
+#TOGGLE_FULLSCREEN
+0x810:Toggle fullscreen
+#USEITEM
+0x811:Use item
+#USEFOOD
+0x812:Feed
+#CALL_USECODE
+0x813:Call Usecode
+#TOGGLE_COMBAT
+0x814:Toggle combat
+#PAUSE_COMBAT
+0x815:Pause combat
+#TARGET_MODE
+0x816:Target mode
+#INVENTORY
+0x817:Show inventory
+#TRY_KEYS
+0x818:Try keys
+#STATS
+0x819:Show stats
+#COMBAT_STATS
+0x81a:Show combat stats
+#FACE_STATS
+0x81b:Change Face Stats State
+#USE_HEALING_ITEMS
+0x81c:Use bandages or healing potions
+#SHOW_SI_INTRO
+0x81d:Show Alternate SI intro
+#SHOW_ENDGAME
+0x81e:Show endgame
+#SCROLL_LEFT
+0x81f:Scroll left
+#SCROLL_RIGHT
+0x820:Scroll right
+#SCROLL_UP
+0x821:Scroll up
+#SCROLL_DOWN
+0x822:Scroll down
+#WALK_WEST
+0x823:Walk west
+#WALK_EAST
+0x824:Walk east
+#WALK_NORTH
+0x825:Walk north
+#WALK_SOUTH
+0x826:Walk south
+#WALK_NORTH_EAST
+0x827:Walk north-east
+#WALK_SOUTH_EAST
+0x828:Walk south-east
+#WALK_NORTH_WEST
+0x829:Walk north-west
+#WALK_SOUTH_WEST
+0x82a:Walk south-west
+#CENTER_SCREEN
+0x82b:Center screen
+#SHAPE_BROWSER
+0x82c:Shape browser
+#SHAPE_BROWSER_HELP
+0x82d:List shape browser keys
+#CREATE_ITEM
+0x82e:Create last shape
+#DELETE_OBJECT
+0x82f:Delete object
+#TOGGLE_EGGS
+0x830:Toggle egg display
+#TOGGLE_GOD_MODE
+0x831:Toggle god mode
+#CHANGE_GENDER
+0x832:Change gender
+#CHEAT_HELP
+0x833:List cheat keys
+#TOGGLE_INFRAVISION
+0x834:Toggle infravision
+#TOGGLE_HACK_MOVER
+0x835:Toggle hack-mover mode
+#MAP_TELEPORT
+0x836:Map teleport
+#CURSOR_TELEPORT
+0x837:Teleport to cursor
+#TARGET_MODE_TELEPORT
+0x838:Bring up cursor to teleport
+#NEXT_MAP_TELEPORT
+0x839:Teleport to next map
+#NEXT_TIME_PERIOD
+0x83a:Next time period
+#TOGGLE_WIZARD_MODE
+0x83b:Toggle archwizard mode
+#PARTY_HEAL
+0x83c:Heal party
+#PARTY_INCREASE_LEVEL
+0x83d:Level-up party
+#CHEAT_SCREEN
+0x83e:Cheat Screen
+#PICK_POCKET
+0x83f:Toggle Pick Pocket
+#NPC_NUMBERS
+0x840:Toggle NPC Numbers
+#GRAB_ACTOR
+0x841:Grab NPC for Cheat Screen
+#PLAY_MUSIC
+0x842:Play song
+#TOGGLE_NAKED
+0x843:Toggle naked mode
+#TOGGLE_PETRA
+0x844:Toggle Petra mode
+#CHANGE_SKIN
+0x845:Change skin colour
+#NOTEBOOK
+0x846:Show notebook
+#SOUND_TESTER
+0x847:Sound tester
+#TEST
+0x848:Test
+#MAPEDIT_HELP
+0x849:List mapedit keys
+#TOGGLE_MAP_EDITOR
+0x84a:Toggle map-editor mode
+#SKIPLIFT_DECREMENT
+0x84b:Decrement skiplift
+#CUT
+0x84c:Cut Selected Objects
+#COPY
+0x84d:Copy Selected Objects
+#PASTE
+0x84e:Paste Selected Objects
+#DELETE_SELECTED
+0x84f:Delete selected
+#MOVE_SELECTED
+0x850:Move selected
+#CYCLE_FRAMES_NEXT
+0x851:Cycle frames next
+#CYCLE_FRAMES_PREV
+0x852:Cycle frames previus
+#ROTATE_FRAMES
+0x853:Rotate frames
+#WRITE_MINIMAP
+0x854:Write minimap
+#REPAINT
+0x855:Repaint screen
+#TOGGLE_BBOXES
+0x856:Toggle bounding boxes
