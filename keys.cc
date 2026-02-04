@@ -531,30 +531,18 @@ void KeyBinder::ShowMapeditHelp() const {
 void KeyBinder::ShowBrowserKeys() const {
 	auto* scroll = new Scroll_gump();
 	scroll->set_from_help(true);
-	scroll->add_text("Esc - Exits the shape browser");
-	scroll->add_text("down - Increase shape by 1");
-	scroll->add_text("R - toggle palette rotation");
-	scroll->add_text("S - Increase shape by 1");
-	scroll->add_text("up - Decrease shape by 1");
-	scroll->add_text("Shift-S - Decrease shape by 1");
-	scroll->add_text("Page down - Increase shape by 20");
-	scroll->add_text("J - Increase shape by 20");
-	scroll->add_text("Page up - Decrease shape by 20");
-	scroll->add_text("Shift-J - Decrease shape by 20");
-	scroll->add_text("right - Increase frame by 1");
-	scroll->add_text("F - Increase frame by 1");
-	scroll->add_text("left - Decrease frame by 1");
-	scroll->add_text("Shift-F - Decrease frame by 1");
-	scroll->add_text("V - Increase vga file by 1");
-	scroll->add_text("Shift-V - Decrease vga file by 1");
-	scroll->add_text("P - Increase palette by 1");
-	scroll->add_text("Shift-P - Decrease palette by 1");
-	scroll->add_text("X - Increase xform by 1");
-	scroll->add_text("Shift-X - Decrease xform by 1");
-	scroll->add_text("B - Toggle 3d Bounding Boxes");
+	int msgid = 0x860;
+	for (; msgid < 0x900; ++msgid) {
+		const char* text = get_text_msg(msgid - msg_file_start);
+		// hit the terminator
+		if (!text || !*text) {
+			break;
+		}
+		scroll->add_text(text);
+	}
 	char returned_key[200];
 	if (last_created_key.empty()) {
-		strcpy(returned_key, "Error: No key assigned");
+		strcpy(returned_key,get_text_msg(0x87D - msg_file_start));    // "Error: No key assigned"
 	} else {
 		strcpy(returned_key, "");    // prevent garbage text
 		int extra_keys = 0;
@@ -562,14 +550,15 @@ void KeyBinder::ShowBrowserKeys() const {
 			if (extra_keys >= 5) {
 				continue;
 			} else if (extra_keys > 0) {
-				strcat(returned_key, " or ");
+				strcat(returned_key,get_text_msg(0x87E - msg_file_start));    // " or "
 			}
 			strcat(returned_key, iter.c_str());
 			extra_keys += 1;
 		}
 	}
-	strcat(returned_key, " - when pressed in game will create the last shape "
-						 "viewed in shapes.vga.");
+
+	strcat(returned_key,get_text_msg(0x87F - msg_file_start));    // " - when pressed in game will create the last shape 
+													//viewed in shapes.vga."
 	scroll->add_text(returned_key);
 	scroll->paint();
 	do {

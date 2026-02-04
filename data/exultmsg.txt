@@ -688,3 +688,36 @@
 0x855:Repaint screen
 #TOGGLE_BBOXES
 0x856:Toggle bounding boxes
+
+
+#Shape Browser Help
+
+#The Entire block starting at 0x860 until the terminator will be displayed in order in the Shape Browser Help
+0x860:Esc - Exits the shape browser
+0x861:down - Increase shape by 1
+0x862:R - toggle palette rotation
+0x863:S - Increase shape by 1
+0x864:up - Decrease shape by 1
+0x865:Shift-S - Decrease shape by 1
+0x866:Page down - Increase shape by 20
+0x867:J - Increase shape by 20
+0x868:Page up - Decrease shape by 20
+0x869:Shift-J - Decrease shape by 20
+0x86A:right - Increase frame by 1
+0x86B:F - Increase frame by 1
+0x86C:left - Decrease frame by 1
+0x86D:Shift-F - Decrease frame by 1
+0x86E:V - Increase vga file by 1
+0x86F:Shift-V - Decrease vga file by 1
+0x870:P - Increase palette by 1
+0x871:Shift-P - Decrease palette by 1
+0x872:X - Increase xform by 1
+0x873:Shift-X - Decrease xform by 1
+0x874:B - Toggle 3d Bounding Boxes
+# this line is the block terminator and must remain an empty string
+0x875:
+
+#If the following lines have their index changed, keys.cc must be updated
+0x87D:Error: No key assigned
+0x87E: or 
+0x87F: - when pressed in game will create the last shape viewed in shapes.vga.
