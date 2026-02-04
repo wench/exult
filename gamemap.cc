@@ -1820,9 +1820,9 @@ bool Game_map::write_minimap() {
 			gwin->paint();
 			gwin->show();
 			maps[i]->create_minimap(&shape, chunk_pixels.get());
-			eman->remove_text_effects();
 		}
 	}
+	U7mkdir("<PATCH>", 0755);    // Create dir if not already there.
 	OFileDataSource mfile(PATCH_MINIMAPS);    // May throw exception.
 	Flex_writer     writer(mfile, "Written by Exult", 1);
 	writer.write_object(shape);
