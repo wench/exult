@@ -227,10 +227,6 @@ public:
 	static auto Serif() {
 		return get_text_msg(0x5DA - msg_file_start);
 	}
-
-	static auto FontsDisabled() {
-		return get_text_msg(0x5DB - msg_file_start);
-	}
 };
 
 using GameDisplayOptions_button = CallbackTextButton<GameDisplayOptions_gump>;
@@ -382,7 +378,7 @@ void GameDisplayOptions_gump::build_buttons() {
 			yForRow(++y_index), large_size);
 
 	auto fonts_txt = std::vector<std::string>{
-			Strings::Original(), Strings::Serif(), Strings::FontsDisabled()};
+			Strings::Original(), Strings::Serif(), Strings::Disabled()};
 	buttons[id_fonts] = std::make_unique<GameDisplayTextToggle>(
 			this, &GameDisplayOptions_gump::toggle_fonts, fonts_txt, fonts,
 			get_button_pos_for_label(Strings::Fonts_()), yForRow(++y_index),
