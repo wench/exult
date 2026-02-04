@@ -649,7 +649,8 @@ void Game_window::init_files(bool cycle) {
  *  Read any map. (This is for "multimap" games, not U7.)
  */
 
-Game_map* Game_window::get_map(int num    // Should be > 0.
+Game_map* Game_window::get_map(
+		int num    // Should be > 0.
 ) {
 	if (num >= static_cast<int>(maps.size())) {
 		maps.resize(num + 1);
@@ -736,7 +737,8 @@ bool Game_window::in_infravision() const {
  *  Add time for a light spell.
  */
 
-void Game_window::add_special_light(int units    // Light=500, GreatLight=5000.
+void Game_window::add_special_light(
+		int units    // Light=500, GreatLight=5000.
 ) {
 	if (!special_light) {    // Nothing in effect now?
 		special_light = clock->get_total_minutes();
@@ -749,9 +751,10 @@ void Game_window::add_special_light(int units    // Light=500, GreatLight=5000.
  *  Set 'stop time' value.
  */
 
-void Game_window::set_time_stopped(long delay    // Delay in ticks (1/1000
-												 // secs.), -1 to stop
-												 // indefinitely, or 0 to end.
+void Game_window::set_time_stopped(
+		long delay    // Delay in ticks (1/1000
+					  // secs.), -1 to stop
+					  // indefinitely, or 0 to end.
 ) {
 	if (delay == -1) {
 		time_stopped = -1;
@@ -1145,7 +1148,8 @@ void Game_window::set_scrolls(int newscrolltx, int newscrollty) {
  *  center_view.)
  */
 
-void Game_window::set_scrolls(Tile_coord cent    // Want center here.
+void Game_window::set_scrolls(
+		Tile_coord cent    // Want center here.
 ) {
 	// Figure in tiles.
 	// OFFSET HERE
@@ -1913,6 +1917,19 @@ void Game_window::start_actor(
 		if (sched != Schedule::follow_avatar && sched != Schedule::combat
 			&& !main_actor->get_flag(Obj_flags::asleep)) {
 			main_actor->set_schedule_type(Schedule::follow_avatar);
+			// If the avatar was *not* in combat or follow avatar schedules,
+			// then we need to reset the schedules of party members when the
+			// Avatar moves.
+			const int cnt = party_man->get_count();
+			for (int i = 0; i < cnt; i++) {
+				Actor* npc = get_npc(party_man->get_member(i));
+				// Not sure how much of this is needed, but in any case...
+				if (npc == nullptr || npc->get_flag(Obj_flags::asleep)
+					|| npc->is_dead()) {
+					continue;
+				}
+				npc->set_schedule_type(Schedule::follow_avatar);
+			}
 		}
 		// Going to use the alternative function for this at the moment
 		start_actor_alt(winx, winy, speed);

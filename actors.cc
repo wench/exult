@@ -4843,6 +4843,8 @@ void Main_actor::handle_event(
  */
 
 void Main_actor::get_followers() const {
+	// TODO: I'm not sure this is needed with the recent changes to
+	// Game_window::start_actor.
 	const int cnt = partyman->get_count();
 	for (int i = 0; i < cnt; i++) {
 		Actor* npc = gwin->get_npc(partyman->get_member(i));
