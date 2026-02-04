@@ -47,6 +47,52 @@
 #include "palette.h"
 #include "shapeid.h"
 
+#include <iomanip>
+#include <sstream>
+
+namespace {
+
+	class Strings {
+	public:
+		static auto ShowKeys() {
+			return get_text_msg(0x8B0 - msg_file_start);
+		}
+
+		static auto VgaFile() {
+			return get_text_msg(0x8B1 - msg_file_start);
+		}
+
+		static auto Shape() {
+			return get_text_msg(0x8B2 - msg_file_start);
+		}
+
+		static auto Frame() {
+			return get_text_msg(0x8B3 - msg_file_start);
+		}
+
+		static auto Palette() {
+			return get_text_msg(0x8B4 - msg_file_start);
+		}
+
+		static auto Class() {
+			return get_text_msg(0x8B5 - msg_file_start);
+		}
+
+		static auto ReadyType() {
+			return get_text_msg(0x8B6 - msg_file_start);
+		}
+
+		static auto ThreeD() {
+			return get_text_msg(0x8B7 - msg_file_start);
+		}
+
+		static auto NoShape() {
+			return get_text_msg(0x8B8 - msg_file_start);
+		}
+	};
+
+}    // namespace
+
 ShapeBrowser::ShapeBrowser() {
 	num_shapes      = 0;
 	current_shape   = 0;
@@ -253,31 +299,45 @@ void ShapeBrowser::browse_shapes() {
 			pal.apply();
 
 			font->paint_text_fixedwidth(
-					ibuf, "Show [K]eys", 2, maxy - 50, 8, fontcolor.colors);
+					ibuf, Strings::ShowKeys(), 2, maxy - 50, 8,
+					fontcolor.colors);
 
-			snprintf(buf, sizeof(buf), "VGA File: '%s'", fname);
-			font->paint_text_fixedwidth(
-					ibuf, buf, 2, maxy - 30, 8, fontcolor.colors);
+			{
+				std::ostringstream oss;
+				oss << Strings::VgaFile() << fname << "'";
+				font->paint_text_fixedwidth(
+						ibuf, oss.str().c_str(), 2, maxy - 30, 8,
+						fontcolor.colors);
+			}
 
 			num_shapes = get_num_shapes();
-			snprintf(
-					buf, sizeof(buf), "Shape: %2d/%d", current_shape,
-					num_shapes - 1);
-			font->paint_text_fixedwidth(
-					ibuf, buf, 2, maxy - 20, 8, fontcolor.colors);
+			{
+				std::ostringstream oss;
+				oss << Strings::Shape() << std::setw(2) << current_shape << "/"
+					<< (num_shapes - 1);
+				font->paint_text_fixedwidth(
+						ibuf, oss.str().c_str(), 2, maxy - 20, 8,
+						fontcolor.colors);
+			}
 
 			num_frames = get_num_frames(current_shape);
-			snprintf(
-					buf, sizeof(buf), "Frame: %2d/%d", current_frame,
-					num_frames - 1);
-			font->paint_text_fixedwidth(
-					ibuf, buf, 162, maxy - 20, 8, fontcolor.colors);
+			{
+				std::ostringstream oss;
+				oss << Strings::Frame() << std::setw(2) << current_frame << "/"
+					<< (num_frames - 1);
+				font->paint_text_fixedwidth(
+						ibuf, oss.str().c_str(), 162, maxy - 20, 8,
+						fontcolor.colors);
+			}
 
-			snprintf(
-					buf, sizeof(buf), "Palette: %s, %d", pal_tuple.str,
-					pal_tuple.num);
-			font->paint_text_fixedwidth(
-					ibuf, buf, 2, maxy - 10, 8, fontcolor.colors);
+			{
+				std::ostringstream oss;
+				oss << Strings::Palette() << pal_tuple.str << ", "
+					<< pal_tuple.num;
+				font->paint_text_fixedwidth(
+						ibuf, oss.str().c_str(), 2, maxy - 10, 8,
+						fontcolor.colors);
+			}
 
 			if (num_frames) {
 				Shape_frame* frame
@@ -314,18 +374,21 @@ void ShapeBrowser::browse_shapes() {
 						const Shape_info& info
 								= ShapeID::get_info(current_shape);
 
-						snprintf(
-								buf, sizeof(buf),
-								"class: %2i  ready_type: 0x%02x 3d: %ix%ix%i",
-								info.get_shape_class(), info.get_ready_type(),
-								info.get_3d_xtiles(current_frame),
-								info.get_3d_ytiles(current_frame),
-								info.get_3d_height());
-						font->paint_text_fixedwidth(
-								ibuf, buf, 2, 12, 8, fontcolor.colors);
-
-						// TODO: do we want to display something other than
-						// this for shapes >= 1024?
+						{
+							std::ostringstream oss;
+							oss << Strings::Class() << std::setw(2)
+								<< info.get_shape_class()
+								<< Strings::ReadyType() << std::hex
+								<< std::setfill('0') << std::setw(2)
+								<< static_cast<int>(info.get_ready_type())
+								<< std::dec << Strings::ThreeD()
+								<< info.get_3d_xtiles(current_frame) << "x"
+								<< info.get_3d_ytiles(current_frame) << "x"
+								<< info.get_3d_height();
+							font->paint_text_fixedwidth(
+									ibuf, oss.str().c_str(), 2, 12, 8,
+									fontcolor.colors);
+						}
 						if (current_shape < get_num_item_names()
 							&& get_item_name(current_shape)) {
 							font->paint_text_fixedwidth(
@@ -352,10 +415,12 @@ void ShapeBrowser::browse_shapes() {
 
 				} else {
 					font->draw_text(
-							ibuf, centerx - 20, centery - 5, "No Shape");
+							ibuf, centerx - 20, centery - 5,
+							Strings::NoShape());
 				}
 			} else {
-				font->draw_text(ibuf, centerx - 20, centery - 5, "No Shape");
+				font->draw_text(
+						ibuf, centerx - 20, centery - 5, Strings::NoShape());
 			}
 
 			pal.apply();

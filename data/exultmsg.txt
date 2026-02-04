@@ -721,3 +721,32 @@
 0x87D:Error: No key assigned
 0x87E: or 
 0x87F: - when pressed in game will create the last shape viewed in shapes.vga.
+
+# soundtester.cc
+0x890: Sound Tester
+0x891: ------------
+0x892:
+0x893:    Up/I - Previous Type
+0x894:  Down/K - Next Type
+0x895:  Left/J - Previous Number
+0x896: Right/L - Next Number
+0x897:   Enter - Play it
+0x898:     ESC - Leave
+0x899:       R - Repeat Music
+0x89A:       S - Stop Music
+0x89B:       D - Dump Music Track
+0x89C: Music
+0x89D: SFX
+0x89E: Voice
+0x89F: - Repeat
+
+# browser.cc
+0x8B0: Show [K]eys
+0x8B1: VGA File: '
+0x8B2: Shape: 
+0x8B3: Frame: 
+0x8B4: Palette: 
+0x8B5: class: 
+0x8B6:   ready_type: 0x
+0x8B7:  3d: 
+0x8B8: No Shape

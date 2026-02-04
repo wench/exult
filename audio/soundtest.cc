@@ -43,9 +43,37 @@
 #include "font.h"
 #include "gamewin.h"
 #include "gump_utils.h"
+#include "items.h"
 #include "mouse.h"
 #include "soundtest.h"
 #include "tqueue.h"
+
+#include <iomanip>
+#include <sstream>
+
+namespace {
+
+	// Only the strings used in dynamic display lines
+	class Strings {
+	public:
+		static auto Music() {
+			return get_text_msg(0x89C - msg_file_start);
+		}
+
+		static auto Sfx() {
+			return get_text_msg(0x89D - msg_file_start);
+		}
+
+		static auto Voice() {
+			return get_text_msg(0x89E - msg_file_start);
+		}
+
+		static auto Repeat() {
+			return get_text_msg(0x89F - msg_file_start);
+		}
+	};
+
+}    // namespace
 
 void SoundTester::test_sound() {
 	Game_window*          gwin = Game_window::get_instance();
@@ -86,58 +114,33 @@ void SoundTester::test_sound() {
 				repeat = player->is_repeating();
 			}
 			line = first_line;
-			font->paint_text_fixedwidth(
-					ibuf, "Sound Tester", left, line, width);
-			line += height;
-			font->paint_text_fixedwidth(
-					ibuf, "------------", left, line, width);
-
-			line += height * 2;
-			font->paint_text_fixedwidth(
-					ibuf, "   Up/I - Previous Type", left, line, width);
-
-			line += height;
-			font->paint_text_fixedwidth(
-					ibuf, " Down/K - Next Type", left, line, width);
-
-			line += height;
-			font->paint_text_fixedwidth(
-					ibuf, " Left/J - Previous Number", left, line, width);
-
-			line += height;
-			font->paint_text_fixedwidth(
-					ibuf, "Right/L - Next Number", left, line, width);
-
-			line += height;
-			font->paint_text_fixedwidth(
-					ibuf, "  Enter - Play it", left, line, width);
-
-			line += height;
-			font->paint_text_fixedwidth(
-					ibuf, "    ESC - Leave", left, line, width);
-
-			line += height;
-			font->paint_text_fixedwidth(
-					ibuf, "      R - Repeat Music", left, line, width);
-
-			line += height;
-			font->paint_text_fixedwidth(
-					ibuf, "      S - Stop Music", left, line, width);
-
+			// Paint controls from exultmsg.txt block 0x890-0x89B
 #ifdef DEBUG
-			line += height;
-			font->paint_text_fixedwidth(
-					ibuf, "      D - Dump Music Track ", left, line, width);
+			// "D - Dump Music Track"
+			constexpr int msg_end = 0x89B;
+#else
+			constexpr int msg_end = 0x89A;
 #endif
+			for (int msgid = 0x890; msgid <= msg_end; ++msgid) {
+				font->paint_text_fixedwidth(
+						ibuf, get_text_msg(msgid - msg_file_start), left, line,
+						width);
+				line += height;
+			}
 
-			snprintf(
-					buf, sizeof(buf), "%2s Music %c%c%3i%c%c %s",
-					active == 0 ? "->" : "", active == 0 ? '<' : ' ',
-					(player && player->is_track_playing(song)) ? '*' : ' ', song,
-					(player && player->is_track_playing(song)) ? '*' : ' ',
-					active == 0 ? '>' : ' ', repeat ? "- Repeat" : "");
-			line += height * 2;
-			font->paint_text_fixedwidth(ibuf, buf, left, line, width);
+			{
+				std::ostringstream oss;
+				oss << (active == 0 ? "->" : "  ") << " " << Strings::Music()
+					<< " " << (active == 0 ? '<' : ' ')
+					<< ((player && player->is_track_playing(song)) ? '*' : ' ')
+					<< std::setw(3) << song
+					<< ((player && player->is_track_playing(song)) ? '*' : ' ')
+					<< (active == 0 ? '>' : ' ')
+					<< (repeat ? Strings::Repeat() : "");
+				line += height * 2;
+				font->paint_text_fixedwidth(
+						ibuf, oss.str().c_str(), left, line, width);
+			}
 			line += height;
 			if (player && player->get_current_track() != -1) {
 				formattime(
@@ -146,12 +149,14 @@ void SoundTester::test_sound() {
 				font->paint_text_fixedwidth(ibuf, buf, left, line, width);
 			}
 			line += height;
-			snprintf(
-					buf, sizeof(buf), "%2s SFX   %c %3i %c",
-					active == 1 ? "->" : "", active == 1 ? '<' : ' ', sfx,
-					active == 1 ? '>' : ' ');
-
-			font->paint_text_fixedwidth(ibuf, buf, left, line, width);
+			{
+				std::ostringstream oss;
+				oss << (active == 1 ? "->" : "  ") << " " << Strings::Sfx()
+					<< "   " << (active == 1 ? '<' : ' ') << " " << std::setw(3)
+					<< sfx << " " << (active == 1 ? '>' : ' ');
+				font->paint_text_fixedwidth(
+						ibuf, oss.str().c_str(), left, line, width);
+			}
 			line += height;
 			if (sfx_id != -1 && mixer->isPlaying(sfx_id)) {
 				formattime(
@@ -161,12 +166,14 @@ void SoundTester::test_sound() {
 			}
 			line += height;
 
-			snprintf(
-					buf, sizeof(buf), "%2s Voice %c %3i %c",
-					active == 2 ? "->" : "", active == 2 ? '<' : ' ', voice,
-					active == 2 ? '>' : ' ');
-
-			font->paint_text_fixedwidth(ibuf, buf, left, line, width);
+			{
+				std::ostringstream oss;
+				oss << (active == 2 ? "->" : "  ") << " " << Strings::Voice()
+					<< " " << (active == 2 ? '<' : ' ') << " " << std::setw(3)
+					<< voice << " " << (active == 2 ? '>' : ' ');
+				font->paint_text_fixedwidth(
+						ibuf, oss.str().c_str(), left, line, width);
+			}
 			line += height;
 			if (audio->is_speech_playing()) {
 				int speech_id = audio->get_speech_id();
