@@ -1345,9 +1345,9 @@ inline void Compare_ranges(
 		}
 		// from1 == from2
 		else if (to1 < to2) {
-			cmp = -1;
-		} else if (to1 > to2) {
 			cmp = 1;
+		} else if (to1 > to2) {
+			cmp = -1;
 		} else {
 			cmp = 0;
 		}
@@ -1400,15 +1400,20 @@ int Game_object::compare(
 		} else if (!inf2.zs) {
 			return TRACE_COMPARE(1);
 		}
+		// Fix small object on top of large: at same base Z, smaller
+		// footprint should be drawn first (behind the larger object).
+		if (inf1.tz == inf2.tz) {
+			const int area1 = inf1.xs * inf1.ys;
+			const int area2 = inf2.xs * inf2.ys;
+			if (area1 < area2) {
+				return TRACE_COMPARE(-1);    // inf1 smaller, draw first.
+			} else if (area2 < area1) {
+				return TRACE_COMPARE(1);    // inf2 smaller, draw inf1 last.
+			}
+		}
 	}
 	if (xcmp >= 0 && ycmp >= 0 && zcmp >= 0) {
 		return TRACE_COMPARE(1);    // GTE in all dimensions.
-	}
-	// fix tapestries in Fawn, LB's castle
-	if (xover && yover && zover && inf1.tz == inf2.tz) {
-		if (!xcmp || !ycmp) {    // Inside N-S wall?  Take shorter.
-			return -zcmp;
-		}
 	}
 	if (xcmp <= 0 && ycmp <= 0 && zcmp <= 0) {
 		return TRACE_COMPARE(-1);    // LTE in all dimensions.
