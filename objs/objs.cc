@@ -1298,16 +1298,16 @@ static inline std::ostream& operator<<(
 
 static int Trace_Compare(
 		int retv, int xcmp, int ycmp, int zcmp, bool xover, bool yover,
-		bool zover, Ordering_info& inf1, Ordering_info& inf2, const char* file,
-		int line) {
-	cerr << "Game_object::compare (@" << file << ":" << line << "): " << retv
-		 << endl;
-	cerr << inf1 << endl;
-	cerr << inf2 << endl;
-	cerr << "xcmp  = " << xcmp << ", ycmp  = " << ycmp << ", zcmp  = " << zcmp
-		 << endl;
-	cerr << "xover = " << xover << ", yover = " << yover
-		 << ", zover = " << zover << endl;
+		bool zover, const Ordering_info& inf1, const Ordering_info& inf2,
+		const char* file, int line) {
+	std::cerr << "Game_object::compare (@" << file << ":" << line
+			  << "): " << retv << std::endl;
+	std::cerr << inf1 << std::endl;
+	std::cerr << inf2 << std::endl;
+	std::cerr << "xcmp  = " << xcmp << ", ycmp  = " << ycmp
+			  << ", zcmp  = " << zcmp << std::endl;
+	std::cerr << "xover = " << xover << ", yover = " << yover
+			  << ", zover = " << zover << std::endl;
 	return retv;
 }
 
