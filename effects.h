@@ -19,17 +19,17 @@
  */
 
 #ifndef EFFECTS_H
-#define EFFECTS_H 1
+#	define EFFECTS_H 1
 
-#include "rect.h"
-#include "shapeid.h"
-#include "singles.h"
-#include "tiles.h"
-#include "tqueue.h"
+#	include "rect.h"
+#	include "shapeid.h"
+#	include "singles.h"
+#	include "tiles.h"
+#	include "tqueue.h"
 
-#include <list>
-#include <memory>
-#include <string>
+#	include <list>
+#	include <memory>
+#	include <string>
 
 class Xform_palette;
 class PathFinder;
@@ -110,7 +110,7 @@ protected:
 	Tile_coord       pos;               // Position within world.
 	int              xoff, yoff;        // Offset from position in pixels.
 	int              deltax, deltay;    // Add to xoff, yoff on each frame.
-	int              reps;              // Repetitions, or -1.
+	int              reps;              // Repetitions, or -1, -2, or -3.
 	void             add_dirty(int frnum);
 
 public:

@@ -537,3 +537,9 @@ enum damage_types {
 	ETHEREAL_DAMAGE		= 4,
 	SONIC_DAMAGE		= 5
 };
+
+enum sprite_repeats {
+	LOOP_ONCE = -1,		// Go through all frames once.
+	LOOP_UNTIL_OFFSCREEN = -2,	// Keep looping until the sprite is off-screen.
+	LOOP_REVERSE = -3	// As LOOP_ONCE, but in reverse order.
+};

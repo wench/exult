@@ -3308,9 +3308,11 @@ UI_sprite_effect(int sprite, int x, int y, int vel_x, int vel_y, int frame, int
               reaches the last frame (depending on the value of the 'reps'
               parameter).
     reps      Number of repetitions to execute. If zero, the sprite will be
-              displayed for a tick and then go away. If positive, how many times
-              the sprite frame will go through all of its frames. If negative,
-              the sprite will go through all of its frames *once*.
+              displayed for a tick and then go away. If positive, number of
+              ticks that the sprite will be displayed. If -1, the sprite will go
+              through all of its frames *once*. If -2 the sprite will go through
+              all of its frames until it goes out of screen. If -3, the sprite
+              will go through all of its frames *once*, but in reverse order.
 
 UI_obj_sprite_effect(object obj, int sprite, int rel_x, int rel_y, int vel_x,
         int vel_y, int frnum, int reps)
@@ -3347,9 +3349,11 @@ obj->obj_sprite_effect(int sprite, int rel_x, int rel_y, int vel_x, int vel_y,
               reaches the last frame (depending on the value of the 'reps'
               parameter).
     reps      Number of repetitions to execute. If zero, the sprite will be
-              displayed for a tick and then go away. If positive, how many times
-              the sprite frame will go through all of its frames. If negative,
-              the sprite will go through all of its frames *once*.
+              displayed for a tick and then go away. If positive, number of
+              ticks that the sprite will be displayed. If -1, the sprite will go
+              through all of its frames *once*. If -2 the sprite will go through
+              all of its frames until it goes out of screen. If -3, the sprite
+              will go through all of its frames *once*, but in reverse order.
 
 UI_play_scene(string text, bool fade_out, bool fade_in)                  [Exult]
 

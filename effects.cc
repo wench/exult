@@ -107,9 +107,10 @@ void Effects_manager::add_text(const char* msg, Game_object* item) {
  */
 
 void Effects_manager::add_text(const char* msg, int x, int y) {
-	texts.emplace_front(std::make_unique<Text_effect>(
-			msg, gwin->get_scrolltx() + x / c_tilesize,
-			gwin->get_scrollty() + y / c_tilesize, gwin));
+	texts.emplace_front(
+			std::make_unique<Text_effect>(
+					msg, gwin->get_scrolltx() + x / c_tilesize,
+					gwin->get_scrollty() + y / c_tilesize, gwin));
 }
 
 /**
@@ -371,31 +372,60 @@ inline void Sprites_effect::add_dirty(int frnum) {
 void Sprites_effect::handle_event(
 		unsigned long curtime,    // Current time of day.
 		uintptr       udata) {
-	int       frame_num = sprite.get_framenum();
-	const int delay
-			= gwin->get_std_delay();    // Delay between frames.  Needs to
+	const int old_frame_num = sprite.get_framenum();
+	int       new_frame_num = old_frame_num;
+	// Delay between frames.  Needs to
+	const int  delay      = gwin->get_std_delay();
+	const bool keep_going = [&]() {    // Determine if we should keep going.
+		switch (reps) {
+		case -1:    // Go through all frames *once*.
+			if (old_frame_num == frames - 1) {
+				return false;
+			}
+			++new_frame_num;
+			new_frame_num %= frames;
+			return true;
+		case -2:    // Loop through all frames until sprite goes offscreen.
+			++new_frame_num;
+			new_frame_num %= frames;
+			return gwin->get_game_rect().intersects(
+					gwin->get_shape_rect(sprite.get_shape(), xoff, yoff));
+		case -3:    // Go through all frames *once* in reverse order.
+			// This is originally SI-only, but we are allowing it for BG too.
+			if (old_frame_num == 0) {
+				return false;
+			}
+			--new_frame_num;
+			return true;
+		default:
+			// Loop through frames the given number of times.
+			if (reps <= 0) {
+				return false;
+			}
+			--reps;
+			++new_frame_num;
+			new_frame_num %= frames;
+			return true;
+		}
+	}();
 	//   match usecode animations.
-	if (!reps || (reps < 0 && frame_num == frames)) {    // At end?
+	if (!keep_going) {    // At end?
 		// Remove & delete this.
 		gwin->set_all_dirty();
 		auto ownHandle = eman->remove_effect(this);
 		return;
 	}
-	add_dirty(frame_num);    // Clear out old.
+	add_dirty(old_frame_num);    // Clear out old.
 	gwin->set_painted();
 	const Game_object_shared item_obj = item.lock();
 	if (item_obj) {    // Following actor?
 		pos = item_obj->get_tile();
 	}
-	xoff += deltax;    // Add deltas.
+	// Add deltas.
+	xoff += deltax;
 	yoff += deltay;
-	frame_num++;       // Next frame.
-	if (reps > 0) {    // Given a count?
-		--reps;
-		frame_num %= frames;
-	}
-	add_dirty(frame_num);    // Want to paint new frame.
-	sprite.set_frame(frame_num);
+	add_dirty(new_frame_num);    // Want to paint new frame.
+	sprite.set_frame(new_frame_num);
 	// Add back to queue for next time.
 	gwin->get_tqueue()->add(curtime + delay, this, udata);
 }
@@ -751,13 +781,15 @@ void Projectile_effect::handle_event(
 				offset = Tile_coord(0, 0, 0);
 			}
 			if (ainf && ainf->is_homing()) {
-				eman->add_effect(std::make_unique<Homing_projectile>(
-						weapon, att_obj.get(), tgt_obj.get(), pos,
-						pos + offset));
+				eman->add_effect(
+						std::make_unique<Homing_projectile>(
+								weapon, att_obj.get(), tgt_obj.get(), pos,
+								pos + offset));
 			} else {
-				eman->add_effect(std::make_unique<Explosion_effect>(
-						pos + offset, nullptr, 0, weapon, projectile_shape,
-						att_obj.get()));
+				eman->add_effect(
+						std::make_unique<Explosion_effect>(
+								pos + offset, nullptr, 0, weapon,
+								projectile_shape, att_obj.get()));
 			}
 			target = Game_object_weak();    // Takes care of attack.
 		} else {
@@ -1458,8 +1490,9 @@ Storm_effect::Storm_effect(
 	// Start raining soon.
 	eman->add_effect(std::make_unique<Clouds_effect>(duration + 1, delay));
 	const int rain_delay = 20 + rand() % 1000;
-	eman->add_effect(std::make_unique<Rain_effect<Raindrop>>(
-			duration + 2, rain_delay, 0));
+	eman->add_effect(
+			std::make_unique<Rain_effect<Raindrop>>(
+					duration + 2, rain_delay, 0));
 	const int lightning_delay = rain_delay + rand() % 500;
 	eman->add_effect(
 			std::make_unique<Lightning_effect>(duration - 2, lightning_delay));
@@ -1494,8 +1527,9 @@ Snowstorm_effect::Snowstorm_effect(
 		: Weather_effect(duration, delay, 1, egg), start(true) {
 	// Start snowing soon.
 	eman->add_effect(std::make_unique<Clouds_effect>(duration + 1, delay));
-	eman->add_effect(std::make_unique<Rain_effect<Snowflake>>(
-			duration + 2, 20 + rand() % 1000, 0));
+	eman->add_effect(
+			std::make_unique<Rain_effect<Snowflake>>(
+					duration + 2, 20 + rand() % 1000, 0));
 }
 
 /**
@@ -1527,8 +1561,9 @@ Sparkle_effect::Sparkle_effect(
 		: Weather_effect(duration, delay, 3, egg), start(true) {
 	// Start snowing soon.
 
-	eman->add_effect(std::make_unique<Rain_effect<Sparkle>>(
-			duration, delay, MAXDROPS / 6, 3, egg));
+	eman->add_effect(
+			std::make_unique<Rain_effect<Sparkle>>(
+					duration, delay, MAXDROPS / 6, 3, egg));
 }
 
 /**
@@ -1566,8 +1601,9 @@ Fog_effect::Fog_effect(
 	// SI adds sparkle/raindrops to the fog palette shift
 	// let's do that for all games
 	const int rain_delay = 250 + rand() % 1000;
-	eman->add_effect(std::make_unique<Rain_effect<Sparkle>>(
-			duration, rain_delay, MAXDROPS / 2));
+	eman->add_effect(
+			std::make_unique<Rain_effect<Sparkle>>(
+					duration, rain_delay, MAXDROPS / 2));
 }
 
 void Fog_effect::handle_event(unsigned long curtime, uintptr udata) {
