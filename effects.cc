@@ -365,48 +365,61 @@ inline void Sprites_effect::add_dirty(int frnum) {
 					.enlarge((3 * c_tilesize) / 2)));
 }
 
+bool Sprites_effect::pause_while_faded(unsigned long curtime, uintptr udata) {
+	const bool faded = Game_window::get_instance()->get_pal()->is_faded_out();
+	if (faded) {
+		// If the game palette is faded out,we just want to delay the
+		// sprite effect. This is needed, e.g., for the Moonshade banquet
+		// teleport scene, because the sprite effects are added when the
+		// palette is faded, and run during it.
+		const int delay = gwin->get_std_delay();
+		gwin->get_tqueue()->add(curtime + delay, this, udata);
+	}
+	return faded;
+}
+
 /**
  *  Animation.
  */
 
-void Sprites_effect::handle_event(
-		unsigned long curtime,    // Current time of day.
-		uintptr       udata) {
-	const int old_frame_num = sprite.get_framenum();
-	int       new_frame_num = old_frame_num;
-	// Delay between frames.  Needs to
-	const int  delay      = gwin->get_std_delay();
-	const bool keep_going = [&]() {    // Determine if we should keep going.
-		switch (reps) {
-		case -1:    // Go through all frames *once*.
-			if (old_frame_num == frames - 1) {
-				return false;
-			}
-			++new_frame_num;
-			new_frame_num %= frames;
-			return true;
-		case -2:    // Loop through all frames until sprite goes offscreen.
-			++new_frame_num;
-			new_frame_num %= frames;
-			return gwin->get_game_rect().intersects(
-					gwin->get_shape_rect(sprite.get_shape(), xoff, yoff));
-		case -3:    // Go through all frames *once* in reverse order.
-			// This is originally SI-only, but we are allowing it for BG too.
-			if (old_frame_num == 0) {
-				return false;
-			}
-			--new_frame_num;
-			return true;
-		default:
-			// Loop through frames the given number of times.
-			if (reps <= 0) {
-				return false;
-			}
-			--reps;
-			++new_frame_num;
-			new_frame_num %= frames;
-			return true;
-		}
+void Sprites_effect::handle_event(unsigned long curtime, uintptr udata) {
+	if (pause_while_faded(curtime, udata)) {
+		return;
+	}
+	const int  delay         = gwin->get_std_delay();
+	const int  old_frame_num = sprite.get_framenum();
+	int        new_frame_num = old_frame_num;
+	const bool keep_going    = [&]() {    // Determine if we should keep going.
+        switch (reps) {
+        case -1:    // Go through all frames *once*.
+            if (old_frame_num == frames - 1) {
+                return false;
+            }
+            ++new_frame_num;
+            new_frame_num %= frames;
+            return true;
+        case -2:    // Loop through all frames until sprite goes offscreen.
+            ++new_frame_num;
+            new_frame_num %= frames;
+            return gwin->get_game_rect().intersects(
+                    gwin->get_shape_rect(sprite.get_shape(), xoff, yoff));
+        case -3:    // Go through all frames *once* in reverse order.
+            // This is originally SI-only, but we are allowing it for BG too.
+            if (old_frame_num == 0) {
+                return false;
+            }
+            --new_frame_num;
+            return true;
+        default:
+            // Loop through frames the given number of times.
+            if (reps <= 0) {
+                return false;
+            }
+            --reps;
+            ++new_frame_num;
+            new_frame_num %= frames;
+            return true;
+        }
 	}();
 	//   match usecode animations.
 	if (!keep_going) {    // At end?
@@ -488,6 +501,9 @@ Explosion_effect::Explosion_effect(
 void Explosion_effect::handle_event(
 		unsigned long curtime,    // Current time of day.
 		uintptr       udata) {
+	if (pause_while_faded(curtime, udata)) {
+		return;
+	}
 	const int frnum = sprite.get_framenum();
 	if (!frnum) {    // Max. volume, with stereo position.
 		Audio::get_ptr()->play_sound_effect(exp_sfx, pos, AUDIO_MAX_VOLUME);

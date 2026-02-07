@@ -113,6 +113,8 @@ protected:
 	int              reps;              // Repetitions, or -1, -2, or -3.
 	void             add_dirty(int frnum);
 
+	bool pause_while_faded(unsigned long time, uintptr udata);
+
 public:
 	Sprites_effect(
 			int num, const Tile_coord& p, int dx = 0, int dy = 0, int delay = 0,
