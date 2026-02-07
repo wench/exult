@@ -537,6 +537,8 @@ void GameDisplayOptions_gump::save_settings() {
 		config->set("config/gameplay/fonts", fontcodes[fonts], false);
 		// Reload fonts if font selection changed
 		Game::setup_fonts();
+		// Re-translate text messages with the correct UTF-8 map
+		Game::setup_text();
 	}
 
 	config->write_back();

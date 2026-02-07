@@ -117,14 +117,14 @@ static const std::unordered_map<std::string_view, std::string>
 				{"\xC3\xAF",  "i"}, // ï -> i
 				{"\xC3\xAE",  "i"}, // î -> i
 				{"\xC3\xAC",  "i"}, // ì -> i
-				{"\xC3\x84", "Ae"}, // Ä -> Ae
+				{"\xC3\x84", "AE"}, // Ä -> Ae
 				{"\xC3\x89",  "E"}, // É -> E
 				{"\xC3\xB4",  "o"}, // ô -> o
 				{"\xC3\xB6", "oe"}, // ö -> oe
 				{"\xC3\xBB",  "u"}, // û -> u
 				{"\xC3\xB9",  "u"}, // ù -> u
-				{"\xC3\x96", "Oe"}, // Ö -> Oe
-				{"\xC3\x9C", "Ue"}, // Ü -> Ue
+				{"\xC3\x96", "OE"}, // Ö -> Oe
+				{"\xC3\x9C", "UE"}, // Ü -> Ue
 				{"\xC3\xA1",  "a"}, // á -> a
 				{"\xC3\x81",  "A"}, // Á -> A
 				{"\xC3\x80",  "A"}, // À -> A
