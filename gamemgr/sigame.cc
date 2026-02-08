@@ -275,6 +275,9 @@ SI_Game::SI_Game() {
 		//    egg spawning spiders in wall
 		mp.add(std::make_unique<Map_patch_remove>(
 				Object_spec(Tile_coord(60, 1937, 0), 275, 0, 0)));
+		// Fog weather egg under the dock before meeting Thoxa
+		mp.add(std::make_unique<Map_patch_remove>(
+				Object_spec(Tile_coord(406, 2548, 0), 275, 4, 0)));
 	}
 }
 
