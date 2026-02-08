@@ -210,15 +210,14 @@ SI_Game::SI_Game() {
 	if (font_config == "serif") {
 		font_source = File_spec(EXULT_FLX, EXULT_FLX_FONTS_SERIF_VGA);
 		font_patch  = PATCH_SERIF_FONTS;
-		vlead       = -5;
 	} else if (font_config == "disabled") {
 		font_source = FONTS_VGA;
 		font_patch  = PATCH_FONTS;
-		vlead       = -10;
+		vlead       = -5;
 	} else {    // "original"
 		font_source = File_spec(EXULT_FLX, EXULT_FLX_FONTS_ORIGINAL_VGA);
 		font_patch  = PATCH_ORIGINAL_FONTS;
-		vlead       = -10;
+		vlead       = -5;
 	}
 
 	fontManager.add_font("SMALL_BLACK_FONT", font_source, font_patch, 2, 0);
