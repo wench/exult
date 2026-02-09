@@ -3210,7 +3210,19 @@ void Usecode_internal::do_speech(int num) {
 	if (!Audio::get_ptr()->start_speech(num)
 		|| Audio::get_ptr()->is_speech_with_subs()) {
 		// No speech?  Call text function.
+		// Save frame state: call_usecode() re-enters run(), which
+		// sets this->frame to nullptr when done.
+		Stack_frame*       save_frame  = frame;
+		Game_object_shared save_caller = caller_item;
 		call_usecode(SpeechUsecode, nullptr, double_click);
+		// Remove the nullptr left by the nested run().
+		if (!call_stack.empty() && call_stack.front() == nullptr) {
+			call_stack.pop_front();
+		}
+		// Restore frame state so the calling intrinsic can
+		// safely access this->frame after we return.
+		frame       = save_frame;
+		caller_item = save_caller;
 	}
 }
 
