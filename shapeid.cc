@@ -281,16 +281,17 @@ void Shape_manager::load() {
 	config->value("config/gameplay/fonts", font_config, "original");
 	Pentagram::tolower(font_config);
 
-	File_spec font_source;
-	File_spec font_patch;
+	File_spec   font_source;
+	File_spec   font_patch;
+	const char* fname = BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX);
 	if (font_config == "serif") {
-		font_source = File_spec(EXULT_FLX, EXULT_FLX_FONTS_SERIF_VGA);
+		font_source = File_spec(fname, EXULT_FLX_FONTS_SERIF_VGA);
 		font_patch  = PATCH_SERIF_FONTS;
 	} else if (font_config == "disabled") {
 		font_source = FONTS_VGA;
 		font_patch  = PATCH_FONTS;
 	} else {    // "original"
-		font_source = File_spec(EXULT_FLX, EXULT_FLX_FONTS_ORIGINAL_VGA);
+		font_source = File_spec(fname, EXULT_FLX_FONTS_ORIGINAL_VGA);
 		font_patch  = PATCH_ORIGINAL_FONTS;
 	}
 
@@ -424,16 +425,17 @@ void Shape_manager::reload_shapes(int shape_kind    // Type from u7drag.h.
 		config->value("config/gameplay/fonts", font_config, "original");
 		Pentagram::tolower(font_config);
 
-		File_spec font_source;
-		File_spec font_patch;
+		const char* fname = BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX);
+		File_spec   font_source;
+		File_spec   font_patch;
 		if (font_config == "serif") {
-			font_source = File_spec(EXULT_FLX, EXULT_FLX_FONTS_SERIF_VGA);
+			font_source = File_spec(fname, EXULT_FLX_FONTS_SERIF_VGA);
 			font_patch  = PATCH_SERIF_FONTS;
 		} else if (font_config == "disabled") {
 			font_source = FONTS_VGA;
 			font_patch  = PATCH_FONTS;
 		} else {    // "original"
-			font_source = File_spec(EXULT_FLX, EXULT_FLX_FONTS_ORIGINAL_VGA);
+			font_source = File_spec(fname, EXULT_FLX_FONTS_ORIGINAL_VGA);
 			font_patch  = PATCH_ORIGINAL_FONTS;
 		}
 		override_vleads();

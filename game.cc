@@ -221,11 +221,12 @@ void Game::setup_fonts() {
 	config->value("config/gameplay/fonts", font_config, "original");
 	Pentagram::tolower(font_config);
 
+	const char* fname = BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX);
 	File_spec   font_source;
 	const char* font_patch = nullptr;
 	int         vlead      = 0;
 	if (font_config == "serif") {
-		font_source = File_spec(EXULT_FLX, EXULT_FLX_FONTS_SERIF_VGA);
+		font_source = File_spec(fname, EXULT_FLX_FONTS_SERIF_VGA);
 		font_patch  = PATCH_SERIF_FONTS;
 		vlead       = GAME_SI ? -5 : 0;
 	} else if (font_config == "disabled") {
@@ -233,7 +234,7 @@ void Game::setup_fonts() {
 		font_patch  = PATCH_FONTS;
 		vlead       = GAME_SI ? -10 : -5;
 	} else {    // "original"
-		font_source = File_spec(EXULT_FLX, EXULT_FLX_FONTS_ORIGINAL_VGA);
+		font_source = File_spec(fname, EXULT_FLX_FONTS_ORIGINAL_VGA);
 		font_patch  = PATCH_ORIGINAL_FONTS;
 		vlead       = GAME_SI ? -10 : -5;
 	}
@@ -283,7 +284,7 @@ void Game::setup_fonts() {
 					"EXULT_END_FONT", font_source, font_patch, 0, -2);
 			fontManager.add_font(
 					"EXULT_AT_FONT",
-					File_spec(EXULT_FLX, EXULT_FLX_FONTS_ORIGINAL_VGA),
+					File_spec(fname, EXULT_FLX_FONTS_ORIGINAL_VGA),
 					PATCH_ORIGINAL_FONTS, 14, -2);
 		}
 	}
@@ -308,7 +309,7 @@ void Game::setup_fonts() {
 					"EXULT_END_FONT", font_source, font_patch, 0, -2);
 			fontManager.add_font(
 					"EXULT_AT_FONT",
-					File_spec(EXULT_FLX, EXULT_FLX_FONTS_ORIGINAL_VGA),
+					File_spec(fname, EXULT_FLX_FONTS_ORIGINAL_VGA),
 					PATCH_ORIGINAL_FONTS, 14, -2);
 		}
 	}

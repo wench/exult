@@ -204,18 +204,19 @@ SI_Game::SI_Game() {
 	config->value("config/gameplay/fonts", font_config, "original");
 	Pentagram::tolower(font_config);
 
+	const char* fname = BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX);
 	File_spec   font_source;
 	const char* font_patch = nullptr;
 	int         vlead      = 0;
 	if (font_config == "serif") {
-		font_source = File_spec(EXULT_FLX, EXULT_FLX_FONTS_SERIF_VGA);
+		font_source = File_spec(fname, EXULT_FLX_FONTS_SERIF_VGA);
 		font_patch  = PATCH_SERIF_FONTS;
 	} else if (font_config == "disabled") {
 		font_source = FONTS_VGA;
 		font_patch  = PATCH_FONTS;
 		vlead       = -5;
 	} else {    // "original"
-		font_source = File_spec(EXULT_FLX, EXULT_FLX_FONTS_ORIGINAL_VGA);
+		font_source = File_spec(fname, EXULT_FLX_FONTS_ORIGINAL_VGA);
 		font_patch  = PATCH_ORIGINAL_FONTS;
 		vlead       = -5;
 	}
@@ -234,8 +235,7 @@ SI_Game::SI_Game() {
 		fontManager.add_font("SIINTRO_FONT", INTRO_DAT, PATCH_INTRO, 14, 0, -5);
 		fontManager.add_font("EXULT_END_FONT", FONTS_VGA, PATCH_FONTS, 0, -2);
 		fontManager.add_font(
-				"EXULT_AT_FONT",
-				File_spec(EXULT_FLX, EXULT_FLX_FONTS_ORIGINAL_VGA),
+				"EXULT_AT_FONT", File_spec(fname, EXULT_FLX_FONTS_ORIGINAL_VGA),
 				PATCH_ORIGINAL_FONTS, 14, -2);
 	}
 
