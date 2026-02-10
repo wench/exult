@@ -287,7 +287,7 @@ void Background_noise::handle_event(unsigned long curtime, uintptr udata) {
 			}
 			last_sound = sound;
 		}
-		if (sound >= 0) {
+		if (sound >= 0 && sound != 255) {
 			Audio::get_ptr()->play_sound_effect(
 					Audio::game_sfx(sound), AUDIO_MAX_VOLUME - 64);
 			repeats++;    // Count it.
