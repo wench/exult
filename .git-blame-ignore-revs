@@ -1,4 +1,2 @@
-# clang-format v19, ColumnLimit 132 - .c and .cpp
-05938041135f0c107e3e7e84f7acc155821418eb
-# clang-format v19, ColumnLimit 132 - .cc and .h
-f5bfa378726021e336665e8f336084df5121ab63
+#Apply clang-format (v19), with column limit 132 (#916)
+114c747aa91cc34dc9ff2495c750ca998e27a1e4
