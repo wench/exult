@@ -922,9 +922,8 @@ private:
 	int  start;     // First frame to play
 	int  count;     // Number of frames
 	bool repeat;    // Repeat?
-	int  cur;       // Frame currently being displayed (note, it's not the actual
-				// frame)
-	int speed;    // Speed of playback (ms per frame)
+	int  cur;       // Frame currently being displayed (note, it's not the actual frame)
+	int  speed;     // Speed of playback (ms per frame)
 
 	// Data info
 	std::unique_ptr<playfli> player;

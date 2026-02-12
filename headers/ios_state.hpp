@@ -28,11 +28,9 @@ namespace boost { namespace io {
 		using state_type  = ::std::ios_base;
 		using aspect_type = ::std::ios_base::fmtflags;
 
-		explicit ios_flags_saver(state_type& s)
-				: s_save_(s), a_save_(s.flags()) {}
+		explicit ios_flags_saver(state_type& s) : s_save_(s), a_save_(s.flags()) {}
 
-		ios_flags_saver(state_type& s, const aspect_type& a)
-				: s_save_(s), a_save_(s.flags(a)) {}
+		ios_flags_saver(state_type& s, const aspect_type& a) : s_save_(s), a_save_(s.flags(a)) {}
 
 		~ios_flags_saver() {
 			this->restore();
@@ -54,11 +52,9 @@ namespace boost { namespace io {
 		using state_type  = ::std::ios_base;
 		using aspect_type = ::std::streamsize;
 
-		explicit ios_precision_saver(state_type& s)
-				: s_save_(s), a_save_(s.precision()) {}
+		explicit ios_precision_saver(state_type& s) : s_save_(s), a_save_(s.precision()) {}
 
-		ios_precision_saver(state_type& s, const aspect_type& a)
-				: s_save_(s), a_save_(s.precision(a)) {}
+		ios_precision_saver(state_type& s, const aspect_type& a) : s_save_(s), a_save_(s.precision(a)) {}
 
 		~ios_precision_saver() {
 			this->restore();
@@ -80,11 +76,9 @@ namespace boost { namespace io {
 		using state_type  = ::std::ios_base;
 		using aspect_type = ::std::streamsize;
 
-		explicit ios_width_saver(state_type& s)
-				: s_save_(s), a_save_(s.width()) {}
+		explicit ios_width_saver(state_type& s) : s_save_(s), a_save_(s.width()) {}
 
-		ios_width_saver(state_type& s, const aspect_type& a)
-				: s_save_(s), a_save_(s.width(a)) {}
+		ios_width_saver(state_type& s, const aspect_type& a) : s_save_(s), a_save_(s.width(a)) {}
 
 		~ios_width_saver() {
 			this->restore();
@@ -110,11 +104,9 @@ namespace boost { namespace io {
 		using state_type  = ::std::basic_ios<Ch, Tr>;
 		using aspect_type = ::std::ios_base::iostate;
 
-		explicit basic_ios_iostate_saver(state_type& s)
-				: s_save_(s), a_save_(s.rdstate()) {}
+		explicit basic_ios_iostate_saver(state_type& s) : s_save_(s), a_save_(s.rdstate()) {}
 
-		basic_ios_iostate_saver(state_type& s, const aspect_type& a)
-				: s_save_(s), a_save_(s.rdstate()) {
+		basic_ios_iostate_saver(state_type& s, const aspect_type& a) : s_save_(s), a_save_(s.rdstate()) {
 			s.clear(a);
 		}
 
@@ -122,8 +114,7 @@ namespace boost { namespace io {
 			this->restore();
 		}
 
-		basic_ios_iostate_saver& operator=(const basic_ios_iostate_saver&)
-				= delete;
+		basic_ios_iostate_saver& operator=(const basic_ios_iostate_saver&) = delete;
 
 		void restore() {
 			s_save_.clear(a_save_);
@@ -140,11 +131,9 @@ namespace boost { namespace io {
 		using state_type  = ::std::basic_ios<Ch, Tr>;
 		using aspect_type = ::std::ios_base::iostate;
 
-		explicit basic_ios_exception_saver(state_type& s)
-				: s_save_(s), a_save_(s.exceptions()) {}
+		explicit basic_ios_exception_saver(state_type& s) : s_save_(s), a_save_(s.exceptions()) {}
 
-		basic_ios_exception_saver(state_type& s, const aspect_type& a)
-				: s_save_(s), a_save_(s.exceptions()) {
+		basic_ios_exception_saver(state_type& s, const aspect_type& a) : s_save_(s), a_save_(s.exceptions()) {
 			s.exceptions(a);
 		}
 
@@ -152,8 +141,7 @@ namespace boost { namespace io {
 			this->restore();
 		}
 
-		basic_ios_exception_saver& operator=(const basic_ios_exception_saver&)
-				= delete;
+		basic_ios_exception_saver& operator=(const basic_ios_exception_saver&) = delete;
 
 		void restore() {
 			s_save_.exceptions(a_save_);
@@ -170,11 +158,9 @@ namespace boost { namespace io {
 		using state_type  = ::std::basic_ios<Ch, Tr>;
 		using aspect_type = ::std::basic_ostream<Ch, Tr>*;
 
-		explicit basic_ios_tie_saver(state_type& s)
-				: s_save_(s), a_save_(s.tie()) {}
+		explicit basic_ios_tie_saver(state_type& s) : s_save_(s), a_save_(s.tie()) {}
 
-		basic_ios_tie_saver(state_type& s, const aspect_type& a)
-				: s_save_(s), a_save_(s.tie(a)) {}
+		basic_ios_tie_saver(state_type& s, const aspect_type& a) : s_save_(s), a_save_(s.tie(a)) {}
 
 		~basic_ios_tie_saver() {
 			this->restore();
@@ -197,11 +183,9 @@ namespace boost { namespace io {
 		using state_type  = ::std::basic_ios<Ch, Tr>;
 		using aspect_type = ::std::basic_streambuf<Ch, Tr>*;
 
-		explicit basic_ios_rdbuf_saver(state_type& s)
-				: s_save_(s), a_save_(s.rdbuf()) {}
+		explicit basic_ios_rdbuf_saver(state_type& s) : s_save_(s), a_save_(s.rdbuf()) {}
 
-		basic_ios_rdbuf_saver(state_type& s, const aspect_type& a)
-				: s_save_(s), a_save_(s.rdbuf(a)) {}
+		basic_ios_rdbuf_saver(state_type& s, const aspect_type& a) : s_save_(s), a_save_(s.rdbuf(a)) {}
 
 		~basic_ios_rdbuf_saver() {
 			this->restore();
@@ -224,11 +208,9 @@ namespace boost { namespace io {
 		using state_type  = ::std::basic_ios<Ch, Tr>;
 		using aspect_type = typename state_type::char_type;
 
-		explicit basic_ios_fill_saver(state_type& s)
-				: s_save_(s), a_save_(s.fill()) {}
+		explicit basic_ios_fill_saver(state_type& s) : s_save_(s), a_save_(s.fill()) {}
 
-		basic_ios_fill_saver(state_type& s, const aspect_type& a)
-				: s_save_(s), a_save_(s.fill(a)) {}
+		basic_ios_fill_saver(state_type& s, const aspect_type& a) : s_save_(s), a_save_(s.fill(a)) {}
 
 		~basic_ios_fill_saver() {
 			this->restore();
@@ -254,18 +236,15 @@ namespace boost { namespace io {
 		using state_type  = ::std::basic_ios<Ch, Tr>;
 		using aspect_type = ::std::locale;
 
-		explicit basic_ios_locale_saver(state_type& s)
-				: s_save_(s), a_save_(s.getloc()) {}
+		explicit basic_ios_locale_saver(state_type& s) : s_save_(s), a_save_(s.getloc()) {}
 
-		basic_ios_locale_saver(state_type& s, const aspect_type& a)
-				: s_save_(s), a_save_(s.imbue(a)) {}
+		basic_ios_locale_saver(state_type& s, const aspect_type& a) : s_save_(s), a_save_(s.imbue(a)) {}
 
 		~basic_ios_locale_saver() {
 			this->restore();
 		}
 
-		basic_ios_locale_saver& operator=(const basic_ios_locale_saver&)
-				= delete;
+		basic_ios_locale_saver& operator=(const basic_ios_locale_saver&) = delete;
 
 		void restore() {
 			s_save_.imbue(a_save_);
@@ -286,11 +265,9 @@ namespace boost { namespace io {
 		using index_type  = int;
 		using aspect_type = long;
 
-		explicit ios_iword_saver(state_type& s, index_type i)
-				: s_save_(s), a_save_(s.iword(i)), i_save_(i) {}
+		explicit ios_iword_saver(state_type& s, index_type i) : s_save_(s), a_save_(s.iword(i)), i_save_(i) {}
 
-		ios_iword_saver(state_type& s, index_type i, const aspect_type& a)
-				: s_save_(s), a_save_(s.iword(i)), i_save_(i) {
+		ios_iword_saver(state_type& s, index_type i, const aspect_type& a) : s_save_(s), a_save_(s.iword(i)), i_save_(i) {
 			s.iword(i) = a;
 		}
 
@@ -316,11 +293,9 @@ namespace boost { namespace io {
 		using index_type  = int;
 		using aspect_type = void*;
 
-		explicit ios_pword_saver(state_type& s, index_type i)
-				: s_save_(s), a_save_(s.pword(i)), i_save_(i) {}
+		explicit ios_pword_saver(state_type& s, index_type i) : s_save_(s), a_save_(s.pword(i)), i_save_(i) {}
 
-		ios_pword_saver(state_type& s, index_type i, const aspect_type& a)
-				: s_save_(s), a_save_(s.pword(i)), i_save_(i) {
+		ios_pword_saver(state_type& s, index_type i, const aspect_type& a) : s_save_(s), a_save_(s.pword(i)), i_save_(i) {
 			s.pword(i) = a;
 		}
 
@@ -348,8 +323,7 @@ namespace boost { namespace io {
 		using state_type = ::std::ios_base;
 
 		explicit ios_base_all_saver(state_type& s)
-				: s_save_(s), a1_save_(s.flags()), a2_save_(s.precision()),
-				  a3_save_(s.width()) {}
+				: s_save_(s), a1_save_(s.flags()), a2_save_(s.precision()), a3_save_(s.width()) {}
 
 		~ios_base_all_saver() {
 			this->restore();
@@ -376,10 +350,8 @@ namespace boost { namespace io {
 		using state_type = ::std::basic_ios<Ch, Tr>;
 
 		explicit basic_ios_all_saver(state_type& s)
-				: s_save_(s), a1_save_(s.flags()), a2_save_(s.precision()),
-				  a3_save_(s.width()), a4_save_(s.rdstate()),
-				  a5_save_(s.exceptions()), a6_save_(s.tie()),
-				  a7_save_(s.rdbuf()), a8_save_(s.fill())
+				: s_save_(s), a1_save_(s.flags()), a2_save_(s.precision()), a3_save_(s.width()), a4_save_(s.rdstate()),
+				  a5_save_(s.exceptions()), a6_save_(s.tie()), a7_save_(s.rdbuf()), a8_save_(s.fill())
 #ifndef BOOST_NO_STD_LOCALE
 				  ,
 				  a9_save_(s.getloc())
@@ -427,9 +399,7 @@ namespace boost { namespace io {
 		using state_type = ::std::ios_base;
 		using index_type = int;
 
-		ios_all_word_saver(state_type& s, index_type i)
-				: s_save_(s), i_save_(i), a1_save_(s.iword(i)),
-				  a2_save_(s.pword(i)) {}
+		ios_all_word_saver(state_type& s, index_type i) : s_save_(s), i_save_(i), a1_save_(s.iword(i)), a2_save_(s.pword(i)) {}
 
 		~ios_all_word_saver() {
 			this->restore();
