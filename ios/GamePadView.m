@@ -22,9 +22,8 @@
 
 #include <objc/NSObjCRuntime.h>
 
-#define CENTER_OF_RECT(r) CGPointMake(r.size.width / 2, r.size.height / 2)
-#define DISTANCE_BETWEEN(a, b) \
-	sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y))
+#define CENTER_OF_RECT(r)      CGPointMake(r.size.width / 2, r.size.height / 2)
+#define DISTANCE_BETWEEN(a, b) sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y))
 
 #define CHOP(x)              \
 	if ((x) > 1.0) {         \
@@ -114,12 +113,8 @@ const double gVJoyRadius = 80.0;    // max-radius of vjoy
 
 - (void)reset {
 	self.vjoyIsActive = false;
-	SDL_SetJoystickVirtualAxis(
-			SDL_GetGamepadJoystick(self.vjoyGamepad), SDL_GAMEPAD_AXIS_LEFTX,
-			0);
-	SDL_SetJoystickVirtualAxis(
-			SDL_GetGamepadJoystick(self.vjoyGamepad), SDL_GAMEPAD_AXIS_LEFTY,
-			0);
+	SDL_SetJoystickVirtualAxis(SDL_GetGamepadJoystick(self.vjoyGamepad), SDL_GAMEPAD_AXIS_LEFTX, 0);
+	SDL_SetJoystickVirtualAxis(SDL_GetGamepadJoystick(self.vjoyGamepad), SDL_GAMEPAD_AXIS_LEFTY, 0);
 	self.vjoyCenter = self.vjoyCurrent = CGPointMake(0, 0);
 	self.vjoyInputSource               = nil;
 	[self updateViewTransform];
@@ -135,14 +130,11 @@ const double gVJoyRadius = 80.0;    // max-radius of vjoy
 		// 'transform' to an untransformed state, as UIView's method,
 		// 'convertPoint:toView:', will apply any existing transform.
 		self.transform                     = CGAffineTransformIdentity;
-		CGPoint vjoy_center_in_parent_view = [self convertPoint:self.vjoyCenter
-														 toView:self.superview];
+		CGPoint vjoy_center_in_parent_view = [self convertPoint:self.vjoyCenter toView:self.superview];
 
-		const CGPoint translation = CGPointMake(
-				vjoy_center_in_parent_view.x - self.center.x,
-				vjoy_center_in_parent_view.y - self.center.y);
-		self.transform = CGAffineTransformMakeTranslation(
-				translation.x, translation.y);
+		const CGPoint translation
+				= CGPointMake(vjoy_center_in_parent_view.x - self.center.x, vjoy_center_in_parent_view.y - self.center.y);
+		self.transform = CGAffineTransformMakeTranslation(translation.x, translation.y);
 	}
 	[self setNeedsDisplay];
 }
@@ -155,12 +147,8 @@ const double gVJoyRadius = 80.0;    // max-radius of vjoy
 		self.vjoyInputSource = touch;
 		self.vjoyCenter = self.vjoyCurrent = [touch locationInView:self];
 		self.vjoyIsActive                  = true;
-		SDL_SetJoystickVirtualAxis(
-				SDL_GetGamepadJoystick(self.vjoyGamepad),
-				SDL_GAMEPAD_AXIS_LEFTX, 0);
-		SDL_SetJoystickVirtualAxis(
-				SDL_GetGamepadJoystick(self.vjoyGamepad),
-				SDL_GAMEPAD_AXIS_LEFTY, 0);
+		SDL_SetJoystickVirtualAxis(SDL_GetGamepadJoystick(self.vjoyGamepad), SDL_GAMEPAD_AXIS_LEFTX, 0);
+		SDL_SetJoystickVirtualAxis(SDL_GetGamepadJoystick(self.vjoyGamepad), SDL_GAMEPAD_AXIS_LEFTY, 0);
 		[self updateViewTransform];
 		// printf("VJOY START\n");
 	}
@@ -185,24 +173,17 @@ const double gVJoyRadius = 80.0;    // max-radius of vjoy
 		double dlength = sqrt((dx * dx) + (dy * dy));
 		if (dlength > gVJoyRadius) {
 			const CGPoint point = CGPointMake(
-					self.vjoyCurrent.x - (dx * (gVJoyRadius / dlength)),
-					self.vjoyCurrent.y - (dy * (gVJoyRadius / dlength)));
+					self.vjoyCurrent.x - (dx * (gVJoyRadius / dlength)), self.vjoyCurrent.y - (dy * (gVJoyRadius / dlength)));
 			self.vjoyCenter = point;
 			dx              = self.vjoyCurrent.x - self.vjoyCenter.x;
 			dy              = self.vjoyCurrent.y - self.vjoyCenter.y;
 		}
 
 		// Update vjoy state
-		const Sint16 joy_axis_x_raw
-				= (Sint16)((dx / gVJoyRadius) * SDL_JOYSTICK_AXIS_MAX);
-		SDL_SetJoystickVirtualAxis(
-				SDL_GetGamepadJoystick(self.vjoyGamepad),
-				SDL_GAMEPAD_AXIS_LEFTX, joy_axis_x_raw);
-		const Sint16 joy_axis_y_raw
-				= (Sint16)((dy / gVJoyRadius) * SDL_JOYSTICK_AXIS_MAX);
-		SDL_SetJoystickVirtualAxis(
-				SDL_GetGamepadJoystick(self.vjoyGamepad),
-				SDL_GAMEPAD_AXIS_LEFTY, joy_axis_y_raw);
+		const Sint16 joy_axis_x_raw = (Sint16)((dx / gVJoyRadius) * SDL_JOYSTICK_AXIS_MAX);
+		SDL_SetJoystickVirtualAxis(SDL_GetGamepadJoystick(self.vjoyGamepad), SDL_GAMEPAD_AXIS_LEFTX, joy_axis_x_raw);
+		const Sint16 joy_axis_y_raw = (Sint16)((dy / gVJoyRadius) * SDL_JOYSTICK_AXIS_MAX);
+		SDL_SetJoystickVirtualAxis(SDL_GetGamepadJoystick(self.vjoyGamepad), SDL_GAMEPAD_AXIS_LEFTY, joy_axis_y_raw);
 
 		// Update visuals
 		[self updateViewTransform];
@@ -318,18 +299,11 @@ const double gVJoyRadius = 80.0;    // max-radius of vjoy
 	if (self.title) {
 		double  fontSize = MIN(14, rect.size.height / 4);
 		UIFont* fnt      = [UIFont systemFontOfSize:fontSize];
-		CGSize  size =
-				[self.title sizeWithAttributes:@{NSFontAttributeName: fnt}];
+		CGSize  size     = [self.title sizeWithAttributes:@{NSFontAttributeName: fnt}];
 
-		CGRect rc = CGRectMake(
-				(rect.size.width - size.width) / 2,
-				(rect.size.height - size.height) / 2, size.width, size.height);
+		CGRect rc = CGRectMake((rect.size.width - size.width) / 2, (rect.size.height - size.height) / 2, size.width, size.height);
 		[color setFill];
-		[self.title drawInRect:rc
-				withAttributes:@{
-					NSFontAttributeName: fnt,
-					NSForegroundColorAttributeName: color
-				}];
+		[self.title drawInRect:rc withAttributes:@{NSFontAttributeName: fnt, NSForegroundColorAttributeName: color}];
 	}
 }
 
