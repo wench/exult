@@ -19,10 +19,9 @@
 #ifndef CONV_H
 #define CONV_H
 
-#include <cstddef>
+#include "span.h"
 
-extern const int    bgconv[];
-const extern size_t bgconv_size;
-extern const int    bgconvsong[];
+extern const tcb::span<const int> bgconv;
+extern const tcb::span<const int> bgconvsong;
 
 #endif

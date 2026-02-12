@@ -22,7 +22,7 @@
 
 // sfx with ??? are converted to sfx #135 so you can tell
 // it's wrong. Some I suspect to be something so it's not set 135
-const int bgconv[] = {
+static const int bgconv_array[] = {
 		12,     // Bow Twang		0
 		80,     // Missile ??		1
 		9,      // Blade			2
@@ -141,11 +141,10 @@ const int bgconv[] = {
 		255,    // Static - not used in SI	115
 		136     // Tick Tock		116
 };
-
-const extern size_t bgconv_size = std::size(bgconv);
+const extern tcb::span<const int> bgconv = bgconv_array;
 
 // A -1 means no equivalent.
-const int bgconvsong[] = {
+static const int bgconvsong_array[] = {
 		-1,    // 0
 		-1,    // 1
 		-1,    // 2
@@ -218,3 +217,4 @@ const int bgconvsong[] = {
 		-1,    // 69
 		-1     // 70
 };
+extern const tcb::span<const int> bgconvsong = bgconvsong_array;

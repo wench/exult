@@ -37,6 +37,7 @@
 #include "Midi.h"
 #include "exceptions.h"
 #include "exult_constants.h"
+#include "span.h"
 
 #include <functional>
 #include <map>
@@ -88,13 +89,13 @@ public:
 
 class Audio : nonreplicatable {
 private:
-	static Audio*     self;
-	static const int* bg2si_songs;    // Converts BG songs to SI songs.
-	static const int* bg2si_sfxs;     // Converts BG sfx's to SI sfx's.
-	bool              truthful_      = false;
-	bool              speech_enabled = true, music_enabled = true, effects_enabled = true, speech_with_subs = false;
-	int               speech_volume = 100;
-	int               sfx_volume    = 100;
+	static Audio*               self;
+	static tcb::span<const int> bg2si_songs;    // Converts BG songs to SI songs.
+	static tcb::span<const int> bg2si_sfxs;     // Converts BG sfx's to SI sfx's.
+	bool                        truthful_      = false;
+	bool                        speech_enabled = true, music_enabled = true, effects_enabled = true, speech_with_subs = false;
+	int                         speech_volume = 100;
+	int                         sfx_volume    = 100;
 	std::unique_ptr<SFX_cache_manager>     sfxs;    // SFX and voice cache manager
 	bool                                   initialized = false;
 	std::unique_ptr<Pentagram::AudioMixer> mixer;
@@ -119,12 +120,30 @@ public:
 
 	// Given BG sfx, get SI if playing SI.
 	static int game_sfx(int sfx) {
-		return bg2si_sfxs ? bg2si_sfxs[sfx] : sfx;
+		// If span is empty return input as is with no warning
+		if (bg2si_sfxs.empty()) {
+			return sfx;
+		}
+		// Out of range print a warning and return as is
+		if (sfx < 0 || size_t(sfx) >= bg2si_sfxs.size()) {
+			std::cerr << __FUNCTION__ << "Out of bounds input:" << sfx << std::endl;
+			return sfx;
+		}
+		return bg2si_sfxs[sfx];
 	}
 
 	// Given BG song, get SI if playing SI.
 	static int game_music(int mus) {
-		return bg2si_songs ? bg2si_songs[mus] : mus;
+		// If span is empty return input as is with no warning
+		if (bg2si_songs.empty()) {
+			return mus;
+		}
+		// Out of range print a warning and return as is
+		if (mus < 0 || size_t(mus) >= bg2si_songs.size()) {
+			std::cerr << __FUNCTION__ << "Out of bounds input:" << mus << std::endl;
+			return mus;
+		}
+		return bg2si_songs[mus];
 	}
 
 	void Init_sfx();

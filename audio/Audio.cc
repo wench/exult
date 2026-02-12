@@ -68,9 +68,9 @@ struct Chunk {
 	Chunk(size_t l, uint8* d) : length(l), data(d) {}
 };
 
-Audio*     Audio::self        = nullptr;
-const int* Audio::bg2si_sfxs  = nullptr;
-const int* Audio::bg2si_songs = nullptr;
+Audio*               Audio::self        = nullptr;
+tcb::span<const int> Audio::bg2si_sfxs  = {};
+tcb::span<const int> Audio::bg2si_songs = {};
 
 //----- Utilities ----------------------------------------------------
 
@@ -362,9 +362,10 @@ void Audio::Init_sfx() {
 	if (game == SERPENT_ISLE) {
 		bg2si_sfxs  = bgconv;
 		bg2si_songs = bgconvsong;
+
 	} else {
-		bg2si_sfxs  = nullptr;
-		bg2si_songs = nullptr;
+		bg2si_sfxs  = {};
+		bg2si_songs = {};
 	}
 	// Collection of .wav's?
 	string flex;
