@@ -271,6 +271,30 @@ namespace {
 
 @end
 
+/* With the UIScene lifecycle (iOS 13+), the app delegate no longer
+ * has a window property.  Retrieve the key window from the active
+ * window scene instead. */
+static UIWindow* getKeyWindow() {
+	if (@available(iOS 13.0, *)) {
+		for (UIScene* scene in [UIApplication sharedApplication]
+				 .connectedScenes) {
+			if ([scene isKindOfClass:[UIWindowScene class]]) {
+				UIWindowScene* ws = (UIWindowScene*)scene;
+				if (ws.activationState
+					== UISceneActivationStateForegroundActive) {
+					for (UIWindow* w in ws.windows) {
+						if (w.isKeyWindow) {
+							return w;
+						}
+					}
+					return ws.windows.firstObject;
+				}
+			}
+		}
+	}
+	return nil;
+}
+
 @implementation UIManager
 @synthesize touchUI;
 @synthesize dpad;
@@ -372,8 +396,18 @@ static NSString* const kGlyphPlay  = @"\u25B6\uFE0F";    // ▶
 }
 
 - (void)promptForName:(NSString*)name {
-	UIWindow* alertWindow =
-			[[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+	UIWindow* alertWindow = nil;
+	if (@available(iOS 13.0, *)) {
+		UIWindow* keyWin = getKeyWindow();
+		if (keyWin.windowScene) {
+			alertWindow =
+					[[UIWindow alloc] initWithWindowScene:keyWin.windowScene];
+		}
+	}
+	if (alertWindow == nil) {
+		alertWindow =
+				[[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+	}
 	alertWindow.windowLevel        = UIWindowLevelAlert;
 	alertWindow.rootViewController = [[UIViewController alloc] init];
 	[alertWindow makeKeyAndVisible];
@@ -417,7 +451,7 @@ static NSString* const kGlyphPlay  = @"\u25B6\uFE0F";    // ▶
 }
 
 - (CGRect)calcRectForDPad {
-	UIWindow* window = [[[UIApplication sharedApplication] delegate] window];
+	UIWindow*         window     = getKeyWindow();
 	UIViewController* controller = window.rootViewController;
 	CGRect            rcScreen   = controller.view.bounds;
 	CGSize            sizeDpad   = CGSizeMake(100, 100);
@@ -462,7 +496,7 @@ static NSString* const kGlyphPlay  = @"\u25B6\uFE0F";    // ▶
 }
 
 - (void)layoutButtonsForDpadLocation {
-	UIWindow* window = [[[UIApplication sharedApplication] delegate] window];
+	UIWindow*         window     = getKeyWindow();
 	UIViewController* controller = window.rootViewController;
 	CGRect            rcScreen   = controller.view.bounds;
 	CGSize            sizeButton = CGSizeMake(60, 40);
@@ -525,7 +559,7 @@ static NSString* const kGlyphPlay  = @"\u25B6\uFE0F";    // ▶
 	if (self.dpad == nil) {
 		self.dpad = [[DPadView alloc] initWithFrame:CGRectZero];
 	}
-	UIWindow* window = [[[UIApplication sharedApplication] delegate] window];
+	UIWindow*         window     = getKeyWindow();
 	UIViewController* controller = window.rootViewController;
 
 	self.dpad.frame = [self calcRectForDPad];
@@ -545,7 +579,7 @@ static NSString* const kGlyphPlay  = @"\u25B6\uFE0F";    // ▶
 								  rect:CGRectZero];
 	}
 
-	UIWindow* window = [[[UIApplication sharedApplication] delegate] window];
+	UIWindow*         window     = getKeyWindow();
 	UIViewController* controller = window.rootViewController;
 
 	// Lay out based on current D-Pad location
@@ -573,7 +607,7 @@ static NSString* const kGlyphPlay  = @"\u25B6\uFE0F";    // ▶
 }
 
 - (void)showPauseControls {
-	UIWindow* window = [[[UIApplication sharedApplication] delegate] window];
+	UIWindow*         window     = getKeyWindow();
 	UIViewController* controller = window.rootViewController;
 	if (self.btn2 == nil) {
 		self.btn2 = [self createButton:kGlyphPause
