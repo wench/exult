@@ -1,3 +1,7 @@
+#Apply clang-format v19 to .hpp files, fix clang-format toggling comment in sigame.cc
+b74cb4ea68979e7066ca0b84042c3a86f169d658
+#Applied clang-format v19 to iOS files
+8d2123dcf3ac2d6159d7f97e754180f82ddfa6e0
 #Apply clang-format (v19), with column limit 132 (#916)
 114c747aa91cc34dc9ff2495c750ca998e27a1e4
 #Cleaning .clang-format and formatting everything with it
