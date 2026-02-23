@@ -407,7 +407,7 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 	scroll->set_line_height(fieldh + fieldgap, false);
 	widgets[id_scroll] = std::move(scroll);
 
-	LoadSaveGameDetails(false);
+	LoadSaveGameDetails();
 	SelectSlot(NoSlot);
 	if (touchui != nullptr) {
 		touchui->hideGameControls();
@@ -502,7 +502,7 @@ void Newfile_gump::save() {
 
 	// Reset everything
 	FreeSaveGameDetails();
-	LoadSaveGameDetails(false);
+	LoadSaveGameDetails();
 	gwin->set_all_dirty();
 	gwin->got_bad_feeling(4);
 	SelectSlot(NoSlot);
@@ -523,7 +523,7 @@ void Newfile_gump::delete_file() {
 		return;
 	}
 
-	U7remove((*games)[selected_slot].filename().c_str());
+	gamedat->DeleteSaveGame((*games)[selected_slot].filename());
 	filename    = nullptr;
 	is_readable = false;
 
@@ -531,7 +531,7 @@ void Newfile_gump::delete_file() {
 
 	// Reset everything
 	FreeSaveGameDetails();
-	LoadSaveGameDetails(true);
+	LoadSaveGameDetails();
 	gwin->set_all_dirty();
 	SelectSlot(NoSlot);
 }
@@ -553,7 +553,7 @@ void Newfile_gump::toggle_settings(int state) {
 		auto selected_before = selected_slot;
 		FreeSaveGameDetails();
 		GameDat::get()->ResortSaveInfos();
-		LoadSaveGameDetails(false);
+		LoadSaveGameDetails();
 		SelectSlot(selected_before);
 	}
 	page_turn_effect->start(show_settings);
@@ -1377,7 +1377,7 @@ void Newfile_gump::SelectSlot(int slot) {
 	gwin->set_all_dirty();    // Repaint.
 }
 
-void Newfile_gump::LoadSaveGameDetails(bool force) {
+void Newfile_gump::LoadSaveGameDetails() {
 	// Gamedat Details
 	if (!gd_shot || !gd_details || gd_party.empty()) {
 		// Only if any are missing
@@ -1391,12 +1391,12 @@ void Newfile_gump::LoadSaveGameDetails(bool force) {
 		}
 	}
 	if (!old_style_mode) {
-		games = gamedat->GetSaveGameInfos(force);
+		games = gamedat->GetSaveGameInfos(false);
 	} else {
 		// Fill old_games slots
 		old_games.clear();
 		old_games.resize(fieldcount);
-		for (const auto& savegame : *gamedat->GetSaveGameInfos(force)) {
+		for (const auto& savegame : *gamedat->GetSaveGameInfos(false)) {
 			if (savegame.num >= 0 && savegame.num < fieldcount) {
 				old_games[savegame.num] = SaveInfo(savegame, {});
 			}
