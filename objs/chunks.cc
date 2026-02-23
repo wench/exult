@@ -1544,10 +1544,7 @@ void Map_chunk::kill_cache() {
 	dungeon_levels.reset();
 }
 
-int Map_chunk::get_obj_actors(vector<Game_object*>& removes, vector<Actor*>& actors) {
-	int  buf_size = 0;
-	bool failed   = false;
-
+void Map_chunk::get_obj_actors(vector<Game_object*>& removes, vector<Actor*>& actors) {
 	// Separate scope for Object_iterator.
 	Object_iterator it(get_objects());
 	Game_object*    each;
@@ -1557,21 +1554,13 @@ int Map_chunk::get_obj_actors(vector<Game_object*>& removes, vector<Actor*>& act
 		// Normal objects and monsters
 		if (actor == nullptr || (each->is_monster() && each->get_flag(Obj_flags::is_temporary))) {
 			removes.push_back(each);
-			const int ireg_size = each->get_ireg_size();
 
-			if (ireg_size < 0) {
-				failed = true;
-			} else {
-				buf_size += ireg_size;
-			}
 		}
 		// Actors/NPCs here
 		else {
 			actors.push_back(actor);
 		}
 	}
-
-	return failed ? -1 : buf_size;
 }
 
 void Map_chunk::write(ODataSource& out, bool v2) {

@@ -221,8 +221,6 @@ public:
 
 	// Write out to IREG file.
 	void write_ireg(ODataSource* out) override;
-	// Get size of IREG. Returns -1 if can't write to buffer
-	int get_ireg_size() override;
 
 	virtual bool reset() {
 		// being unloaded last change call unhatch_now
@@ -256,8 +254,6 @@ public:
 	void hatch(Game_object* obj, bool must = false) override;
 	// Write out to IREG file.
 	void write_ireg(ODataSource* out) override;
-	// Get size of IREG. Returns -1 if can't write to buffer
-	int get_ireg_size() override;
 
 	bool reset() override {
 		return false;
@@ -302,8 +298,6 @@ public:
 	}
 
 	void write_ireg(ODataSource* out) override;
-	// Get size of IREG. Returns -1 if can't write to buffer
-	int get_ireg_size() override;
 
 	bool reset() override {
 		return false;
