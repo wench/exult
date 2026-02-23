@@ -23,6 +23,8 @@
 class Image_window8;
 struct File_spec;
 class U7multiobject;
+class ODataSource;
+class IDataSource;
 
 #include <memory>
 
@@ -89,11 +91,21 @@ public:
 	}
 
 	void apply(bool repaint = true);
+
+	// Clear Palette cache
+	static void ClearCache();
+
 	void load(const File_spec& fname0, int index, const char* xfname = nullptr, int xindex = -1);
 	void load(const File_spec& fname0, const File_spec& fname1, int index, const char* xfname = nullptr, int xindex = -1);
 	void load(
 			const File_spec& fname0, const File_spec& fname1, const File_spec& fname2, int index, const char* xfname = nullptr,
 			int xindex = -1);
+
+	// Serialize palette object to datasource (for savegames)
+	void Serialize(ODataSource& ds);
+	// Deseralize Palette object from DataSource (for savegames)
+	void Deserialize(IDataSource& ds);
+
 	void set_brightness(int bright);
 
 	void set_max_val(int max) {
