@@ -75,6 +75,7 @@ public:
 		char reserved0;        // 16
 		char reserved1[48];    // 64
 
+		// Compare functions for display sorting Newer comes first
 		int CompareRealTime(const SaveGame_Details& other) const noexcept;
 		int CompareGameTime(const SaveGame_Details& other) const noexcept;
 	};
@@ -214,8 +215,9 @@ public:
 	// Save gamedat to a new savegame of the specified SaveInfo:Type with the
 	// given name
 	void save_gamedat(SaveInfo::Type type, const char* savename);
-	void read_saveinfo();    // Read the save info from gamedat
-private:
+	void read_saveinfo();                // Read the save info from gamedat
+	void read_saveinfo(bool newgame);    // Read the save info from gamedat
+
 	void restore_flex_files(IDataSource& in, const char* basepath);
 
 	bool get_saveinfo(

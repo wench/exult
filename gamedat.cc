@@ -543,10 +543,10 @@ void GameDat::read_save_infos() {
 		if (saveinfo.type != SaveInfo::Type::UNKNOWN && saveinfo.num >= 0) {
 			int itype = int(saveinfo.type);
 
-			// Only try to figure oldest if saveinfo is readable and details were read
-			// If no savegame is good oldest will default to 0
+			// Only try to figure oldest if saveinfo is readable and details
+			// were read. If no savegame is good oldest will default to 0
 			if (saveinfo.readable) {
-				if (!oldestinfo[itype] || saveinfo.details.CompareRealTime(oldestinfo[itype]->details) < 0) {
+				if (!oldestinfo[itype] || saveinfo.details.CompareRealTime(oldestinfo[itype]->details) > 0) {
 					oldest[itype]     = saveinfo.num;
 					oldestinfo[itype] = &saveinfo;
 				}
@@ -707,7 +707,17 @@ void GameDat::write_saveinfo(bool screenshot) {
 	}
 }
 
-void GameDat::read_saveinfo() {
+void GameDat::read_saveinfo(bool newgame) {
+	// if newgame, reset save count just in case the initgame file contains saveinfo.dat
+	// U6 mod has one and it should be ignored so save count starts at 0 for players
+	if (newgame) {
+		save_count = 0;
+		return;
+		// Remove the saveinfo if exists to prevent reading it in the future
+		if (U7exists(GSAVEINFO)) {
+			U7remove(GSAVEINFO);
+		}
+	}
 	IFileDataSource ds(GSAVEINFO);
 	if (ds.good()) {
 		ds.skip(10);    // Skip 10 bytes.
@@ -791,6 +801,12 @@ bool GameDat::read_saveinfo(IDataSource* in, SaveGame_Details& details, std::vec
 bool GameDat::get_saveinfo(
 		const std::string& filename, std::string& name, std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
 		std::vector<SaveGame_Party>& party) {
+	// Clear out old info
+	details = SaveGame_Details();
+	party.clear();
+	map.reset();
+	name.clear();
+
 	// First check for compressed save game
 #ifdef HAVE_ZIP_SUPPORT
 	if (get_saveinfo_zip(filename.c_str(), name, map, details, party)) {
