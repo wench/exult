@@ -533,6 +533,7 @@ void Game_window::abort(const char* msg, ...) {
 	va_start(ap, msg);
 	char buf[512];
 	vsnprintf(buf, sizeof(buf), msg, ap);    // Format the message.
+	va_end(ap);
 	cerr << "Exult (fatal): " << buf << endl;
 	delete this;
 	throw quit_exception(-1);
@@ -1380,7 +1381,20 @@ bool Game_window::init_gamedat(bool create) {
 		}
 		// scroll coords.
 	}
-	read_save_infos();    // Read in saved-game names.
+	init_savegames();
+
+	if (create) {
+		save_count = 0;
+	} else {
+		// Preload savecount from GSAVEINFO if it exists
+		IFileDataSource ds(GSAVEINFO);
+		if (ds.good()) {
+			ds.skip(10);    // Skip 10 bytes.
+			save_count = ds.read2();
+		} else {
+			save_count = 0;
+		}
+	}
 	return true;
 }
 
@@ -1440,6 +1454,17 @@ void Game_window::read() {
 	// before calling read_npcs!!
 	setup_game(cheat.in_map_editor());    // Read NPC's, usecode.
 	Mouse::mouse()->set_speed_cursor();
+
+	// Preload savecount from GSAVEINFO if it exists
+	{
+		IFileDataSource ds(GSAVEINFO);
+		if (ds.good()) {
+			ds.skip(10);    // Skip 10 bytes.
+			save_count = ds.read2();
+		} else {
+			save_count = 0;
+		}
+	}
 }
 
 /*
