@@ -74,7 +74,8 @@ private:
 	bool                            npc_numbers;
 	bool                            hack_mover;
 
-	bool enabled;
+	bool         enabled;
+	mutable bool cheated;
 	// Rectangle containing selected chunks:
 	int chunksel_left, chunksel_right, chunksel_top, chunksel_bottom;
 
@@ -86,6 +87,14 @@ public:
 	}
 
 	void set_enabled(bool en);
+
+	void set_cheated(bool set = true) const {
+		cheated = set;
+	}
+
+	bool has_cheated() {
+		return cheated;
+	}
 
 	bool in_god_mode() const {
 		return god_mode;

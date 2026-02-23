@@ -94,7 +94,7 @@ public:
 		char  old_party_size;    // 13 Party size is stored on disk here but this
 								 // field is no longer used
 
-		char unused;    // 14 Quite literally unused
+		bool cheated;    // 14 has the player used a cheat
 
 		char real_second;    // 15
 
