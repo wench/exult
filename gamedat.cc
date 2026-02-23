@@ -22,12 +22,16 @@
 #	include <config.h>
 #endif
 
+#include "gamedat.h"
+
+#include "Audio.h"
 #include "Configuration.h"
 #include "Flex.h"
 #include "Newfile_gump.h"
-#include "SaveInfo.h"
+#include "Notebook_gump.h"
 #include "Yesno_gump.h"
 #include "actors.h"
+#include "cheat.h"
 #include "databuf.h"
 #include "exceptions.h"
 #include "exult.h"
@@ -37,12 +41,13 @@
 #include "gamemap.h"
 #include "gamewin.h"
 #include "listfiles.h"
+#include "mouse.h"
 #include "party.h"
 #include "span.h"
+#include "ucmachine.h"
 #include "utils.h"
 #include "version.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -50,8 +55,6 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
-#include <future>
-#include <mutex>
 #include <sstream>
 
 #ifdef _WIN32
@@ -86,35 +89,17 @@ using std::time;
 using std::time_t;
 using std::tm;
 
-namespace Globals {
-	// Save game compression level
-	static int                                  save_compression = 1;    // 1 is Default compression level
-	static std::vector<SaveInfo>                save_infos;
-	static std::array<int, SaveInfo::NUM_TYPES> first_free;
-	static std::string                          save_mask;
-	static std::shared_future<void>             saveinfo_future;
-	static std::mutex                           save_info_mutex;
-}    // namespace Globals
-
-static bool get_saveinfo(
-		const std::string& filename, std::string& name, std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-		std::vector<SaveGame_Party>& party);
-
-static void clear_saveinfos() {
-	std::lock_guard<std::mutex> lock(Globals::save_info_mutex);
-	Globals::save_infos.clear();
-	Globals::saveinfo_future = std::shared_future<void>();
+void GameDat::clear_saveinfos() {
+	std::lock_guard lock(save_info_mutex);
+	save_infos.clear();
+	saveinfo_future = std::shared_future<void>();
 }
-
-static bool get_saveinfo_zip(
-		const char* fname, std::string& name, std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-		std::vector<SaveGame_Party>& party);
 
 /*
  *  Write files from flex assuming first 13 characters of
  *  each flex object are an 8.3 filename.
  */
-void Game_window::restore_flex_files(IDataSource& in, const char* basepath) {
+void GameDat::restore_flex_files(IDataSource& in, const char* basepath) {
 	in.seek(0x54);    // Get to where file count sits.
 	const size_t numfiles = in.read4();
 	in.seek(0x80);    // Get to file info.
@@ -176,19 +161,19 @@ void Game_window::restore_flex_files(IDataSource& in, const char* basepath) {
 		}
 		auto pOut = U7open_out(fname);
 		if (!pOut) {
-			abort("Error opening '%s'.", fname);
+			gwin->abort("Error opening '%s'.", fname);
 		}
 		OStreamDataSource sout(pOut.get());
 		sout.write(buf.get(), len);    // Then write it out.
 		if (!sout.good()) {
-			abort("Error writing '%s'.", fname);
+			gwin->abort("Error writing '%s'.", fname);
 		}
-		cycle_load_palette();
+		gwin->cycle_load_palette();
 	}
 }
 
 // In gamemgr/modmgr.cc because it is also needed by ES.
-string get_game_identity(const char* savename, const string& title);
+extern string get_game_identity(const char* savename, const string& title);
 
 /*
  *  Write out the gamedat directory from a saved game.
@@ -196,7 +181,7 @@ string get_game_identity(const char* savename, const string& title);
  *  Output: Aborts if error.
  */
 
-void Game_window::restore_gamedat(const char* fname    // Name of savegame file.
+void GameDat::restore_gamedat(const char* fname    // Name of savegame file.
 ) {
 	// Check IDENTITY.
 	string       id                             = get_game_identity(fname, Game::get_gametitle());
@@ -220,7 +205,7 @@ void Game_window::restore_gamedat(const char* fname    // Name of savegame file.
 #endif
 
 	// Display red plasma during load...
-	setup_load_palette();
+	gwin->setup_load_palette();
 
 	U7mkdir("<GAMEDAT>", 0755);    // Create dir. if not already there. Don't
 	// use GAMEDAT define cause that's got a
@@ -258,7 +243,7 @@ void Game_window::restore_gamedat(const char* fname    // Name of savegame file.
 
 	cout.flush();
 
-	load_palette_timer = 0;
+	gwin->load_finished();
 
 	if (user_ignored_identity_mismatch) {
 		// create new identity file if user agreed to open
@@ -273,7 +258,7 @@ void Game_window::restore_gamedat(const char* fname    // Name of savegame file.
  *  Output: Aborts if error.
  */
 
-void Game_window::restore_gamedat(int num    // 0-9, currently.
+void GameDat::restore_gamedat(int num    // 0-9, currently.
 ) {
 	char fname[50];    // Set up name.
 	snprintf(
@@ -293,7 +278,7 @@ constexpr static const std::array bgsavefiles{GEXULTVER, GNEWGAMEVER, NPC_DAT, M
 constexpr static const std::array sisavefiles{GEXULTVER, GNEWGAMEVER, NPC_DAT,   MONSNPCS,   USEVARS,    USEDAT,
 											  FLAGINIT,  GWINDAT,     GSCHEDULE, KEYRINGDAT, NOTEBOOKXML};
 
-static void SavefileFromDataSource(
+void GameDat::SavefileFromDataSource(
 		Flex_writer& flex,
 		IDataSource& source,    // read from here
 		const char*  fname      // store data using this filename
@@ -305,7 +290,7 @@ static void SavefileFromDataSource(
  *  Save a single file into an IFF repository.
  */
 
-static void Savefile(
+void GameDat::Savefile(
 		Flex_writer& flex,
 		const char*  fname    // Name of file to save.
 ) {
@@ -319,7 +304,7 @@ static void Savefile(
 	SavefileFromDataSource(flex, source, fname);
 }
 
-static inline void save_gamedat_chunks(Game_map* map, Flex_writer& flex) {
+inline void GameDat::save_gamedat_chunks(Game_map* map, Flex_writer& flex) {
 	for (int schunk = 0; schunk < 12 * 12; schunk++) {
 		char iname[128];
 		// Check to see if the ireg exists before trying to
@@ -340,7 +325,7 @@ static inline void save_gamedat_chunks(Game_map* map, Flex_writer& flex) {
  *  Output: 0 if error (reported).
  */
 
-void Game_window::save_gamedat(
+void GameDat::save_gamedat(
 		const char* fname,      // File to create.
 		const char* savename    // User's savegame name.
 ) {
@@ -351,7 +336,7 @@ void Game_window::save_gamedat(
 
 #ifdef HAVE_ZIP_SUPPORT
 	// Try to save as a zip file
-	if (Globals::save_compression > 0 && save_gamedat_zip(fname, savename)) {
+	if (save_compression > 0 && save_gamedat_zip(fname, savename)) {
 		return;
 	}
 #endif
@@ -369,7 +354,7 @@ void Game_window::save_gamedat(
 	// gamedat flex, while all others have a flex
 	// of their own contained in gamedat flex.
 	size_t count = savefiles.size() + 12 * 12 + 2;
-	for (auto* map : maps) {
+	for (auto* map : gwin->get_maps()) {
 		if (map) {
 			count++;
 		}
@@ -394,7 +379,7 @@ void Game_window::save_gamedat(
 		Savefile(flex, savefile);
 	}
 	// Now the Ireg's.
-	for (auto* map : maps) {
+	for (auto* map : gwin->get_maps()) {
 		if (!map) {
 			continue;
 		}
@@ -420,7 +405,7 @@ void Game_window::save_gamedat(
 	}
 }
 
-std::string Game_window::get_save_filename(int num, int type) {
+std::string GameDat::get_save_filename(int num, int type) {
 	// preallocate string to a size that should be big enough
 	std::string fname(std::size(SAVENAME3) + 3, 0);
 	for (;;) {
@@ -458,7 +443,7 @@ std::string Game_window::get_save_filename(int num, int type) {
  *  Output: false if error (reported).
  */
 
-void Game_window::save_gamedat(
+void GameDat::save_gamedat(
 		int         num,        // 0-9, currently.
 		const char* savename    // User's savegame name.
 ) {
@@ -466,10 +451,10 @@ void Game_window::save_gamedat(
 	save_gamedat(fname.c_str(), savename);
 }
 
-void Game_window::save_gamedat(
+void GameDat::save_gamedat(
 		const char* savename,    // User's savegame name.
 		int         type) {
-	std::string fname = get_save_filename(Globals::first_free[type], type);    // Set up name.
+	std::string fname = get_save_filename(first_free[type], type);    // Set up name.
 	save_gamedat(fname.c_str(), savename);
 
 	// Update save_info
@@ -478,22 +463,22 @@ void Game_window::save_gamedat(
 /*
  *  Read in the saved game names.
  */
-void read_save_infos() {
-	std::lock_guard<std::mutex> lock(Globals::save_info_mutex);
+void GameDat::read_save_infos() {
+	std::lock_guard lock(save_info_mutex);
 
 	char mask[256];
 	snprintf(mask, sizeof(mask), SAVENAME2, GAME_BG ? "bg" : GAME_SI ? "si" : "dev");
-	string save_mask = get_system_path(mask);
+	auto save_mask = get_system_path(mask);
 
 	FileList filenames;
 	U7ListFiles(save_mask, filenames, true);
 
 	// If save_mask is the same and we've already read the save infos do nothing
-	if (save_mask == Globals::save_mask && Globals::save_infos.size() == filenames.size()) {
+	if (std::string_view(save_mask) == this->save_mask && save_infos.size() == filenames.size()) {
 		return;
 	}
-	Globals::save_mask = std::move(save_mask);
-	Globals::save_infos.clear();
+	this->save_mask = save_mask;
+	save_infos.clear();
 
 	// Sort filenames
 	if (filenames.size()) {
@@ -501,29 +486,29 @@ void read_save_infos() {
 	}
 
 	// Setup basic details
-	Globals::save_infos.reserve(filenames.size());
+	save_infos.reserve(filenames.size());
 	for (auto& filename : filenames) {
-		Globals::save_infos.emplace_back(std::move(filename));
+		save_infos.emplace_back(std::move(filename));
 	}
 
-	Globals::first_free.fill(-1);
+	first_free.fill(-1);
 
 	std::array<int, SaveInfo::NUM_TYPES> last;
 	last.fill(-1);
 
 	// Read and cache all details
-	for (auto& saveinfo : Globals::save_infos) {
+	for (auto& saveinfo : save_infos) {
 		saveinfo.readable
 				= get_saveinfo(saveinfo.filename(), saveinfo.savename, saveinfo.screenshot, saveinfo.details, saveinfo.party);
 
 		// Handling of regular savegame with a savegame number
 		if (saveinfo.type != SaveInfo::UNKNOWN && saveinfo.num >= 0) {
 			// First free not yet found
-			if (Globals::first_free[saveinfo.type] == -1) {
+			if (first_free[saveinfo.type] == -1) {
 				// If the last save was not 1 before this there is a gap wer can
 				// use
 				if (last[saveinfo.type] + 1 != saveinfo.num) {
-					Globals::first_free[saveinfo.type] = last[saveinfo.type] + 1;
+					first_free[saveinfo.type] = last[saveinfo.type] + 1;
 				}
 
 				last[saveinfo.type] = saveinfo.num;
@@ -532,23 +517,25 @@ void read_save_infos() {
 	}
 	// If no gaps found set forst free of each type to last +1
 	for (int type = 0; type < SaveInfo::NUM_TYPES; ++type) {
-		if (Globals::first_free[type] == -1) {
-			Globals::first_free[type] = last[type] + 1;
+		if (first_free[type] == -1) {
+			first_free[type] = last[type] + 1;
 		}
 	}
 
 	// Sort infos
-	if (Globals::save_infos.size()) {
-		std::sort(Globals::save_infos.begin(), Globals::save_infos.end());
+	if (save_infos.size()) {
+		std::sort(save_infos.begin(), save_infos.end());
 	}
 }
 
-static void read_save_infos_async() {
-	std::lock_guard<std::mutex> lock(Globals::save_info_mutex);
-	if ((!Globals::saveinfo_future.valid()
-		 || Globals::saveinfo_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-		&& Globals::save_infos.empty()) {
-		Globals::saveinfo_future = std::async(std::launch::async, []() {
+void GameDat::read_save_infos_async(bool force) {
+	std::lock_guard lock(save_info_mutex);
+	if (force) {
+		clear_saveinfos();
+	}
+	if ((!saveinfo_future.valid() || saveinfo_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+		&& save_infos.empty()) {
+		saveinfo_future = std::async(std::launch::async, [this]() {
 			try {
 				read_save_infos();
 			} catch (const std::exception& e) {
@@ -558,30 +545,26 @@ static void read_save_infos_async() {
 	}
 }
 
-static void wait_for_saveinfo_read() {
-	if (Globals::saveinfo_future.valid()) {
-		Globals::saveinfo_future.wait();
+void GameDat::wait_for_saveinfo_read() {
+	if (saveinfo_future.valid()) {
+		saveinfo_future.wait();
 	}
 }
 
-const std::vector<SaveInfo>* Game_window::GetSaveGameInfos(bool force) {
-	if (force) {
-		clear_saveinfos();
-	}
-
+const std::vector<GameDat::SaveInfo>* GameDat::GetSaveGameInfos(bool force) {
 	// read save infos if needed
-	read_save_infos_async();
+	read_save_infos_async(force);
 
 	// wait for read to finish
 	wait_for_saveinfo_read();
 
-	return &Globals::save_infos;
+	return &save_infos;
 }
 
-void Game_window::write_saveinfo(bool screenshot) {
+void GameDat::write_saveinfo(bool screenshot) {
 	// Update save count
 	save_count++;
-	const int party_size = party_man->get_count() + 1;
+	const int party_size = partyman->get_count() + 1;
 
 	{
 		OFileDataSource out(GSAVEINFO);    // Open file; throws an exception - Don't care
@@ -597,6 +580,8 @@ void Game_window::write_saveinfo(bool screenshot) {
 		out.write1(timeinfo->tm_mday);
 		out.write1(timeinfo->tm_mon + 1);
 		out.write2(timeinfo->tm_year + 1900);
+
+		auto clock = gwin->get_clock();
 
 		// The Game Time that the save was done at
 		out.write1(clock->get_minute());
@@ -615,7 +600,7 @@ void Game_window::write_saveinfo(bool screenshot) {
 			out.write1(0);
 		}
 
-		for (auto npc : party_man->IterateWithMainActor) {
+		for (auto npc : partyman->IterateWithMainActor) {
 			std::string name(npc->get_npc_name());
 			name.resize(sizeof(SaveGame_Party::name) - 1, '\0');
 			out.write(name.c_str(), sizeof(SaveGame_Party::name));
@@ -647,7 +632,7 @@ void Game_window::write_saveinfo(bool screenshot) {
 	if (screenshot) {
 		std::cout << "Creating screenshot for savegame" << std::endl;
 		// Save Shape
-		std::unique_ptr<Shape_file> map = create_mini_screenshot();
+		std::unique_ptr<Shape_file> map = gwin->create_mini_screenshot();
 		// Open file; throws an exception - Don't care
 		OFileDataSource out(GSCRNSHOT);
 		map->save(&out);
@@ -673,7 +658,17 @@ void Game_window::write_saveinfo(bool screenshot) {
 	}
 }
 
-static bool read_saveinfo(IDataSource* in, SaveGame_Details& details, std::vector<SaveGame_Party>& party) {
+void GameDat::read_saveinfo() {
+	IFileDataSource ds(GSAVEINFO);
+	if (ds.good()) {
+		ds.skip(10);    // Skip 10 bytes.
+		save_count = ds.read2();
+	} else {
+		save_count = 0;
+	}
+}
+
+bool GameDat::read_saveinfo(IDataSource* in, SaveGame_Details& details, std::vector<SaveGame_Party>& party) {
 	details = SaveGame_Details();
 	party.clear();
 
@@ -744,7 +739,7 @@ static bool read_saveinfo(IDataSource* in, SaveGame_Details& details, std::vecto
 	return true;
 }
 
-static bool get_saveinfo(
+bool GameDat::get_saveinfo(
 		const std::string& filename, std::string& name, std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
 		std::vector<SaveGame_Party>& party) {
 	// First check for compressed save game
@@ -814,7 +809,7 @@ static bool get_saveinfo(
 	return true;
 }
 
-void Game_window::get_saveinfo(
+void GameDat::get_saveinfo(
 		std::unique_ptr<Shape_file>& map, SaveGame_Details& details, std::vector<SaveGame_Party>& party, bool current) {
 	{
 		map.reset();
@@ -822,11 +817,13 @@ void Game_window::get_saveinfo(
 		party.clear();
 		if (current) {
 			// Current screenshot
-			map = create_mini_screenshot();
+			map = gwin->create_mini_screenshot();
 
 			// Current Details
 
 			details.save_count = save_count;
+
+			auto clock = gwin->get_clock();
 
 			details.game_day    = static_cast<short>(clock->get_total_hours() / 24);
 			details.game_hour   = clock->get_hour();
@@ -844,9 +841,9 @@ void Game_window::get_saveinfo(
 			details.good        = true;
 			// Current Party
 			party.clear();
-			party.reserve(party_man->get_count() + 1);
+			party.reserve(partyman->get_count() + 1);
 
-			for (auto npc : party_man->IterateWithMainActor) {
+			for (auto npc : partyman->IterateWithMainActor) {
 				auto&       sgp_current = party.emplace_back();
 				std::string namestr     = npc->get_npc_name();
 				std::strncpy(sgp_current.name, namestr.c_str(), std::size(sgp_current.name) - 1);
@@ -906,7 +903,7 @@ static const char* remove_dir(const char* fname) {
 	return fname;
 }
 
-bool get_saveinfo_zip(
+bool GameDat::get_saveinfo_zip(
 		const char* fname, std::string& name, std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
 		std::vector<SaveGame_Party>& party) {
 	// If a flex, so can't read it
@@ -960,7 +957,7 @@ bool get_saveinfo_zip(
 }
 
 // Level 2 Compression
-bool Game_window::Restore_level2(unzFile& unzipfile, const char* dirname, int dirlen) {
+bool GameDat::Restore_level2(unzFile& unzipfile, const char* dirname, int dirlen) {
 	std::vector<char>       filebuf;
 	std::unique_ptr<char[]> dynamicname;
 	char                    fixedname[50];    // Set up name.
@@ -1032,7 +1029,7 @@ bool Game_window::Restore_level2(unzFile& unzipfile, const char* dirname, int di
 				std::cerr << "out was bad" << std::endl;
 				return false;
 			}
-			cycle_load_palette();
+			gwin->cycle_load_palette();
 		}
 	}
 
@@ -1045,7 +1042,7 @@ bool Game_window::Restore_level2(unzFile& unzipfile, const char* dirname, int di
  *  Output: Aborts if error.
  */
 
-bool Game_window::restore_gamedat_zip(const char* fname    // Name of savegame file.
+bool GameDat::restore_gamedat_zip(const char* fname    // Name of savegame file.
 ) {
 	// If a flex, so can't read it
 	try {
@@ -1056,7 +1053,7 @@ bool Game_window::restore_gamedat_zip(const char* fname    // Name of savegame f
 		return false;    // Ignore if not found.
 	}
 	// Display red plasma during load...
-	setup_load_palette();
+	gwin->setup_load_palette();
 	IFileDataSource ds(fname);
 	unzFile         unzipfile = unzOpen(&ds);
 	if (!unzipfile) {
@@ -1120,13 +1117,13 @@ bool Game_window::restore_gamedat_zip(const char* fname    // Name of savegame f
 			U7mkdir(oname.c_str(), 0755);
 			// Put a final marker in the dir name.
 			if (!Restore_level2(unzipfile, oname.c_str(), filenamelen)) {
-				abort("Error reading level2 from zip '%s'.", fname);
+				gwin->abort("Error reading level2 from zip '%s'.", fname);
 			}
 			continue;
 		} else if (!std::strcmp("GAMEDAT", oname2)) {
 			// Put a final marker in the dir name.
 			if (!Restore_level2(unzipfile, oname.c_str(), 0)) {
-				abort("Error reading level2 from zip '%s'.", fname);
+				gwin->abort("Error reading level2 from zip '%s'.", fname);
 			}
 			// Flag that this is a level 2 save.
 			level2zip = true;
@@ -1153,43 +1150,43 @@ bool Game_window::restore_gamedat_zip(const char* fname    // Name of savegame f
 
 		// Open the file in the zip
 		if (unzOpenCurrentFile(unzipfile) != UNZ_OK) {
-			abort("Error opening current from zipfile '%s'.", fname);
+			gwin->abort("Error opening current from zipfile '%s'.", fname);
 		}
 
 		// Now read the file.
 		std::vector<char> buf(len);
 		if (unzReadCurrentFile(unzipfile, buf.data(), buf.size()) != len) {
-			abort("Error reading current from zip '%s'.", fname);
+			gwin->abort("Error reading current from zip '%s'.", fname);
 		}
 
 		// now write it out.
 		auto pOut = U7open_out(oname.c_str());
 		if (!pOut) {
-			abort("Error opening '%s'.", oname.c_str());
+			gwin->abort("Error opening '%s'.", oname.c_str());
 		}
 		auto& out = *pOut;
 		out.write(buf.data(), buf.size());
 		if (!out.good()) {
-			abort("Error writing to '%s'.", oname.c_str());
+			gwin->abort("Error writing to '%s'.", oname.c_str());
 		}
 
 		// Close the file in the zip
 		if (unzCloseCurrentFile(unzipfile) != UNZ_OK) {
-			abort("Error closing current in zip '%s'.", fname);
+			gwin->abort("Error closing current in zip '%s'.", fname);
 		}
 
-		cycle_load_palette();
+		gwin->cycle_load_palette();
 	} while (unzGoToNextFile(unzipfile) == UNZ_OK);
 
 	cout.flush();
 
-	load_palette_timer = 0;
+	gwin->load_finished();
 
 	return true;
 }
 
 // Level 1 Compression
-static bool Save_level1(zipFile zipfile, const char* fname) {
+bool GameDat::Save_level1(zipFile zipfile, const char* fname) {
 	IFileDataSource ds(fname);
 	if (!ds.good()) {
 		if (Game::is_editing()) {
@@ -1209,7 +1206,7 @@ static bool Save_level1(zipFile zipfile, const char* fname) {
 }
 
 // Level 2 Compression
-static bool Begin_level2(zipFile zipfile, int mapnum) {
+bool GameDat::Begin_level2(zipFile zipfile, int mapnum) {
 	char oname[8];    // Set up name.
 	if (mapnum == 0) {
 		strcpy(oname, "GAMEDAT");
@@ -1224,7 +1221,7 @@ static bool Begin_level2(zipFile zipfile, int mapnum) {
 	return zipOpenNewFileInZip(zipfile, oname, nullptr, nullptr, 0, nullptr, 0, nullptr, Z_DEFLATED, Z_BEST_COMPRESSION) == ZIP_OK;
 }
 
-static bool Save_level2(zipFile zipfile, const char* fname) {
+bool GameDat::Save_level2(zipFile zipfile, const char* fname) {
 	IFileDataSource ds(fname);
 	if (!ds.good()) {
 		if (Game::is_editing()) {
@@ -1266,7 +1263,7 @@ static bool Save_level2(zipFile zipfile, const char* fname) {
 	return err == ZIP_OK;
 }
 
-static bool End_level2(zipFile zipfile) {
+bool GameDat::End_level2(zipFile zipfile) {
 	uint32 zeros = 0;
 
 	// Write a terminator (12 zeros)
@@ -1281,13 +1278,13 @@ static bool End_level2(zipFile zipfile) {
 	return zipCloseFileInZip(zipfile) == ZIP_OK && err == ZIP_OK;
 }
 
-bool Game_window::save_gamedat_zip(
+bool GameDat::save_gamedat_zip(
 		const char* fname,      // File to create.
 		const char* savename    // User's savegame name.
 ) {
 	char iname[128];
 	// If no compression return
-	if (Globals::save_compression < 1) {
+	if (save_compression < 1) {
 		return false;
 	}
 
@@ -1322,13 +1319,14 @@ bool Game_window::save_gamedat_zip(
 	Save_level1(zipfile, IDENTITY);
 
 	// Level 1 Compression
-	if (Globals::save_compression != 2) {
+	if (save_compression != 2) {
 		for (const auto* savefile : savefiles) {
 			Save_level1(zipfile, savefile);
 		}
 
 		// Now the Ireg's.
-		for (auto* map : maps) {
+
+		for (const auto* map : gwin->get_maps()) {
 			if (!map) {
 				continue;
 			}
@@ -1352,7 +1350,7 @@ bool Game_window::save_gamedat_zip(
 		}
 
 		// Now the Ireg's.
-		for (auto* map : maps) {
+		for (const auto* map : gwin->get_maps()) {
 			if (!map) {
 				continue;
 			}
@@ -1385,7 +1383,7 @@ bool Game_window::save_gamedat_zip(
 
 #endif
 
-void Game_window::MakeEmergencySave(const char* savename) {
+void GameDat::MakeEmergencySave(const char* savename) {
 	// Using mostly std::filesystem here insteaf of U7 functions to avoid
 	// repeated looking up paths
 
@@ -1421,7 +1419,7 @@ void Game_window::MakeEmergencySave(const char* savename) {
 
 	// Write out current gamestate to gamedat
 	std::cerr << " attempting to save current gamestate to gamedat" << std::endl;
-	write(true);
+	gwin->write(true);
 
 	// save it as the save
 	std::cerr << " attempting to save gamedat as \"" << savename << "\"" << std::endl;
@@ -1434,14 +1432,11 @@ void Game_window::MakeEmergencySave(const char* savename) {
 	add_system_path("<GAMEDAT>", gamedatpath);
 }
 
-void Game_window::init_savegames() {
+GameDat::GameDat() {
 	// Save game compression level
-	config->value("config/disk/save_compression_level", Globals::save_compression, Globals::save_compression);
-	if (Globals::save_compression < 0 || Globals::save_compression > 2) {
-		Globals::save_compression = 1;
+	config->value("config/disk/save_compression_level", save_compression, save_compression);
+	if (save_compression < 0 || save_compression > 2) {
+		save_compression = 1;
 	}
-	config->set("config/disk/save_compression_level", Globals::save_compression, false);
-
-	//
-	read_save_infos_async();    // Start reading save infos in background
+	config->set("config/disk/save_compression_level", save_compression, false);
 }

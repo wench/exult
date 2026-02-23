@@ -20,8 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define NEWFILE_GUMP_H
 
 #include "Modal_gump.h"
-#include "SaveInfo.h"
 #include "Scrollable_widget.h"
+#include "gamedat.h"
 
 #include <array>
 #include <memory>
@@ -35,6 +35,10 @@ struct SDL_Window;
  */
 class Newfile_gump : public Modal_gump {
 public:
+	using SaveInfo         = GameDat::SaveInfo;
+	using SaveGame_Details = GameDat::SaveGame_Details;
+	using SaveGame_Party   = GameDat::SaveGame_Party;
+
 protected:
 	enum button_ids {
 		id_first = 0,
