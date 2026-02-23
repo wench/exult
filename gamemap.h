@@ -69,13 +69,12 @@ class Game_map {
 	// Chunk_terrain index for each chunk:
 	short terrain_map[c_num_chunks][c_num_chunks];
 	// A list of objects in each chunk:
-	std::unique_ptr<Map_chunk>            objects[c_num_chunks][c_num_chunks];
-	bool                                  schunk_read[144];        // Flag for reading in each "ifix".
-	bool                                  schunk_modified[144];    // Flag for modified "ifix".
-	char*                                 schunk_cache[144];
-	int                                   schunk_cache_sizes[144];
-	int                                   caching_out;    // >0 in 'cache_out_schunk'.
-	std::unique_ptr<Map_patch_collection> map_patches;
+	std::unique_ptr<Map_chunk>                  objects[c_num_chunks][c_num_chunks];
+	bool                                        schunk_read[144];        // Flag for reading in each "ifix".
+	bool                                        schunk_modified[144];    // Flag for modified "ifix".
+	std::array<std::vector<unsigned char>, 144> schunk_cache;
+	int                                         caching_out;    // >0 in 'cache_out_schunk'.
+	std::unique_ptr<Map_patch_collection>       map_patches;
 
 	Map_chunk*            create_chunk(int cx, int cy);
 	static Chunk_terrain* read_terrain(int chunk_num);
