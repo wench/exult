@@ -1345,7 +1345,7 @@ bool Game_window::init_gamedat(bool create) {
 		// scroll coords.
 	}
 	// Read saveinfo from gamedat.
-	gamedat->read_saveinfo(create);
+	gamedat->init(create);
 	// Start forced async read of save infos from saved games.
 	gamedat->read_save_infos_async(true);
 	return true;
@@ -1417,7 +1417,7 @@ void Game_window::read() {
 	setup_game(cheat.in_map_editor());    // Read NPC's, usecode.
 	Mouse::mouse()->set_speed_cursor();
 
-	GameDat::get()->read_saveinfo(false);
+	GameDat::get()->init(false);
 }
 
 /*
