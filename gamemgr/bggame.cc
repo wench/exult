@@ -35,6 +35,7 @@
 #include "flic/playfli.h"
 #include "fnames.h"
 #include "font.h"
+#include "gamedat.h"
 #include "gamewin.h"
 #include "gump_utils.h"
 #include "imagewin/ArbScaler.h"
