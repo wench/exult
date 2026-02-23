@@ -2660,6 +2660,7 @@ int Usecode_internal::run() {
 					}
 #endif
 					if (flagvalue) {
+						gamedat->Queue_Autosave(offset);
 						Notebook_gump::add_gflag_text(offset);
 					}
 					// ++++KLUDGE for Monk Isle:

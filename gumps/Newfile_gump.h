@@ -37,6 +37,8 @@ class PageTurnEffect;
  */
 class Newfile_gump : public Modal_gump {
 public:
+	friend class GameDat;
+
 	using SaveInfo         = GameDat::SaveInfo;
 	using SaveGame_Details = GameDat::SaveGame_Details;
 	using SaveGame_Party   = GameDat::SaveGame_Party;
@@ -55,6 +57,7 @@ protected:
 		id_apply,
 		id_revert,
 		id_slider_autocount,
+		id_slider_flagautocount,
 		id_slider_quickcount,
 		id_button_sortby,
 		id_button_groupbytype,
@@ -177,8 +180,9 @@ protected:
 	int  AddCharacter(char c);
 	void SelectSlot(int slot);    // Select a given slot
 
-	void LoadSaveGameDetails();    // Loads (and sorts) all the savegame details
-	void FreeSaveGameDetails();    // Frees all the savegame details
+	static void SaveGameDetailsChanging();    // Notification from GameDat that save infos are about to change
+	void        LoadSaveGameDetails();        // Loads (and sorts) all the savegame details
+	void        FreeSaveGameDetails();        // Frees all the savegame details
 
 	void SetTextInputArea(SDL_Window* window);
 
