@@ -202,6 +202,10 @@ public:
 		cliph = h;
 	}
 
+	void set_clip(const TileRect& r) {
+		set_clip(r.x, r.y, r.w, r.h);
+	}
+
 	void get_clip(int& x, int& y, int& w, int& h) const {
 		x = clipx;
 		y = clipy;
