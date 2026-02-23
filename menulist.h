@@ -183,7 +183,7 @@ public:
 	}
 
 	void paint(Game_window* gwin);
-	int  handle_events(Game_window* gwin);
+	int  handle_events(Game_window* gwin, int& keymods);
 
 	int get_selection() {
 		return selection;
