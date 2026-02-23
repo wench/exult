@@ -688,16 +688,16 @@ void Game_map::write_scheduled(
 		bool write_mark    // Write an IREG_ENDMARK if true.
 ) {
 	for (Usecode_script* scr = Usecode_script::find(obj); scr; scr = Usecode_script::find(obj, scr)) {
-		ostringstream     outbuf(ios::out);
-		OStreamDataSource nbuf(&outbuf);
-		const int         len = scr->save(&nbuf);
+		std::pmr::vector<unsigned char> outbuf;
+		OVectorDataSource               nbuf(&outbuf);
+		const int                       len = scr->save(&nbuf);
 		if (len < 0) {
 			cerr << "Error saving Usecode script" << endl;
 		} else if (len > 0) {
 			ireg->write1(IREG_SPECIAL);
 			ireg->write1(IREG_UCSCRIPT);
 			ireg->write2(len);    // Store length.
-			ireg->write(outbuf.str());
+			ireg->write(outbuf.data(), len);
 		}
 	}
 	if (write_mark) {
