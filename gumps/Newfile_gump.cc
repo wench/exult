@@ -204,9 +204,14 @@ void Newfile_gump::SetTextInputArea(SDL_Window* window) {
 	TouchUI::setTextInputArea(window, text_gx, text_gy, text_gx2, text_gy2);
 }
 
-Newfile_gump::Newfile_gump()
-		: Modal_gump(nullptr, gwin->get_width() / 2 - 160, gwin->get_height() / 2 - 100, EXULT_FLX_SAVEGUMP_SHP, SF_EXULT_FLX) {
+Newfile_gump::Newfile_gump(bool restore_mode)
+		: Modal_gump(nullptr, gwin->get_width() / 2 - 160, gwin->get_height() / 2 - 100, EXULT_FLX_SAVEGUMP_SHP, SF_EXULT_FLX),
+		  restore_mode(restore_mode) {
 	set_object_area(TileRect(0, 0, 320, 200), -6, 178);    //+++++ ???
+
+	if (restore_mode) {
+		list_position = -1;
+	}
 
 	newname[0] = 0;
 
@@ -266,8 +271,10 @@ void Newfile_gump::load() {
 		gwin->restore_gamedat(games[selected].num);
 	}
 
-	// Read Gamedat
-	gwin->read();
+	// Read Gamedat if not in restore mode
+	if (!restore_mode) {
+		gwin->read();
+	}
 
 	// Set Done
 	done     = true;
@@ -293,7 +300,7 @@ void Newfile_gump::load() {
 
 void Newfile_gump::save() {
 	// Shouldn't ever happen.
-	if (!strlen(newname) || selected == -3) {
+	if (!strlen(newname) || selected == -3 || restore_mode) {
 		return;
 	}
 
@@ -375,7 +382,10 @@ void Newfile_gump::scroll_line(int dir) {
 		list_position = num_games - fieldcount;
 	}
 
-	if (list_position < -2) {
+	// When in mainmenu, we don't slot for a new savedgame
+	if (restore_mode && list_position < -1) {
+		list_position = -1;
+	} else if (list_position < -2) {
 		list_position = -2;
 	}
 
@@ -405,9 +415,13 @@ void Newfile_gump::PaintSaveName(int line) {
 	const char* text;
 
 	if (actual_game == -1) {
-		text = "Quick Save";
+		text = "Gamedat Directory";
 	} else if (actual_game == -2 && selected != -2) {
-		text = "Empty Slot";
+		if (restore_mode) {
+			text = "";
+		} else {
+			text = "Empty Slot";
+		}
 	} else if (actual_game != selected || buttons[id_load]) {
 		text = games[actual_game].savename;
 	} else {
@@ -554,7 +568,7 @@ void Newfile_gump::paint() {
 			sman->paint_text_box(4, info, x + infox, y + infoy, infow, infoh);
 		}
 
-		if (!is_readable) {
+		if (!is_readable && !(restore_mode && selected == -3)) {
 			sman->paint_text(
 					2, "Unreadable", x + infox + (infow - sman->get_text_width(2, "Unreadable")) / 2, y + infoy + (infoh - 18) / 2);
 			sman->paint_text(2, "Savegame", x + infox + (infow - sman->get_text_width(2, "Savegame")) / 2, y + infoy + (infoh) / 2);
@@ -679,7 +693,7 @@ bool Newfile_gump::mouse_down(
 		screenshot  = gd_shot.get();
 		details     = gd_details;
 		party       = gd_party;
-		strcpy(newname, "Quick Save");
+		strcpy(newname, "Gamedat Directory");
 		cursor      = -1;    // No cursor
 		is_readable = true;
 		filename    = nullptr;
@@ -691,6 +705,13 @@ bool Newfile_gump::mouse_down(
 		cursor      = static_cast<int>(strlen(newname));
 		is_readable = want_load = games[selected].readable;
 		filename                = games[selected].filename;
+	}
+
+	if (restore_mode) {
+		// No cursor in restore mode because there is no saving so names can't be
+		// changed
+		cursor    = -1;
+		want_save = false;
 	}
 
 	if (!buttons[id_load] && want_load) {
@@ -840,6 +861,10 @@ bool Newfile_gump::mouse_drag(
 }
 
 bool Newfile_gump::text_input(const char* text) {
+	if (restore_mode) {
+		return true;
+	}
+
 	if (cursor == -1 || strlen(text) >= MAX_SAVEGAME_NAME_LEN - 1) {
 		return true;
 	}
@@ -879,6 +904,10 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 
 	// Are we selected on some text?
 	if (selected == -3) {
+		return false;
+	}
+
+	if (restore_mode) {
 		return false;
 	}
 
@@ -1050,69 +1079,72 @@ void Newfile_gump::LoadSaveGameDetails() {
 	// Gamedat Details
 	gwin->get_saveinfo(gd_shot, gd_details, gd_party);
 
-	// Current screenshot
-	cur_shot = gwin->create_mini_screenshot();
+	if (!restore_mode) {
+		// Current screenshot
+		cur_shot = gwin->create_mini_screenshot();
 
-	// Current Details
-	cur_details = new SaveGame_Details{};
+		// Current Details
+		cur_details = new SaveGame_Details{};
 
-	gwin->get_win()->put(back.get(), 0, 0);
+		gwin->get_win()->put(back.get(), 0, 0);
 
-	if (gd_details) {
-		cur_details->save_count = gd_details->save_count;
-	} else {
-		cur_details->save_count = 0;
-	}
-
-	cur_details->party_size  = partyman->get_count() + 1;
-	cur_details->game_day    = static_cast<short>(gclock->get_total_hours() / 24);
-	cur_details->game_hour   = gclock->get_hour();
-	cur_details->game_minute = gclock->get_minute();
-
-	const time_t t        = time(nullptr);
-	tm*          timeinfo = localtime(&t);
-
-	cur_details->real_day    = timeinfo->tm_mday;
-	cur_details->real_hour   = timeinfo->tm_hour;
-	cur_details->real_minute = timeinfo->tm_min;
-	cur_details->real_month  = timeinfo->tm_mon + 1;
-	cur_details->real_year   = timeinfo->tm_year + 1900;
-	cur_details->real_second = timeinfo->tm_sec;
-
-	// Current Party
-	cur_party = new SaveGame_Party[cur_details->party_size];
-	for (i = 0; i < cur_details->party_size; i++) {
-		Actor* npc;
-		if (i == 0) {
-			npc = gwin->get_main_actor();
+		if (gd_details) {
+			cur_details->save_count = gd_details->save_count;
 		} else {
-			npc = gwin->get_npc(partyman->get_member(i - 1));
+			cur_details->save_count = 0;
 		}
 
-		SaveGame_Party& current = cur_party[i];
-		std::string     namestr = npc->get_npc_name();
-		namestr.resize(sizeof(current.name), '\0');
-		std::memmove(current.name, namestr.data(), sizeof(current.name));
-		current.shape      = npc->get_shapenum();
-		current.shape_file = npc->get_shapefile();
+		cur_details->party_size  = partyman->get_count() + 1;
+		cur_details->game_day    = static_cast<short>(gclock->get_total_hours() / 24);
+		cur_details->game_hour   = gclock->get_hour();
+		cur_details->game_minute = gclock->get_minute();
 
-		current.dext     = npc->get_property(Actor::dexterity);
-		current.str      = npc->get_property(Actor::strength);
-		current.intel    = npc->get_property(Actor::intelligence);
-		current.health   = npc->get_property(Actor::health);
-		current.combat   = npc->get_property(Actor::combat);
-		current.mana     = npc->get_property(Actor::mana);
-		current.magic    = npc->get_property(Actor::magic);
-		current.training = npc->get_property(Actor::training);
-		current.exp      = npc->get_property(Actor::exp);
-		current.food     = npc->get_property(Actor::food_level);
-		current.flags    = npc->get_flags();
-		current.flags2   = npc->get_flags2();
+		const time_t t        = time(nullptr);
+		tm*          timeinfo = localtime(&t);
+
+		cur_details->real_day    = timeinfo->tm_mday;
+		cur_details->real_hour   = timeinfo->tm_hour;
+		cur_details->real_minute = timeinfo->tm_min;
+		cur_details->real_month  = timeinfo->tm_mon + 1;
+		cur_details->real_year   = timeinfo->tm_year + 1900;
+		cur_details->real_second = timeinfo->tm_sec;
+
+		// Current Party
+		cur_party = new SaveGame_Party[cur_details->party_size];
+
+		for (i = 0; i < cur_details->party_size; i++) {
+			Actor* npc;
+			if (i == 0) {
+				npc = gwin->get_main_actor();
+			} else {
+				npc = gwin->get_npc(partyman->get_member(i - 1));
+			}
+
+			SaveGame_Party& current = cur_party[i];
+			std::string     namestr = npc->get_npc_name();
+			namestr.resize(sizeof(current.name), '\0');
+			std::memmove(current.name, namestr.data(), sizeof(current.name));
+			current.shape      = npc->get_shapenum();
+			current.shape_file = npc->get_shapefile();
+
+			current.dext     = npc->get_property(Actor::dexterity);
+			current.str      = npc->get_property(Actor::strength);
+			current.intel    = npc->get_property(Actor::intelligence);
+			current.health   = npc->get_property(Actor::health);
+			current.combat   = npc->get_property(Actor::combat);
+			current.mana     = npc->get_property(Actor::mana);
+			current.magic    = npc->get_property(Actor::magic);
+			current.training = npc->get_property(Actor::training);
+			current.exp      = npc->get_property(Actor::exp);
+			current.food     = npc->get_property(Actor::food_level);
+			current.flags    = npc->get_flags();
+			current.flags2   = npc->get_flags2();
+		}
+
+		party      = cur_party;
+		screenshot = cur_shot.get();
+		details    = cur_details;
 	}
-
-	party      = cur_party;
-	screenshot = cur_shot.get();
-	details    = cur_details;
 
 	// Now read save game details
 	char mask[256];
@@ -1183,6 +1215,8 @@ void Newfile_gump::FreeSaveGameDetails() {
 	gd_party = nullptr;
 
 	filename = nullptr;
+	details  = nullptr;
+	party    = nullptr;
 
 	// The SaveInfo struct will delete everything that it's got allocated
 	// So we don't need to worry about that
