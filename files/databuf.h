@@ -28,6 +28,7 @@
 #include <fstream>
 #include <memory>
 #include <string>
+#include <vector>
 
 class ODataSource;
 
@@ -522,9 +523,17 @@ protected:
 	unsigned char* buf;
 	unsigned char* buf_ptr;
 	std::size_t    size;
+	// bad flag is set if any opperation fails
+	bool bad;
+
+	void setbad() {
+		buf_ptr = buf = nullptr;
+		size          = 0;
+		bad           = true;
+	}
 
 public:
-	OBufferDataSpan(void* data, size_t len) : buf(static_cast<unsigned char*>(data)), buf_ptr(buf), size(len) {
+	OBufferDataSpan(void* data, size_t len) : buf(static_cast<unsigned char*>(data)), buf_ptr(buf), size(len), bad(false) {
 		// data can be nullptr if len is also 0
 		assert(data != nullptr || len == 0);
 	}
@@ -534,40 +543,92 @@ public:
 	// Prevent use after free.
 	OBufferDataSpan(std::unique_ptr<unsigned char[]>&& data_, size_t len) = delete;
 
+	bool good() const final {
+		return !bad && buf_ptr >= buf && size_t(buf_ptr - buf) <= size;
+	}
+
+	// Ensure buffer has enough space, increasing buffer size if supported
+	// Sets bad flag and retuns false if there is no space and the buffer can't
+	// be resized Always returns false if bad flag was already set
+	virtual bool ensure_space(size_t needed_space) {
+		// First make sure object is in a good state,
+		if (!good()) {
+			setbad();
+			return false;
+		}
+
+		const size_t current_pos = buf_ptr - buf;
+		needed_space += current_pos;
+
+		if (needed_space > size) {
+			setbad();
+			return false;
+		}
+
+		return true;
+	}
+
 	void write1(uint32 val) final {
+		if (!ensure_space(1)) {
+			return;
+		}
 		Write1(buf_ptr, val);
 	}
 
 	void write2(uint16 val) final {
+		if (!ensure_space(2)) {
+			return;
+		}
 		little_endian::Write2(buf_ptr, val);
 	}
 
 	void write2high(uint16 val) final {
+		if (!ensure_space(2)) {
+			return;
+		}
 		big_endian::Write2(buf_ptr, val);
 	}
 
 	void write4(uint32 val) final {
+		if (!ensure_space(4)) {
+			return;
+		}
 		little_endian::Write4(buf_ptr, val);
 	}
 
 	void write4high(uint32 val) final {
+		if (!ensure_space(4)) {
+			return;
+		}
 		big_endian::Write4(buf_ptr, val);
 	}
 
 	void write(const void* b, size_t len) final {
+		if (!ensure_space(len)) {
+			return;
+		}
 		std::memcpy(buf_ptr, b, len);
 		buf_ptr += len;
 	}
 
 	void write(const std::string& s) final {
+		if (!ensure_space(s.size())) {
+			return;
+		}
 		write(s.data(), s.size());
 	}
 
 	void seek(size_t pos) final {
+		if (pos > size && !ensure_space(pos - size)) {
+			return;
+		}
 		buf_ptr = buf + pos;
 	}
 
 	void skip(std::streamoff pos) final {
+		if (pos > 0 && !ensure_space(pos)) {
+			return;
+		}
 		buf_ptr += pos;
 	}
 
@@ -628,4 +689,59 @@ inline void IBufferDataView::copy_to(ODataSource& dest) {
 	skip(len);
 }
 
+// Automatically resizing OBufferDataSpan backed by a vector
+class OVectorDataSource : public OBufferDataSpan {
+	std::vector<unsigned char> data;
+
+public:
+	explicit OVectorDataSource(size_t initial) : OBufferDataSpan(nullptr, 0) {
+		data.reserve(initial);
+		ensure_space(0);
+	}
+
+	explicit OVectorDataSource(std::vector<unsigned char>&& existing) : OBufferDataSpan(nullptr, 0), data(std::move(existing)) {
+		ensure_space(0);
+	}
+
+	OVectorDataSource() : OBufferDataSpan(nullptr, 0) {
+		ensure_space(0);
+	}
+
+	// Perform a move on the backing vector
+	//  calling this will clear all the ODataSource state
+	std::vector<unsigned char>&& move_data() {
+		// Clear stat
+		buf_ptr = buf = nullptr;
+		size          = 0;
+		bad           = false;
+		return std::move(std::move(data));
+	}
+
+	bool ensure_space(size_t needed_space) final {
+		try {
+			// First make sure object is in a good state,
+			if (!good()) {
+				setbad();
+				return false;
+			}
+			const size_t current_pos = buf_ptr - buf;
+			needed_space += current_pos;
+
+			// Resize data if needed
+			if (needed_space > data.size()) {
+				data.resize(needed_space);
+			}
+
+			// Recreate the buffer pointers
+			buf     = data.data();
+			buf_ptr = buf + current_pos;
+			size    = data.size();
+		} catch (std::exception&) {
+			setbad();
+			return false;
+		}
+
+		return true;
+	}
+};
 #endif
