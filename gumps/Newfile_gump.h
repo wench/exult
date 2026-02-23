@@ -276,7 +276,7 @@ private:
 	// Calculate the top slot being shown
 	int list_position() {
 		if (auto scroll = dynamic_cast<Scrollable_widget*>(widgets[id_scroll].get())) {
-			return scroll->get_scroll_offset() / fieldh + FirstSlot();
+			return scroll->get_scroll_offset() / (fieldh + fieldgap) + FirstSlot();
 		} else {
 			return FirstSlot();
 		}
