@@ -396,7 +396,7 @@ ModManager::ModManager(const string& name, const string& menu, bool needtitle, b
 
 		// <path> setting: default is "$gameprefix".
 		config_path = base_cfg_path + "/path";
-		default_dir = get_system_path("<GAMEHOME>") + "/" + cfgname;
+		default_dir = std::string(lookup_system_path("<GAMEHOME>")) + "/" + cfgname;
 		config->value(config_path.c_str(), game_path, default_dir.c_str());
 
 		// <static_path> setting: default is "$game_path/static".
@@ -654,11 +654,11 @@ void ModManager::gather_mods() {
 			std::filesystem::path modcfg(filenames[i]);
 			auto modtitle = modcfg.stem();
 #else
-			const auto& filename = filenames[i];
-			auto        pathend  = filename.find_last_of("/\\") + 1;
-			auto        modtitle = filename.substr(pathend, filename.length() - pathend - strlen(".cfg"));
+			const std::string filename(filenames[i]);
+			auto              pathend  = filename.find_last_of("/\\") + 1;
+			auto              modtitle = filename.substr(pathend, filename.length() - pathend - strlen(".cfg"));
 #endif
-			modlist.emplace_back(type, language, cfgname, modtitle, path_prefix, expansion, sibeta, editing, filenames[i]);
+			modlist.emplace_back(type, language, cfgname, modtitle, path_prefix, expansion, sibeta, editing, filename);
 		}
 	}
 }
@@ -913,8 +913,8 @@ int ModManager::InstallModZip(std::string& zipfilename, ModManager* game_overrid
 		U7ListFiles(("<" + base_game->get_path_prefix() + "_STATIC>/*").c_str(), filelist, true);
 		std::unordered_map<std::string, std::string> lowercase_map;
 		for (auto filename : filelist) {
-			filename          = get_filename_from_path(filename);
-			std::string lower = filename;
+			filename = get_filename_from_path(filename);
+			std::string lower(filename);
 			for (char& c : lower) {
 				c = std::tolower(c);
 			}
@@ -1016,10 +1016,10 @@ int ModManager::InstallModZip(std::string& zipfilename, ModManager* game_overrid
 						return -16;
 					}
 					// Write out the buffer
-					std::unique_ptr<std::ostream> outfile;
+					std::shared_ptr<std::ostream> outfile;
 
 					try {
-						outfile = U7open_out(outpath.c_str());
+						outfile = U7open_out(outpath);
 					} catch (exult_exception&) {
 						std::cerr << "InstallMod: exception trying open file \"" << get_system_path(outpath) << "\" for writing"
 								  << std::endl;
@@ -1099,7 +1099,7 @@ ModInfo* ModManager::get_mod(const string& name, bool checkversion) {
  *  game is selected.
  */
 void ModManager::get_game_paths(const string& game_path) {
-	string       saveprefix(get_system_path("<SAVEHOME>") + "/" + cfgname);
+	string       saveprefix = std::string(get_system_path("<SAVEHOME>")) + "/" + cfgname;
 	string       default_dir;
 	string       config_path;
 	string       gamedat_dir;

@@ -22,8 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <string>
 #include <vector>
 
-using FileList = std::vector<std::string>;
+using FileList = std::pmr::vector<std::pmr::string>;
 
-int U7ListFiles(const std::string& mask, FileList& files, bool quiet = false);
+int U7ListFiles(std::string_view mask, FileList& files, bool quiet = false);
 
 #endif    // LISTFILES_H
