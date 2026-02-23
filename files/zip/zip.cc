@@ -30,6 +30,8 @@ using namespace std;
 #	include <memory>
 #	include <iostream>
 
+#	include "../databuf.h"
+
 /* Added by Ryan Nunn to overcome DEF_MEM_LEVEL being undeclared */
 #	if MAX_MEM_LEVEL >= 8
 #		define DEF_MEM_LEVEL 8
@@ -124,18 +126,22 @@ struct curfile_info {
 };
 
 struct zip_internal {
-	FILE*           filezip;
-	linkedlist_data central_dir;          /* datablock with central dir in construction*/
-	int             in_opened_file_inzip; /* 1 if a file in the zip is currently writ.*/
-	curfile_info    ci;                   /* info on the file curretly writing */
+	std::shared_ptr<ODataSource> filezip;
+	linkedlist_data              central_dir;          /* datablock with central dir in construction*/
+	int                          in_opened_file_inzip; /* 1 if a file in the zip is currently writ.*/
+	curfile_info                 ci;                   /* info on the file curretly writing */
 
-	uLong begin_pos; /* position of the beginning of the zipfile */
-	uLong number_entry;
+	uLong                                 begin_pos; /* position of the beginning of the zipfile */
+	uLong                                 number_entry;
+	std::pmr::polymorphic_allocator<char> allocator;
+
+	zip_internal(std::pmr::polymorphic_allocator<char> alloc)
+			: filezip(nullptr), central_dir(), in_opened_file_inzip(0), ci(), begin_pos(0), number_entry(0), allocator(alloc) {}
 };
 
-static linkedlist_datablock_internal* allocate_new_datablock() {
-	linkedlist_datablock_internal* ldi;
-	ldi = new linkedlist_datablock_internal();
+static linkedlist_datablock_internal* allocate_new_datablock(
+		std::pmr::polymorphic_allocator<linkedlist_datablock_internal> allocator) {
+	linkedlist_datablock_internal* ldi = allocator.allocate(1);
 	if (ldi != nullptr) {
 		ldi->next_datablock       = nullptr;
 		ldi->filled_in_this_block = 0;
@@ -144,10 +150,11 @@ static linkedlist_datablock_internal* allocate_new_datablock() {
 	return ldi;
 }
 
-static void free_datablock(linkedlist_datablock_internal* ldi) {
+static void free_datablock(
+		linkedlist_datablock_internal* ldi, std::pmr::polymorphic_allocator<linkedlist_datablock_internal> allocator) {
 	while (ldi != nullptr) {
 		linkedlist_datablock_internal* ldinext = ldi->next_datablock;
-		delete ldi;
+		allocator.deallocate(ldi, sizeof(linkedlist_datablock_internal));
 		ldi = ldinext;
 	}
 }
@@ -156,7 +163,7 @@ static void init_linkedlist(linkedlist_data* ll) {
 	ll->first_block = ll->last_block = nullptr;
 }
 
-static int add_data_in_datablock(linkedlist_data* ll, const void* buf, uLong len) {
+static int add_data_in_datablock(linkedlist_data* ll, const void* buf, uLong len, std::pmr::polymorphic_allocator<char> allocator) {
 	linkedlist_datablock_internal* ldi;
 	const unsigned char*           from_copy;
 
@@ -165,7 +172,7 @@ static int add_data_in_datablock(linkedlist_data* ll, const void* buf, uLong len
 	}
 
 	if (ll->last_block == nullptr) {
-		ll->first_block = ll->last_block = allocate_new_datablock();
+		ll->first_block = ll->last_block = allocate_new_datablock(allocator);
 		if (ll->first_block == nullptr) {
 			return ZIP_INTERNALERROR;
 		}
@@ -180,7 +187,7 @@ static int add_data_in_datablock(linkedlist_data* ll, const void* buf, uLong len
 		unsigned char* to_copy;
 
 		if (ldi->avail_in_this_block == 0) {
-			ldi->next_datablock = allocate_new_datablock();
+			ldi->next_datablock = allocate_new_datablock(allocator);
 			if (ldi->next_datablock == nullptr) {
 				return ZIP_INTERNALERROR;
 			}
@@ -215,16 +222,17 @@ static int add_data_in_datablock(linkedlist_data* ll, const void* buf, uLong len
    nbByte == 1, 2 or 4 (byte, short or long)
 */
 
-static int ziplocal_putValue(FILE* file, uLong x, int nbByte);
+static int ziplocal_putValue(std::shared_ptr<ODataSource>& file, uLong x, int nbByte);
 
-static int ziplocal_putValue(FILE* file, uLong x, int nbByte) {
+static int ziplocal_putValue(std::shared_ptr<ODataSource>& file, uLong x, int nbByte) {
 	unsigned char buf[4];
 	int           n;
 	for (n = 0; n < nbByte; n++) {
 		buf[n] = static_cast<unsigned char>(x & 0xff);
 		x >>= 8;
 	}
-	if (fwrite(buf, nbByte, 1, file) != 1) {
+	file->write(buf, nbByte);
+	if (!file->good()) {
 		return ZIP_ERRNO;
 	} else {
 		return ZIP_OK;
@@ -258,52 +266,43 @@ static uLong ziplocal_TmzDateToDosDate(const tm_zip* ptm, uLong uLongdosDate) {
 
 /****************************************************************************/
 
-extern zipFile ZEXPORT zipOpen(const char* pathname, int append) {
+extern zipFile ZEXPORT zipOpen(std::shared_ptr<ODataSource> ds, std::pmr::polymorphic_allocator<char> allocator) {
 	// Allocate memory at the start assuming everything will succeed. Eliminates
 	// a copy at the end and make_unique will value initialize the object
-	std::unique_ptr<zip_internal> ziinit;
+	zipFile ziinit;
+
+	if (!ds || !ds->good()) {
+		std::cerr << "zipOpen: Could not open data source for zip" << std::endl;
+		{
+			return {};
+		}
+	}
 
 	try {
-		ziinit = std::make_unique<zip_internal>();
+		ziinit.set(std::allocate_shared<zip_internal>(allocator, allocator));
 	} catch (std::bad_alloc&) {
 		std::cerr << "zipOpen: make_unique<zip_internal> failed" << std::endl;
 		return {};
 	}
 
-	/* Start changes by Ryan Nunn to fix append mode bug */
-
-	/* If append, use r+b mode, will fail if not exist */
-	if (append != 0) {
-		ziinit->filezip = fopen(pathname, "r+b");
-	}
-
-	/* If not append, or failed, use wb */
-	if (ziinit->filezip == nullptr) {
-		ziinit->filezip = fopen(pathname, "wb");
-	}
-
-	/* Still doesn't exist, means can't create */
-	if (ziinit->filezip == nullptr) {
-		return nullptr;
-	}
+	ziinit->filezip = ds;
 
 	/* Make sure we are at the end of the file */
-	fseek(ziinit->filezip, 0, SEEK_END);
+	ziinit->filezip->seek(ziinit->filezip->getSize());
 
-	/* End changes by Ryan Nunn to fix append mode bug */
-
-	ziinit->begin_pos             = ftell(ziinit->filezip);
+	ziinit->begin_pos             = ziinit->filezip->getPos();
 	ziinit->in_opened_file_inzip  = 0;
 	ziinit->ci.stream_initialised = 0;
 	ziinit->number_entry          = 0;
 	init_linkedlist(&(ziinit->central_dir));
 
-	return ziinit.release();
+	return ziinit;
 }
 
 extern int ZEXPORT zipOpenNewFileInZip(
-		zipFile file, const char* filename, const zip_fileinfo* zipfi, const void* extrafield_local, uInt size_extrafield_local,
-		const void* extrafield_global, uInt size_extrafield_global, const char* comment, int method, int level) {
+		zip_internal* file, const char* filename, const zip_fileinfo* zipfi, const void* extrafield_local,
+		uInt size_extrafield_local, const void* extrafield_global, uInt size_extrafield_global, const char* comment, int method,
+		int level) {
 	uInt size_filename;
 	uInt size_comment;
 	uInt i;
@@ -360,9 +359,9 @@ extern int ZEXPORT zipOpenNewFileInZip(
 	file->ci.method               = method;
 	file->ci.stream_initialised   = 0;
 	file->ci.pos_in_buffered_data = 0;
-	file->ci.pos_local_header     = ftell(file->filezip);
+	file->ci.pos_local_header     = file->filezip->getPos();
 	file->ci.size_centralheader   = SIZECENTRALHEADER + size_filename + size_extrafield_global + size_comment;
-	file->ci.central_header       = new char[file->ci.size_centralheader];
+	file->ci.central_header       = file->allocator.allocate(file->ci.size_centralheader);
 
 	ziplocal_putValue_inmemory(file->ci.central_header, CENTRALHEADERMAGIC, 4);
 	/* version info */
@@ -445,13 +444,15 @@ extern int ZEXPORT zipOpenNewFileInZip(
 	}
 
 	if ((err == ZIP_OK) && (size_filename > 0)) {
-		if (fwrite(filename, size_filename, 1, file->filezip) != 1) {
+		file->filezip->write(filename, size_filename);
+		if (!file->filezip->good()) {
 			err = ZIP_ERRNO;
 		}
 	}
 
 	if ((err == ZIP_OK) && (size_extrafield_local > 0)) {
-		if (fwrite(extrafield_local, size_extrafield_local, 1, file->filezip) != 1) {
+		file->filezip->write(extrafield_local, size_extrafield_local);
+		if (!file->filezip->good()) {
 			err = ZIP_ERRNO;
 		}
 	}
@@ -480,7 +481,7 @@ extern int ZEXPORT zipOpenNewFileInZip(
 	return err;
 }
 
-extern int ZEXPORT zipWriteInFileInZip(zipFile file, voidpc buf, unsigned len) {
+extern int ZEXPORT zipWriteInFileInZip(zip_internal* file, voidpc buf, unsigned len) {
 	int err = ZIP_OK;
 
 	if (file == nullptr) {
@@ -497,7 +498,8 @@ extern int ZEXPORT zipWriteInFileInZip(zipFile file, voidpc buf, unsigned len) {
 
 	while ((err == ZIP_OK) && (file->ci.stream.avail_in > 0)) {
 		if (file->ci.stream.avail_out == 0) {
-			if (fwrite(file->ci.buffered_data, file->ci.pos_in_buffered_data, 1, file->filezip) != 1) {
+			file->filezip->write(file->ci.buffered_data, file->ci.pos_in_buffered_data);
+			if (!file->filezip->good()) {
 				err = ZIP_ERRNO;
 			}
 			file->ci.pos_in_buffered_data = 0;
@@ -533,7 +535,7 @@ extern int ZEXPORT zipWriteInFileInZip(zipFile file, voidpc buf, unsigned len) {
 	return 0;
 }
 
-extern int ZEXPORT zipCloseFileInZip(zipFile file) {
+extern int ZEXPORT zipCloseFileInZip(zip_internal* file) {
 	int err = ZIP_OK;
 
 	if (file == nullptr) {
@@ -549,7 +551,8 @@ extern int ZEXPORT zipCloseFileInZip(zipFile file) {
 		while (err == ZIP_OK) {
 			uLong uTotalOutBefore;
 			if (file->ci.stream.avail_out == 0) {
-				if (fwrite(file->ci.buffered_data, file->ci.pos_in_buffered_data, 1, file->filezip) != 1) {
+				file->filezip->write(file->ci.buffered_data, file->ci.pos_in_buffered_data);
+				if (!file->filezip->good()) {
 					err = ZIP_ERRNO;
 				}
 				file->ci.pos_in_buffered_data = 0;
@@ -567,7 +570,8 @@ extern int ZEXPORT zipCloseFileInZip(zipFile file) {
 	}
 
 	if ((file->ci.pos_in_buffered_data > 0) && (err == ZIP_OK)) {
-		if (fwrite(file->ci.buffered_data, file->ci.pos_in_buffered_data, 1, file->filezip) != 1) {
+		file->filezip->write(file->ci.buffered_data, file->ci.pos_in_buffered_data);
+		if (!file->filezip->good()) {
 			err = ZIP_ERRNO;
 		}
 	}
@@ -582,13 +586,15 @@ extern int ZEXPORT zipCloseFileInZip(zipFile file) {
 	ziplocal_putValue_inmemory(file->ci.central_header + 24, file->ci.stream.total_in, 4);  /*uncompr size*/
 
 	if (err == ZIP_OK) {
-		err = add_data_in_datablock(&file->central_dir, file->ci.central_header, file->ci.size_centralheader);
+		err = add_data_in_datablock(&file->central_dir, file->ci.central_header, file->ci.size_centralheader, file->allocator);
 	}
-	delete[] file->ci.central_header;
+	file->allocator.deallocate(file->ci.central_header, file->ci.size_centralheader);
 
 	if (err == ZIP_OK) {
-		const long cur_pos_inzip = ftell(file->filezip);
-		if (fseek(file->filezip, file->ci.pos_local_header + 14, SEEK_SET) != 0) {
+		const long cur_pos_inzip = file->filezip->getPos();
+		file->filezip->seek(file->ci.pos_local_header + 14);
+
+		if (!file->filezip->good() != 0) {
 			err = ZIP_ERRNO;
 		}
 
@@ -604,7 +610,8 @@ extern int ZEXPORT zipCloseFileInZip(zipFile file) {
 			err = ziplocal_putValue(file->filezip, file->ci.stream.total_in, 4);
 		}
 
-		if (fseek(file->filezip, cur_pos_inzip, SEEK_SET) != 0) {
+		file->filezip->seek(cur_pos_inzip);
+		if (!file->filezip->good()) {
 			err = ZIP_ERRNO;
 		}
 	}
@@ -615,17 +622,17 @@ extern int ZEXPORT zipCloseFileInZip(zipFile file) {
 	return err;
 }
 
-extern int ZEXPORT zipClose(zipFile file, const char* global_comment) {
+extern int ZEXPORT zipCloseInternal(std::shared_ptr<zip_internal>& file, const char* global_comment) {
 	int   err             = 0;
 	uLong size_centraldir = 0;
 	uLong centraldir_pos_inzip;
 	uInt  size_global_comment;
-	if (file == nullptr) {
+	if (!file || !file->filezip) {
 		return ZIP_PARAMERROR;
 	}
 
 	if (file->in_opened_file_inzip == 1) {
-		err = zipCloseFileInZip(file);
+		err = zipCloseFileInZip(file.get());
 	}
 
 	if (global_comment == nullptr) {
@@ -634,12 +641,14 @@ extern int ZEXPORT zipClose(zipFile file, const char* global_comment) {
 		size_global_comment = strlen(global_comment);
 	}
 
-	centraldir_pos_inzip = ftell(file->filezip);
+	centraldir_pos_inzip = file->filezip->getPos();
 	if (err == ZIP_OK) {
 		linkedlist_datablock_internal* ldi = file->central_dir.first_block;
 		while (ldi != nullptr) {
 			if ((err == ZIP_OK) && (ldi->filled_in_this_block > 0)) {
-				if (fwrite(ldi->data, ldi->filled_in_this_block, 1, file->filezip) != 1) {
+				file->filezip->write(ldi->data, ldi->filled_in_this_block);
+
+				if (!file->filezip->good()) {
 					err = ZIP_ERRNO;
 				}
 			}
@@ -648,7 +657,7 @@ extern int ZEXPORT zipClose(zipFile file, const char* global_comment) {
 			ldi = ldi->next_datablock;
 		}
 	}
-	free_datablock(file->central_dir.first_block);
+	free_datablock(file->central_dir.first_block, file->allocator);
 
 	if (err == ZIP_OK) { /* Magic End */
 		err = ziplocal_putValue(file->filezip, ENDHEADERMAGIC, 4);
@@ -686,14 +695,44 @@ extern int ZEXPORT zipClose(zipFile file, const char* global_comment) {
 	}
 
 	if ((err == ZIP_OK) && (size_global_comment > 0)) {
-		if (fwrite(global_comment, size_global_comment, 1, file->filezip) != 1) {
+		file->filezip->write(global_comment, size_global_comment);
+
+		if (!file->filezip->good()) {
 			err = ZIP_ERRNO;
 		}
 	}
-	fclose(file->filezip);
-	delete file;
-
+	//
+	file.reset();
 	return err;
+}
+
+zipFile::zipFile() : data(nullptr) {}
+
+// Only moving allowed
+zipFile::zipFile(zipFile&& other) noexcept : data(std::move(other.data)) {
+	other.data = nullptr;
+}
+
+zipFile::zipFile(std::shared_ptr<zip_internal>&& data) noexcept : data(std::move(data)) {}
+
+int zipFile::close(const char* global_comment) {
+	int ret = zipCloseInternal(data, global_comment);
+	return ret;
+}
+
+int zipFile::set(std::shared_ptr<zip_internal>&& newdata) {
+	int ret = ZIP_OK;
+	if (data) {
+		ret = zipCloseInternal(data, nullptr);
+	}
+	data = std::move(newdata);
+	return ret;
+}
+
+zipFile::~zipFile() {
+	if (data) {
+		zipCloseInternal(data, nullptr);
+	}
 }
 
 /* Added by Ryan Nunn */
