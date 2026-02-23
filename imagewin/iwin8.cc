@@ -41,9 +41,12 @@ Boston, MA  02111-1307, USA.
 #	pragma GCC diagnostic pop
 #endif    // __GNUC__
 
+#include "U7file.h"
 #include "common_types.h"
+#include "fnames.h"
 #include "gamma.h"
 #include "iwin8.h"
+#include "palette.h"
 
 #include <algorithm>
 #include <climits>
@@ -174,6 +177,17 @@ unique_ptr<unsigned char[]> Image_window8::mini_screenshot() {
 	const int            h      = 3 * 60;
 	const unsigned char* pixels = ibuf->get_bits();
 	const int            pitch  = ibuf->get_line_width();
+
+	// Alwayes try to use Palette 0
+	const unsigned char* colors;
+	Palette              palette0;
+	try {
+		palette0.load(PALETTES_FLX, PATCH_PALETTES, 0);
+		colors = palette0.get_colors();
+	} catch (...) {
+		// Default to current palette if failed to load palette0
+		colors = this->colors;
+	}
 
 	for (int y = 0; y < h; y += 3) {
 		for (int x = 0; x < w; x += 3) {
