@@ -142,6 +142,8 @@ public:
 	static inline const String<0x6DE> RealTime;
 
 	static inline const String<0x6DF> Name;
+
+	static inline const String<0x6E0> CheatsUsed;
 	
 };
 
@@ -683,6 +685,9 @@ void Newfile_gump::paint_normal() {
 		font->get_text_box_dims(msg, tw, th);
 
 		font->paint_text_box(ibuf, msg, x + 270 - tw / 2, y + 30 - th / 2, tw, th, 0, false, true);
+	}
+	if (details && details->cheated) {
+		sman->paint_text_box(5, Strings::CheatsUsed(), x + 222, y + 54, 96, 8, 0, false, true);
 	}
 	// Draw details background
 	ibuf->draw_beveled_box(x + 222, y + 63, 96, 68, 1, 137, 144, 145, 140, 139, 142);
