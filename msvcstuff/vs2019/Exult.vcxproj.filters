@@ -770,6 +770,9 @@
     <ClCompile Include="..\..\cheat_screen_actors.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\conf\Settings.cc">
+      <Filter>conf</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\actions.h">
@@ -1533,6 +1536,9 @@
     </ClInclude>
     <ClInclude Include="..\..\gamedat.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\conf\Settings.h">
+      <Filter>conf</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
