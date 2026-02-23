@@ -89,16 +89,19 @@ protected:
 	constexpr static std::array<short, 3> old_btn_cols{95, 164, 233};
 
 	// Text field info
-	constexpr static short fieldx   = 2;              // Start Y of each field
-	constexpr static short fieldy   = 2;              // Start X of first
-	constexpr static short fieldw   = 208;            // Width of each field
-	constexpr static short fieldh   = 12;             // Height of each field
-	constexpr static short fieldgap = 1;              // Gap between fields
-	constexpr static short textx    = 12;             // X Offset in field
-	constexpr static short texty    = 2;              // Y Offset in field
-	constexpr static short textw    = fieldw - 17;    // Maximum allowable width of text (pixels)
-	constexpr static short iconx    = 2;              // X Offset in field
-	constexpr static short icony    = 2;              // Y Offset in field
+	constexpr static short fieldx   = 2;      // Start Y of each field
+	constexpr static short fieldy   = 2;      // Start X of first
+	constexpr static short fieldw   = 208;    // Width of each field
+	constexpr static short fieldh   = 12;     // Height of each field
+	constexpr static short fieldgap = 1;      // Gap between fields
+	constexpr static short textx    = 8;      // X Offset in field
+	constexpr static short texty    = 2;      // Y Offset in field
+	constexpr static short textw
+			= fieldw - textx - 2;    // Maximum allowable width of text = field width minus x offset of text minus room for cursor
+	constexpr static short texth = 8;
+
+	constexpr static short iconx = 2;    // X Offset in field
+	constexpr static short icony = 2;    // Y Offset in field
 
 	constexpr static short scrollx = 2, scrolly = 2;
 
