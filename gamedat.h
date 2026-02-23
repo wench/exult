@@ -282,7 +282,10 @@ public:
 	// gamedat_in_memory lock before waiting on returned future returned future
 	// waits for disk writing to complete if todisk argument is true
 
-	std::future<void> writetoMemory(bool todisk, bool nopaint, bool screenshot);
+	void writetoMemory(bool nopaint, bool screenshot);
+
+	bool writeMemorytoDisk();
+
 
 	auto Open_ODataSource(const char* fname) {
 		return ODataSourceFileOrVector(get_memory_file(fname, true), fname);
@@ -392,7 +395,7 @@ public:
 	// Do an immediate Autosave. Should Only be called from main thread
 	void Autosave_Now(
 			const char* savemessage = nullptr, int gflag = -1, int map_from = -1, int map_to = -1, int sc_from = -1, int sc_to = -1,
-			bool wait = true, bool screenshot = false);
+			bool noasync = true, bool screenshot = false);
 
 	void Quicksave();
 
