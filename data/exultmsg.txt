@@ -328,9 +328,6 @@
 0x65A:pm
 
 #Newfile_gump.cc
-#multiline no screenshot message(0x65B-0x65f)
-0x65B:No
-0x65C:Screenshot
 #Info Box Strings
 0x660:Avatar
 0x661:Exp
@@ -434,6 +431,15 @@
 0X6C1:Press ESC to exit.
 0X6C2:Please add the games in File Sharing
 0X6C3:Touch screen for help!
+
+#Additional Newfile_gump.cc
+0x6D0: Unreadable~Savegame
+0x6D1: No Info
+0x6D2:No~Screenshot
+0x6D3:QUIT
+0x6D4:Gamedat Directory
+0x6D5:New QuickSave
+0x6D6:Empty Slot
 
 #Misc
 # SI copy protection failed
