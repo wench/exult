@@ -256,7 +256,7 @@ void Modal_gump::SetProceduralBackground(TileRect backsize, int Checkbg_paletter
 
 void Modal_gump::paint() {
 	TileRect backrect;
-	auto     ib = gwin->get_win()->get_ib8();
+	auto     ib = Shape_frame::get_to_render();
 	if (procedural_background) {
 		backrect = procedural_background;
 		local_to_screen(backrect.x, backrect.y);
