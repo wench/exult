@@ -55,19 +55,27 @@ class GameDat : protected Game_singletons {
 public:
 	struct Strings {
 		static auto AutoSave() {
-			return get_text_msg(0x6E1 - msg_file_start);
+			return get_text_msg(0x6EA - msg_file_start);
 		}
 
 		static auto QuickSave() {
-			return get_text_msg(0x6E2 - msg_file_start);
+			return get_text_msg(0x6EB - msg_file_start);
 		}
 
 		static auto CrashSave() {
-			return get_text_msg(0x6E3 - msg_file_start);
+			return get_text_msg(0x6EC - msg_file_start);
 		}
 
 		static auto Save() {
-			return get_text_msg(0x6E4 - msg_file_start);
+			return get_text_msg(0x6ED - msg_file_start);
+		}
+
+		static auto LostFocus() {
+			return get_text_msg(0x6EE - msg_file_start);
+		}
+
+		static auto AutosaveGF() {
+			return get_text_msg(0x6EF - msg_file_start);
 		}
 	};
 
@@ -151,11 +159,11 @@ public:
 		// Default constructor is allowed
 		SaveInfo() {}
 
-		// Move Costructor from a std::string filename
+		// Move Constructor from a std::string filename
 		SaveInfo(std::string&& filename);
 
-		// No copy constructor as screenshot can't be copied because Shape_file has
-		// no copy constructor
+		// No copy constructor as screenshot can't be copied because Shape_file
+		// has no copy constructor
 
 		SaveInfo(const SaveInfo&) = delete;
 		SaveInfo(SaveInfo&&)      = default;
@@ -175,6 +183,7 @@ public:
 			UNKNOWN = -1,
 			REGULAR = 0,
 			AUTOSAVE,
+			FLAG_AUTOSAVE,
 			QUICKSAVE,
 			CRASHSAVE,
 			NUM_TYPES
@@ -535,6 +544,8 @@ public:
 	// Get Vector of all savegame info
 	const std::vector<SaveInfo>* GetSaveGameInfos(bool force);
 
+	bool are_save_infos_loaded();
+
 	void wait_for_saveinfo_read();
 
 	// Get the filename for savegame num of specified SaveInfo:Type
@@ -642,14 +653,28 @@ private:
 
 	void read_save_infos();
 
+	class Autosave_Event : public Time_sensitive {
+	public:
+		int map_from = -1;
+		int map_to   = -1;
+		int sc_from  = -1;
+		int sc_to    = -1;
+		int gflag    = -1;
+
+		void handle_event(unsigned long curtime, uintptr udata) override;
+
+	} autosave_event;
+
 public:
 	// Queue an autosave to occur at the next possible time. Safe to call at any
-	// time including during usecode execution
+	// time and from other threads.
+	// Only one Autosave can be queued at a time
 	void Queue_Autosave(int gflag = -1, int map_from = -1, int map_to = -1, int sc_from = -1, int sc_to = -1);
 
+	// Do an immediate Autosave. Should Only be called from main thread
 	void Autosave_Now(
-			bool write_gamedat = false, const char* savemessage = nullptr, int gflag = -1, int map_from = -1, int map_to = -1,
-			int sc_from = -1, int sc_to = -1);
+			const char* savemessage = nullptr, int gflag = -1, int map_from = -1, int map_to = -1, int sc_from = -1, int sc_to = -1,
+			bool wait = true, bool screenshot = false);
 
 	void Quicksave();
 

@@ -694,7 +694,6 @@ public:
 	/*
 	 *  Save/restore/startup:
 	 */
-	void write(bool nopaint = false);      // Write out to 'gamedat'.
 	void read();                           // Read in 'gamedat'.
 	void write_gwin();                     // Write gamedat/gamewin.dat.
 	void read_gwin();                      // Read gamedat/gamewin.dat.
@@ -707,6 +706,7 @@ public:
 
 private:
 public:
+	void write(bool nopaint);             // Write out to 'gamedat'.
 	void setup_game(bool map_editing);    // Prepare for game
 	void read_npcs();                     // Read in npc's.
 	void write_npcs();                    // Write them back.
