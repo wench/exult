@@ -35,6 +35,7 @@ Boston, MA  02111-1307, USA.
 #include <optional>
 
 class IDataSource;
+class Image_buffer8;
 
 // Table for translating palette vals.:
 /*
@@ -245,6 +246,9 @@ public:
 			= 0;
 	// Copy rectangle into here.
 	virtual void copy8(const unsigned char* src_pixels, int srcw, int srch, int destx, int desty) = 0;
+	// Copy a column from an Image_buffer8
+	virtual void copy_col8(Image_buffer8* src_buf, int srcx, int srcy, int height, int destx, int desty) = 0;
+
 	// Copy line to here.
 	virtual void copy_hline8(const unsigned char* src_pixels, int srcw, int destx, int desty) = 0;
 	// Copy with translucency table.
