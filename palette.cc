@@ -464,6 +464,8 @@ void Palette::fade_in(int cycles) {
 
 		win->show();
 	}
+	// Make sure the flag is cleared
+	faded_out = false;
 }
 
 void Palette::fade_out(int cycles) {
