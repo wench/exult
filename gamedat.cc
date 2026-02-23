@@ -445,10 +445,6 @@ void Game_window::save_gamedat(
 ) {
 	std::string fname = get_save_filename(num, SaveInfo::REGULAR);    // Set up name.
 	save_gamedat(fname.c_str(), savename);
-	if (num >= 0 && num < 10) {
-		// Update name
-		save_names[num] = savename;
-	}
 }
 
 void Game_window::save_gamedat(
@@ -467,16 +463,16 @@ void Game_window::read_save_infos() {
 	char mask[256];
 	snprintf(mask, sizeof(mask), SAVENAME2, GAME_BG ? "bg" : GAME_SI ? "si" : "dev");
 	string save_mask = get_system_path(mask);
+
+	FileList filenames;
+	U7ListFiles(save_mask, filenames, true);
+
 	// If save_mask is the same and we've already read the save infos do nothing
-	if (save_mask == Globals::save_mask && !Globals::save_infos.empty()) {
+	if (save_mask == Globals::save_mask && Globals::save_infos.size() == filenames.size()) {
 		return;
 	}
 	Globals::save_mask = std::move(save_mask);
-
 	Globals::save_infos.clear();
-
-	FileList filenames;
-	U7ListFiles(Globals::save_mask, filenames);
 
 	// Sort filenames
 	if (filenames.size()) {
@@ -484,6 +480,7 @@ void Game_window::read_save_infos() {
 	}
 
 	// Setup basic details
+	Globals::save_infos.reserve(filenames.size());
 	for (auto& filename : filenames) {
 		Globals::save_infos.emplace_back(std::move(filename));
 	}
@@ -500,9 +497,6 @@ void Game_window::read_save_infos() {
 
 		// Handling of regular savegame with a savegame number
 		if (saveinfo.type != SaveInfo::UNKNOWN && saveinfo.num >= 0) {
-			if (size_t(saveinfo.num) < save_names.size() && saveinfo.type == SaveInfo::REGULAR) {
-				save_names[saveinfo.num] = saveinfo.savename;
-			}
 			// First free not yet found
 			if (Globals::first_free[saveinfo.type] == -1) {
 				// If the last save was not 1 before this there is a gap wer can
