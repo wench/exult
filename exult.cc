@@ -35,6 +35,7 @@
 #include "Gump_button.h"
 #include "Gump_manager.h"
 #include "Scroll_gump.h"
+#include "Settings.h"
 #include "ShortcutBar_gump.h"
 #include "U7file.h"
 #include "U7fileman.h"
@@ -518,6 +519,8 @@ int exult_main(const char* runpath) {
 	} else {
 		config->read_config_file(USER_CONFIGURATION_FILE);
 	}
+	// Load all setting now that config is available
+	Settings::get().load_all(config);
 
 #if defined _WIN32
 	// Install the crash handler after we've loaded config
