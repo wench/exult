@@ -30,8 +30,11 @@ It has been partly rewritten to use an SDL surface as input.
 #	include <config.h>
 #endif
 
+#include "ibuf8.h"
 #include "ignore_unused_variable_warning.h"
+#include "palette.h"
 
+#include <cstddef>
 #include <cstdlib>
 #include <iostream>
 
@@ -50,6 +53,53 @@ It has been partly rewritten to use an SDL surface as input.
 
 using std::cout;
 using std::endl;
+
+template <typename T>
+class PaletteAdapter {
+	T palette;
+
+public:
+	PaletteAdapter(T palette) : palette(palette) {}
+
+	int       ncolors() const;
+	SDL_Color operator[](uint8 index) const;
+
+	operator bool() const {
+		return palette;
+	}
+};
+
+template <typename T>
+inline int PaletteAdapter<T>::ncolors() const {
+	return 256;
+}
+
+template <>
+inline int PaletteAdapter<SDL_Palette*>::ncolors() const {
+	return palette->ncolors;
+}
+
+template <typename T>
+inline SDL_Color PaletteAdapter<T>::operator[](uint8 index) const {
+	if (index == 255) {
+		return SDL_Color{0, 0, 0, 0};
+	} else {
+		return SDL_Color{index, index, index, 255};
+	}
+}
+
+template <>
+inline SDL_Color PaletteAdapter<SDL_Palette*>::operator[](uint8 index) const {
+	return palette->colors[index];
+}
+
+template <>
+inline SDL_Color PaletteAdapter<Palette*>::operator[](uint8 index) const {
+	int maxval = palette->get_max_val();
+	return SDL_Color{
+			uint8((palette->get_red(index) * 255) / maxval), uint8((palette->get_green(index) * 255) / maxval),
+			uint8((palette->get_blue(index) * 255) / maxval), uint8(index == 255 ? 0 : 255)};
+}
 
 #ifdef HAVE_PNG_H
 
@@ -85,18 +135,24 @@ static void png_write_SDL(png_structp png_ptr, png_bytep data, png_size_t length
 	SDL_WriteIO(rw, data, sizeof(png_byte) * length);
 }
 
-static bool save_image(SDL_Surface* surface, SDL_IOStream* dst, int guardband) {
-	png_structp  png_ptr;
-	png_infop    info_ptr;
-	png_colorp   pal_ptr;
-	SDL_Palette* pal;
-	int          i, colortype;
-	png_bytep*   row_pointers;
-	const int    width  = surface->w - 2 * guardband;
-	const int    height = surface->h - 2 * guardband;
-	const int    pitch  = surface->pitch;
-	auto*        pixels = static_cast<png_bytep>(surface->pixels) + guardband + pitch * guardband;
-
+template <typename TPal>
+bool save_image(
+		const void* source, int width, int height, const int pitch, SDL_IOStream* dst, int guardband,
+		const PaletteAdapter<TPal> pal, const SDL_PixelFormatDetails* surface_format) {
+	png_structp png_ptr;
+	png_infop   info_ptr;
+	int         i, colortype;
+	width -= 2 * guardband;
+	height -= 2 * guardband;
+	// const int    pitch  = surface->pitch;
+	// auto*        pixels = static_cast<png_bytep>(surface->pixels) + guardband
+	//  surface_format = SDL_GetPixelFormatDetails(surface->format)
+	//			   + pitch * guardband;
+	auto* pixels = static_cast<png_const_bytep>(source) + guardband + pitch * guardband;
+	if (!pal && !surface_format) {
+		SDL_SetError("save_image requires a palette or surface format\n");
+		return false;
+	}
 	/* err_ptr, err_fn, warn_fn */
 	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, png_error_SDL, nullptr);
 	if (!png_ptr) {
@@ -120,34 +176,36 @@ static bool save_image(SDL_Surface* surface, SDL_IOStream* dst, int guardband) {
 	png_set_write_fn(png_ptr, dst, png_write_SDL, nullptr);
 
 	/* Prepare chunks */
-	colortype                                    = PNG_COLOR_MASK_COLOR;
-	const SDL_PixelFormatDetails* surface_format = SDL_GetPixelFormatDetails(surface->format);
-	if ((surface_format->bytes_per_pixel > 0) && (surface_format->bytes_per_pixel <= 8) && (pal = SDL_GetSurfacePalette(surface))) {
-		colortype |= PNG_COLOR_MASK_PALETTE;
-		pal_ptr = static_cast<png_colorp>(malloc(pal->ncolors * sizeof(png_color)));
-		for (i = 0; i < pal->ncolors; i++) {
-			pal_ptr[i].red   = pal->colors[i].r;
-			pal_ptr[i].green = pal->colors[i].g;
-			pal_ptr[i].blue  = pal->colors[i].b;
+	colortype = PNG_COLOR_MASK_COLOR;
+
+	if (pal) {
+		if (pal.ncolors() > 256) {
+			SDL_SetError("Palette has more than 256 colors\n");
+			return false;
 		}
-		png_set_PLTE(png_ptr, info_ptr, pal_ptr, pal->ncolors);
-		free(pal_ptr);
+		colortype |= PNG_COLOR_MASK_PALETTE;
+		png_color png_pal[256] = {0};
+		for (i = 0; i < pal.ncolors(); i++) {
+			SDL_Color col    = pal[i];
+			png_pal[i].red   = col.r;
+			png_pal[i].green = col.g;
+			png_pal[i].blue  = col.b;
+		}
+		png_set_PLTE(png_ptr, info_ptr, png_pal, pal.ncolors());
 	} else if ((surface_format->bytes_per_pixel > 3) || (surface_format->Amask)) {
 		colortype |= PNG_COLOR_MASK_ALPHA;
 	}
-
 	png_set_IHDR(
 			png_ptr, info_ptr, width, height, 8, colortype, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
 			PNG_FILTER_TYPE_DEFAULT);
 
 	/* Write everything */
 	png_write_info(png_ptr, info_ptr);
-	row_pointers = static_cast<png_bytep*>(malloc(sizeof(png_bytep) * height));
+	auto row_pointers = std::make_unique<png_const_bytep[]>(height);
 	for (i = 0; i < height; i++) {
 		row_pointers[i] = pixels + i * pitch;
 	}
-	png_write_image(png_ptr, row_pointers);
-	free(row_pointers);
+	png_write_image(png_ptr, const_cast<png_bytep*>(row_pointers.get()));
 	png_write_end(png_ptr, info_ptr);
 
 	/* Done */
@@ -186,8 +244,8 @@ struct PCX_Header {
 	Uint8  filler[58];
 };
 
-static void writeline(SDL_IOStream* dst, Uint8* buffer, int bytes) {
-	Uint8* finish = buffer + bytes;
+static void writeline(SDL_IOStream* dst, const Uint8* buffer, int bytes) {
+	const Uint8* finish = buffer + bytes;
 
 	while (buffer < finish) {
 		Uint8 value = *(buffer++);
@@ -208,7 +266,7 @@ static void writeline(SDL_IOStream* dst, Uint8* buffer, int bytes) {
 	}
 }
 
-static void save_8(SDL_IOStream* dst, int width, int height, int pitch, Uint8* buffer) {
+static void save_8(SDL_IOStream* dst, int width, int height, int pitch, const Uint8* buffer) {
 	for (int row = 0; row < height; ++row) {
 		writeline(dst, buffer, width);
 		buffer += pitch;
@@ -230,28 +288,33 @@ static void save_24(SDL_IOStream* dst, int width, int height, int pitch, const U
 	delete[] line;
 }
 
-static bool save_image(SDL_Surface* surface, SDL_IOStream* dst, int guardband) {
+template <typename TPal>
+bool save_image(
+		const void* source, int width, int height, const int pitch, SDL_IOStream* dst, int guardband,
+		const PaletteAdapter<TPal> pal, const SDL_PixelFormatDetails* surface_format) {
 	Uint8* cmap   = nullptr;
 	int    colors = 0;
-	int    width  = surface->w - 2 * guardband;
-	int    height = surface->h - 2 * guardband;
-	int    pitch  = surface->pitch;
-	auto*  pixels = static_cast<Uint8*>(surface->pixels) + guardband + pitch * guardband;
+	width -= 2 * guardband;
+	height -= 2 * guardband;
+	auto* pixels = static_cast<const Uint8*>(source) + guardband + pitch * guardband;
+
+	if (!pal && !surface_format) {
+		return false;
+	}
 
 	PCX_Header header;
 	header.manufacturer = 0x0a;
 	header.version      = 5;
 	header.compression  = 1;
 
-	const SDL_PixelFormatDetails* surface_format  = SDL_GetPixelFormatDetails(surface->format);
-	const SDL_Palette*            surface_palette = SDL_GetSurfacePalette(surface);
-	if (surface_palette && surface_format->bits_per_pixel == 8) {
-		colors = surface_palette->ncolors;
+	if (pal) {
+		colors = pal.ncolors();
 		cmap   = new Uint8[3 * colors];
 		for (int i = 0; i < colors; i++) {
-			cmap[3 * i]     = surface_palette->colors[i].r;
-			cmap[3 * i + 1] = surface_palette->colors[i].g;
-			cmap[3 * i + 2] = surface_palette->colors[i].b;
+			SDL_Color color = pal[i];
+			cmap[3 * i]     = color.r;
+			cmap[3 * i + 1] = color.g;
+			cmap[3 * i + 2] = color.b;
 		}
 		header.bpp          = 8;
 		header.bytesperline = htoqs(width);
@@ -358,7 +421,10 @@ bool SaveIMG_RW(SDL_Surface* saveme, SDL_IOStream* dst, bool freedst, int guardb
 	}
 
 	if (surface && (SDL_LockSurface(surface))) {
-		found_error |= !save_image(surface, dst, guardband);
+		found_error |= !save_image(
+				surface->pixels, surface->w, surface->h, surface->pitch, dst, guardband,
+				PaletteAdapter{saveme_format->bits_per_pixel == 8 ? SDL_GetSurfacePalette(surface) : nullptr},
+				SDL_GetPixelFormatDetails(surface->format));
 
 		/* Close it up.. */
 		SDL_UnlockSurface(surface);
@@ -366,6 +432,29 @@ bool SaveIMG_RW(SDL_Surface* saveme, SDL_IOStream* dst, bool freedst, int guardb
 			SDL_DestroySurface(surface);
 		}
 	}
+
+	if (freedst && dst) {
+		SDL_CloseIO(dst);
+	}
+
+	if (!found_error) {
+		cout << "Done!" << endl;
+		return true;
+	}
+
+	return false;
+}
+
+bool SaveIMG_RW(Image_buffer8* saveme, Palette* pal, SDL_IOStream* dst, bool freedst, int guardband) {
+	bool found_error = false;
+
+	cout << "Taking screenshot...";
+
+	found_error |= !save_image(
+			saveme->get_bits(), saveme->get_width(), saveme->get_height(), saveme->get_line_width(), dst, guardband,
+			PaletteAdapter{pal}, nullptr);
+
+	/* Close it up.. */
 
 	if (freedst && dst) {
 		SDL_CloseIO(dst);
