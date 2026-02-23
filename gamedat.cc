@@ -93,6 +93,10 @@ using std::time_t;
 using std::tm;
 
 void GameDat::clear_saveinfos() {
+	if (saveinfo_future.valid()) {
+		save_info_cancel = true;
+		saveinfo_future.wait();
+	}
 	Newfile_gump::SaveGameDetailsChanging();
 	std::lock_guard lock(save_info_mutex);
 	save_infos.clear();
@@ -605,7 +609,7 @@ void GameDat::read_save_infos() {
 	U7ListFiles(save_mask, filenames, true);
 
 	// If save_mask is the same and we've already read the save infos do nothing
-	if (std::string_view(save_mask) == this->save_mask && save_infos.size() == filenames.size()) {
+	if (save_info_cancel || (std::string_view(save_mask) == this->save_mask && save_infos.size() == filenames.size())) {
 		return;
 	}
 	this->save_mask = save_mask;
@@ -619,7 +623,11 @@ void GameDat::read_save_infos() {
 	// Setup basic details
 	save_infos.reserve(filenames.size());
 	for (auto& filename : filenames) {
-		save_infos.emplace_back(std::move(filename));
+		if (save_info_cancel) {
+			return;
+		}
+
+		save_infos.emplace_back(std::string(filename));
 	}
 
 	first_free.fill(-1);
@@ -633,6 +641,9 @@ void GameDat::read_save_infos() {
 
 	// Read and cache all details
 	for (auto& saveinfo : save_infos) {
+		if (save_info_cancel) {
+			return;
+		}
 		saveinfo.readable = get_saveinfo(
 				saveinfo.filename(), saveinfo.savename, saveinfo.screenshot, saveinfo.details, saveinfo.party, saveinfo.palette);
 
@@ -669,27 +680,26 @@ void GameDat::read_save_infos() {
 	}
 
 	// Sort infos
-	if (save_infos.size()) {
+	if (!save_info_cancel && save_infos.size()) {
 		std::sort(save_infos.begin(), save_infos.end());
 	}
-
-	gamedat_in_memory.disable();
 }
 
 void GameDat::read_save_infos_async(bool force) {
-	std::lock_guard lock(save_info_mutex);
 	if (force) {
 		clear_saveinfos();
 	}
+	std::lock_guard lock(save_info_mutex);
 	if ((!saveinfo_future.valid() || saveinfo_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
 		&& save_infos.empty()) {
-		saveinfo_future = std::async(std::launch::async, [this]() {
-			try {
-				read_save_infos();
-			} catch (const std::exception& e) {
-				std::cerr << "Error reading save infos: " << e.what() << std::endl;
-			}
-		});
+		save_info_cancel = false;
+		saveinfo_future  = std::async(std::launch::async, [this]() {
+            try {
+                read_save_infos();
+            } catch (const std::exception& e) {
+                std::cerr << "Error reading save infos: " << e.what() << std::endl;
+            }
+        });
 	}
 }
 
@@ -1653,7 +1663,6 @@ bool GameDat::save_gamedat_zip(
 	if (zipfile.close(savename) != ZIP_OK) {
 		throw file_write_exception(fname);
 	}
-	read_save_infos_async(true);
 	return true;
 }
 
@@ -1817,6 +1826,14 @@ void GameDat::GamedatInMemory::disable() {
 }
 
 void GameDat::Queue_Autosave(int gflag, int map_from, int map_to, int sc_from, int sc_to) {
+	// No autosaves if haven't done first scene
+	auto usecode = gwin->get_usecode();
+	if ((GAME_BG && !usecode->get_global_flag_bool(Usecode_machine::did_first_scene))
+		|| (GAME_SI && !usecode->get_global_flag_bool(Usecode_machine::si_did_first_scene))) {
+		std::cout << "Skipping autosave: haven't done first scene" << std::endl;
+		return;
+	}
+
 	auto tqueue = gwin->get_tqueue();
 	auto lock   = tqueue->get_lock();
 	if (autosave_event.in_queue()) {
@@ -1922,6 +1939,15 @@ void GameDat::Extractgame(const char* fname, bool doread) {
 void GameDat::Autosave_Event::handle_event(unsigned long curtime, uintptr udata) {
 	ignore_unused_variable_warning(curtime);
 	ignore_unused_variable_warning(udata);
+
+	// If don't move is set delay autosave till flag is cleared
+	if (gwin->main_actor_dont_move()) {
+		auto tqueue = gwin->get_tqueue();
+		auto lock   = tqueue->get_lock();
+		// Queue the autosave event to happen again next frame
+		tqueue->add(curtime + 1, this);
+		return;
+	}
 	gamedat->Autosave_Now(nullptr, gflag, map_from, map_to, sc_from, sc_to, false, true);
 }
 
