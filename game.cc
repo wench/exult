@@ -583,7 +583,7 @@ bool Game::show_menu(bool skip) {
 	Mouse            menu_mouse(gwin, mouse_data);
 
 	top_menu();
-	MenuList* menu = nullptr;
+	std::unique_ptr<MenuList> menu;
 	// Check for mod overrides
 	bool force_skip_splash   = false;
 	bool menu_credits        = true;
@@ -625,8 +625,12 @@ bool Game::show_menu(bool skip) {
 	bool exitmenu = false;
 
 	do {
-		if (menu == nullptr) {
-			menu       = new MenuList();
+		if (quitting_time == QUIT_TIME_YES) {
+			Audio::get_ptr()->stop_music();
+			throw quit_exception();
+		}
+		if (!menu) {
+			menu       = std::make_unique<MenuList>();
 			int offset = 0;
 			for (size_t i = 0; i < menuchoices.size(); i++) {
 				// Skip menu options based on mod settings
@@ -691,7 +695,6 @@ bool Game::show_menu(bool skip) {
 #else
 			pal->fade_out(c_fade_out_time);
 			Audio::get_ptr()->stop_music();
-			delete menu;
 			throw quit_exception();
 #endif
 		case 0:    // Intro
@@ -759,8 +762,7 @@ bool Game::show_menu(bool skip) {
 			} else {
 				show_credits();
 			}
-			delete menu;
-			menu = nullptr;
+			menu.reset();
 			top_menu();
 			break;
 		case 4:    // Quotes
@@ -799,7 +801,6 @@ bool Game::show_menu(bool skip) {
 		pal->fade_out(c_fade_out_time);
 		gwin->clear_screen(true);
 	}
-	delete menu;
 	Audio::get_ptr()->stop_music();
 	return play;
 }
