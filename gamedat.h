@@ -205,12 +205,13 @@ public:
 
 	int save_count = 0;
 
-	std::vector<SaveInfo>                           save_infos      = {};
-	std::array<int, int(SaveInfo::Type::NUM_TYPES)> first_free      = {};
-	std::array<int, SaveInfo::NUM_TYPES>            oldest          = {};
-	std::string                                     save_mask       = "";
-	std::shared_future<void>                        saveinfo_future = {};
-	std::recursive_mutex                            save_info_mutex = {};
+	std::vector<SaveInfo>                           save_infos       = {};
+	std::array<int, int(SaveInfo::Type::NUM_TYPES)> first_free       = {};
+	std::array<int, SaveInfo::NUM_TYPES>            oldest           = {};
+	std::string                                     save_mask        = "";
+	std::shared_future<void>                        saveinfo_future  = {};
+	std::recursive_mutex                            save_info_mutex  = {};
+	std::atomic_bool                                save_info_cancel = {};
 
 	constexpr static size_t MAX_SAVE_BUFFER = 64 * 1024;    // 64 KB
 
