@@ -24,6 +24,7 @@
 
 #include "Flex.h"
 #include "Newfile_gump.h"
+#include "SaveInfo.h"
 #include "Yesno_gump.h"
 #include "actors.h"
 #include "databuf.h"
@@ -550,9 +551,10 @@ void Game_window::write_saveinfo(bool screenshot) {
 	}
 }
 
-void Game_window::read_saveinfo(IDataSource* in, SaveGame_Details*& details, SaveGame_Party*& party) {
+void Game_window::read_saveinfo(
+		IDataSource* in, std::unique_ptr<SaveGame_Details>& details, std::unique_ptr<SaveGame_Party[]>& party) {
 	int i;
-	details = new SaveGame_Details;
+	details = std::make_unique<SaveGame_Details>();
 
 	// This order must match struct SaveGame_Details
 	// Time that the game was saved
@@ -577,7 +579,7 @@ void Game_window::read_saveinfo(IDataSource* in, SaveGame_Details*& details, Sav
 	// Packing for the rest of the structure
 	in->skip(sizeof(SaveGame_Details) - offsetof(SaveGame_Details, reserved0));
 
-	party = new SaveGame_Party[details->party_size];
+	party = std::make_unique<SaveGame_Party[]>(details->party_size);
 	for (i = 0; i < 8 && i < details->party_size; i++) {
 		in->read(party[i].name, 18);
 		party[i].shape = in->read2();
@@ -604,32 +606,23 @@ void Game_window::read_saveinfo(IDataSource* in, SaveGame_Details*& details, Sav
 }
 
 bool Game_window::get_saveinfo(
-		int num, char*& name, std::unique_ptr<Shape_file>& map, SaveGame_Details*& details, SaveGame_Party*& party) {
-	char fname[50];    // Set up name.
-	snprintf(
-			fname, sizeof(fname), SAVENAME, num,
-			Game::get_game_type() == BLACK_GATE     ? "bg"
-			: Game::get_game_type() == SERPENT_ISLE ? "si"
-													: "dev");
-
+		const std::string& filename, std::string& name, std::unique_ptr<Shape_file>& map,
+		std::unique_ptr<SaveGame_Details>& details, std::unique_ptr<SaveGame_Party[]>& party) {
 	// First check for compressed save game
 #ifdef HAVE_ZIP_SUPPORT
-	if (get_saveinfo_zip(fname, name, map, details, party)) {
+	if (get_saveinfo_zip(filename.c_str(), name, map, details, party)) {
 		return true;
 	}
 #endif
 
-	IFileDataSource in(fname);
+	IFileDataSource in(filename);
 	if (!in.good()) {
-		throw file_read_exception(fname);
+		throw file_read_exception(filename.c_str());
 	}
 	// in case of an error.
 	// Always try to Read Name
-	char buf[0x50];
-	memset(buf, 0, sizeof(buf));
-	in.read(buf, sizeof(buf) - 1);
-	name = new char[strlen(buf) + 1];
-	strcpy(name, buf);
+	name.resize(0x50);
+	in.read(name.data(), 0x4F);
 
 	// Isn't a flex, can't actually read it
 	if (!Flex::is_flex(&in)) {
@@ -682,7 +675,8 @@ bool Game_window::get_saveinfo(
 	return true;
 }
 
-void Game_window::get_saveinfo(std::unique_ptr<Shape_file>& map, SaveGame_Details*& details, SaveGame_Party*& party) {
+void Game_window::get_saveinfo(
+		std::unique_ptr<Shape_file>& map, std::unique_ptr<SaveGame_Details>& details, std::unique_ptr<SaveGame_Party[]>& party) {
 	{
 		IFileDataSource ds(GSAVEINFO);
 		if (ds.good()) {
@@ -719,7 +713,8 @@ static const char* remove_dir(const char* fname) {
 }
 
 bool Game_window::get_saveinfo_zip(
-		const char* fname, char*& name, std::unique_ptr<Shape_file>& map, SaveGame_Details*& details, SaveGame_Party*& party) {
+		const char* fname, std::string& name, std::unique_ptr<Shape_file>& map, std::unique_ptr<SaveGame_Details>& details,
+		std::unique_ptr<SaveGame_Party[]>& party) {
 	// If a flex, so can't read it
 	if (Flex::is_flex(fname)) {
 		return false;
@@ -732,14 +727,11 @@ bool Game_window::get_saveinfo_zip(
 	}
 
 	// Name comes from comment
-	char namebuf[0x50];
-	if (unzGetGlobalComment(unzipfile, namebuf, std::size(namebuf) - 1) <= 0) {
-		strcpy(namebuf, "UNNAMED");
+	name.resize(0x50);
+
+	if (unzGetGlobalComment(unzipfile, name.data(), 0x4F) <= 0) {
+		name = "UNNAMED";
 	}
-	// Null terminate just to be sure
-	namebuf[std::size(namebuf) - 1] = 0;
-	name                            = new char[strlen(namebuf) + 1];
-	strcpy(name, namebuf);
 
 	// Things we need
 	unz_file_info file_info;
