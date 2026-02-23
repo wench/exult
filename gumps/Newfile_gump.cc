@@ -32,6 +32,7 @@
 #include "Text_button.h"
 #include "Yesno_gump.h"
 #include "actors.h"
+#include "effects.h"
 #include "exult.h"
 #include "game.h"
 #include "gameclk.h"
@@ -300,7 +301,8 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 				get_button_pos_for_label(Strings::AutosavesWriteToGamedat_()), yForRow(yindex++) - 2, 64, 0);
 
 		RightAlignWidgets(tcb::span(widgets.data() + id_slider_autocount, 5));
-		// RightAlignWidgets(tcb::span(widgets.data() + id_button_sortbyname, 3),num_width+4);
+		// RightAlignWidgets(tcb::span(widgets.data() + id_button_sortbyname,
+		// 3),num_width+4);
 	}
 
 	// Reposition the gump
@@ -447,6 +449,16 @@ void Newfile_gump::delete_file() {
 void Newfile_gump::toggle_settings(int state) {
 	show_settings = (state != 0);
 
+	TileRect usable = get_usable_area();
+	local_to_screen(usable.x, usable.y);
+
+	if (!page_turn_effect) {
+		page_turn_effect = std::make_unique<PageTurnEffect>(transition_duration, usable, 0, false);
+	} else {
+		// Update the rect in case the usable area has changed
+		page_turn_effect->UpdateRect(usable);
+	}
+
 	if (!show_settings) {
 		auto selected_before = selected_slot;
 		FreeSaveGameDetails();
@@ -454,8 +466,22 @@ void Newfile_gump::toggle_settings(int state) {
 		LoadSaveGameDetails(false);
 		SelectSlot(selected_before);
 	}
+	page_turn_effect->start(show_settings);
 
-	transition_start_time = SDL_GetTicks();
+	// paint buffers
+	{
+		// Paint normal screen to buffer 1
+		Image_buffer8* ibuf    = page_turn_effect->getBuffer1();
+		auto           restore = Shape_frame::set_to_render_safe(ibuf);
+		paint_normal();
+	}
+
+	{
+		// Paint settings screen to buffer 2
+		Image_buffer8* ibuf    = page_turn_effect->getBuffer2();
+		auto           restore = Shape_frame::set_to_render_safe(ibuf);
+		paint_settings();
+	}
 }
 
 void Newfile_gump::apply_settings() {
@@ -479,11 +505,7 @@ void Newfile_gump::revert_settings() {
 }
 
 bool Newfile_gump::run() {
-	bool need_repaint = Modal_gump::run() || transition_start_time != 0;
-
-	if (transition_start_time != 0 && SDL_GetTicks() > transition_start_time + transition_duration) {
-		transition_start_time = 0;
-	}
+	bool need_repaint = Modal_gump::run() || (page_turn_effect && page_turn_effect->isStarted());
 
 	for (auto& btn : widgets) {
 		if (btn) {
@@ -577,47 +599,33 @@ void Newfile_gump::Slot_widget::paint() {
  */
 
 void Newfile_gump::paint() {
-	auto ibuf = Shape_frame::get_to_render();
+	if (page_turn_effect && page_turn_effect->isStarted() && !page_turn_effect->isComplete()) {
+		// First let modal gunp paint to ensure anything out of the effect rect is painted
+		Modal_gump::paint();
 
-	if (old_style_mode || !show_settings || transition_start_time) {
-		paint_normal();
-	}
-	if (old_style_mode || !(show_settings || transition_start_time)) {
-		return;
-	}
-
-	//
-	// create a barn door wipe using clipping rect to transition between normal
-	// and settings
-	//
-	// The clipping rect controls how much of the settings to show
-	//
-	auto     clipsave = ibuf->SaveClip();
-	TileRect newclip  = get_rect();
-
-	if (transition_start_time) {
-		Uint32 elapsed     = std::min(SDL_GetTicks() - transition_start_time, transition_duration);
-		int    total_width = newclip.w;
-		if (show_settings) {
-			// Expanding
-			newclip.w = (elapsed * total_width) / transition_duration;
-		} else {
-			// Contracting
-			newclip.w = total_width - (elapsed * total_width) / transition_duration;
+		// Update the effect rect in case the gump position has changed
+		TileRect usable = get_usable_area();
+		local_to_screen(usable.x, usable.y);
+		page_turn_effect->UpdateRect(usable);
+		page_turn_effect->paint();
+		// If effect is not complete we return without further painting
+		// otherwise we fall through to do regular painting of current mode
+		if (!page_turn_effect->isComplete()) {
+			return;
 		}
-		newclip.x = newclip.x + (total_width - newclip.w) / 2;
 	}
 
-	newclip = clipsave.Rect().intersect(newclip);
-	ibuf->set_clip(newclip.x, newclip.y, newclip.w, newclip.h);
-	paint_settings();
+	if (!show_settings) {
+		paint_normal();
+	} else {
+		paint_settings();
+	}
 }
 
 void Newfile_gump::paint_normal() {
-	Modal_gump::paint();
+	auto ibuf = Shape_frame::get_to_render();
 
-	Image_window8* iwin = gwin->get_win();
-	Image_buffer8* ibuf = iwin->get_ib8();
+	Modal_gump::paint();
 
 	// draw button backgrounds
 	if (!old_style_mode) {
@@ -817,8 +825,8 @@ void Newfile_gump::paint_settings() {
 
 		if (widget) {
 			auto rect = widget->get_rect();
-			// Slider_widget* slider = dynamic_cast<Slider_widget*>(widget.get());
-			// if (slider) {
+			// Slider_widget* slider =
+			// dynamic_cast<Slider_widget*>(widget.get()); if (slider) {
 
 			// ibuf->draw_box(
 			//	rect.x + 12, rect.y + 2, 64,
@@ -855,8 +863,9 @@ inline bool Newfile_gump::forward_input(std::function<bool(Gump_widget*)> func) 
 		}
 	}
 
-	bool do_normal   = !transition_start_time && !show_settings;
-	bool do_settings = !transition_start_time && show_settings;
+	bool doing_transition = page_turn_effect && page_turn_effect->isStarted() && !page_turn_effect->isComplete();
+	bool do_normal        = !doing_transition && !show_settings;
+	bool do_settings      = !doing_transition && show_settings;
 
 	for (int i = id_first; i < id_count; i++) {
 		const auto& widget = widgets[i];
@@ -1012,7 +1021,9 @@ bool Newfile_gump::text_input(const char* text) {
  */
 
 bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
-	if (transition_start_time) {
+	bool doing_transition = page_turn_effect && page_turn_effect->isStarted() && !page_turn_effect->isComplete();
+
+	if (doing_transition) {
 		return false;
 	}
 
