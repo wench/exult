@@ -3,6 +3,7 @@
 #include "istring.h"
 
 #include <algorithm>
+#include <charconv>
 #include <functional>
 #include <limits>
 #include <map>
@@ -12,7 +13,6 @@
 #include <vector>
 
 class Configuration;
-
 
 class Settings {
 public:
@@ -25,8 +25,6 @@ public:
 		bool config_write(const char* s, bool writeback);
 		bool config_read(std::string& s, const std::string& defaultvalue);
 		bool config_write(const std::string& s, bool writeback);
-		bool config_read(int& i, int defaultvalue);
-		bool config_write(int i, bool writeback);
 
 	private:
 		property(const property&)            = delete;
@@ -51,23 +49,17 @@ public:
 			return synced_to_config;
 		}
 
-		static bool callback_equal(
-				const std::function<void(property*)>& a,
-				const std::function<void(property*)>& b) {
-			return a.target_type() == b.target_type()
-				   && a.target<void(property*)>()
-							  == b.target<void(property*)>();
+		static bool callback_equal(const std::function<void(property*)>& a, const std::function<void(property*)>& b) {
+			return a.target_type() == b.target_type() && a.target<void(property*)>() == b.target<void(property*)>();
 		}
 
 		void add_on_change_callback(std::function<void(property*)> cb) {
 			if (!cb) {
 				return;
 			}
-			auto it = std::find_if(
-					on_change_callbacks.begin(), on_change_callbacks.end(),
-					[cb](auto& check) {
-						return callback_equal(cb, check);
-					});
+			auto it = std::find_if(on_change_callbacks.begin(), on_change_callbacks.end(), [cb](auto& check) {
+				return callback_equal(cb, check);
+			});
 			if (it == on_change_callbacks.end()) {
 				on_change_callbacks.push_back(cb);
 			}
@@ -77,11 +69,9 @@ public:
 			if (!cb) {
 				return;
 			}
-			auto it = std::find_if(
-					on_change_callbacks.begin(), on_change_callbacks.end(),
-					[cb](auto& check) {
-						return callback_equal(cb, check);
-					});
+			auto it = std::find_if(on_change_callbacks.begin(), on_change_callbacks.end(), [cb](auto& check) {
+				return callback_equal(cb, check);
+			});
 			if (it != on_change_callbacks.end()) {
 				on_change_callbacks.erase(it);
 			}
@@ -105,11 +95,10 @@ public:
 		T saved_value;
 
 	public:
-		Tproperty(
-				const char* key, const T& def_value,
-				std::set<property*>* set = nullptr)
-				: property(key, set), value(def_value),
-				  default_value(def_value), saved_value(def_value) {}
+		using valuetype = T;
+
+		Tproperty(const char* key, const T& def_value, std::set<property*>* set = nullptr)
+				: property(key, set), value(def_value), default_value(def_value), saved_value(def_value) {}
 
 		bool dirty() const final {
 			return value != saved_value;
@@ -140,7 +129,7 @@ public:
 		}
 
 		T operator=(const T& v) {
-			set(v, false);
+			set(v);
 			return v;
 		}
 	};
@@ -153,20 +142,14 @@ public:
 
 	public:
 		enum_like_property(
-				const char* key, const T& def_value,
-				const std::vector<std::pair<std::string, T>>& values,
-				bool                 normalize_values = true,
-				std::set<property*>* set              = nullptr)
-				: Tproperty<T>(key, def_value, set), values(values),
-				  normalize(normalize_values) {}
+				const char* key, const T& def_value, const std::vector<std::pair<std::string, T>>& values,
+				bool normalize_values = true, std::set<property*>* set = nullptr)
+				: Tproperty<T>(key, def_value, set), values(values), normalize(normalize_values) {}
 
 		enum_like_property(
-				const char* key, const T& def_value,
-				std::vector<std::pair<std::string, T>>&& values,
-				bool                 normalize_values = true,
-				std::set<property*>* set              = nullptr)
-				: Tproperty<T>(key, def_value, set), values(std::move(values)),
-				  normalize(normalize_values) {}
+				const char* key, const T& def_value, std::vector<std::pair<std::string, T>>&& values, bool normalize_values = true,
+				std::set<property*>* set = nullptr)
+				: Tproperty<T>(key, def_value, set), values(std::move(values)), normalize(normalize_values) {}
 
 		virtual void save(bool write_out = false) override {
 			// Find first matching string for current enum value
@@ -182,32 +165,33 @@ public:
 		}
 
 		bool load() override {
+			auto& value = this->value;
+
 			std::string str_value;
 			bool        need_save = !this->config_read(str_value, {});
 
 			auto find_it = values.begin();
 			for (; find_it != values.end(); ++find_it) {
-				if (!Pentagram::strcasecmp(
-							str_value.c_str(), find_it->first.c_str())) {
+				if (!Pentagram::strcasecmp(str_value.c_str(), find_it->first.c_str())) {
 					break;
 				}
 			}
 
 			if (find_it != values.end()) {
-				this->value = find_it->second;
+				value = find_it->second;
 			} else {
-				this->value = this->default_value;
-				need_save   = true;
+				value     = this->default_value;
+				need_save = true;
 			}
 
-			this->saved_value      = this->value;
+			this->saved_value      = value;
 			this->synced_to_config = true;
 			if (normalize || need_save) {
 				for (const auto& [str, enum_val] : values) {
-					if (enum_val == this->value) {
+					if (enum_val == value) {
 						if (need_save || str != str_value) {
 							if (this->config_write(std::string(str), false)) {
-								this->saved_value      = this->value;
+								this->saved_value      = value;
 								this->synced_to_config = true;
 							}
 
@@ -223,27 +207,46 @@ public:
 			}
 			return false;
 		}
+
+		using Tproperty<T>::operator=;
 	};
 
-	class int_property : public Tproperty<int> {
-		int min_value;
-		int max_value;
+	template <typename T = int>
+	class int_property : public Tproperty<T> {
+		T min_value;
+		T max_value;
+
+		bool config_read(T& i, T defaultvalue) {
+			std::string str_value;
+			if (!property::config_read(str_value, {})) {
+				i = defaultvalue;
+				return false;
+			}
+			if (std::from_chars(str_value.data(), str_value.data() + str_value.size(), i).ec != std::errc()) {
+				i = defaultvalue;
+				return false;
+			}
+			return true;
+		}
+
+		bool config_write(T i, bool writeback) {
+			return property::config_write(std::to_string(i), writeback);
+		}
 
 	public:
-		int_property(
-				const char* key, int def_value, int min_value, int max_value,
-				std::set<property*>* set = nullptr)
-				: Tproperty<int>(key, def_value, set), min_value(min_value),
-				  max_value(max_value) {}
+		int_property(const char* key, T def_value, T min_value, T max_value, std::set<property*>* set = nullptr)
+				: Tproperty<int>(key, def_value, set), min_value(min_value), max_value(max_value) {}
 
 		virtual void save(bool write_out = false) override {
-			config_write(value, write_out);
-			saved_value      = value;
-			synced_to_config = true;
+			if (config_write(this->value, write_out)) {
+				this->saved_value      = this->value;
+				this->synced_to_config = true;
+			}
 		}
 
 		bool load() override {
-			bool need_save = !config_read(value, default_value);
+			auto& value     = this->value;
+			bool  need_save = !config_read(value, this->default_value);
 			if (value < min_value) {
 				value     = min_value;
 				need_save = true;
@@ -251,26 +254,32 @@ public:
 				value     = max_value;
 				need_save = true;
 			}
-			saved_value      = value;
-			synced_to_config = true;
+			this->saved_value      = value;
+			this->synced_to_config = true;
 			if (need_save) {
-				if (!config_write(value, false))
-				{
-					synced_to_config = false;
+				if (!config_write(value, false)) {
+					this->synced_to_config = false;
 				}
 			}
 			return need_save;
 		}
+
+		T get_min() const {
+			return min_value;
+		}
+
+		T get_max() const {
+			return max_value;
+		}
+
+		using Tproperty<T>::operator=;
 	};
 
 	class string_property : public Tproperty<std::string> {
 	public:
 		struct Insensitive_less {
-			bool operator()(
-					std::string_view left, std::string_view right) const {
-				int result = Pentagram::strncasecmp(
-						left.data(), right.data(),
-						std::min(left.size(), right.size()));
+			bool operator()(std::string_view left, std::string_view right) const {
+				int result = Pentagram::strncasecmp(left.data(), right.data(), std::min(left.size(), right.size()));
 
 				// same till the size of the shorter string
 				if (result == 0) {
@@ -293,17 +302,14 @@ public:
 
 	public:
 		string_property(
-				const char* key, const std::string& def_value = {},
-				const std::set<std::string, Insensitive_less>& values = {},
-				std::set<property*>*                           set    = nullptr)
+				const char* key, const std::string& def_value = {}, const std::set<std::string, Insensitive_less>& values = {},
+				std::set<property*>* set = nullptr)
 				: Tproperty<std::string>(key, def_value, set), values(values) {}
 
 		string_property(
-				const char* key, const std::string& def_value = {},
-				std::set<std::string, Insensitive_less>&& values = {},
-				std::set<property*>*                      set    = nullptr)
-				: Tproperty<std::string>(key, def_value, set),
-				  values(std::move(values)) {}
+				const char* key, const std::string& def_value = {}, std::set<std::string, Insensitive_less>&& values = {},
+				std::set<property*>* set = nullptr)
+				: Tproperty<std::string>(key, def_value, set), values(std::move(values)) {}
 
 		virtual void save(bool write_out = false) override {
 			config_write(value, write_out);
@@ -336,6 +342,25 @@ public:
 			synced_to_config = true;
 			return need_save;
 		}
+
+		using Tproperty<std::string>::operator=;
+	};
+
+	// ReadOnly wrapper for properties that only allows the friend class to
+	// modify them
+	template <typename Base, typename Tfriend = void>
+	class ReadOnly : private Base {
+		friend Tfriend;
+
+	public:
+		using Base::Base;
+		using Base::get;
+		using typename Base::valuetype;
+		using Base::operator const typename Base::valuetype &;
+
+	private:
+		using Base::set;
+		using Base::operator=;
 	};
 
 	static const std::vector<std::pair<std::string, bool>> boolyesnoany;
@@ -355,9 +380,8 @@ public:
 			settings->property_sets.insert(this);
 		}
 
-		using const_iterator = std::set<property*>::const_iterator;
-		using const_reverse_iterator
-				= std::set<property*>::const_reverse_iterator;
+		using const_iterator         = std::set<property*>::const_iterator;
+		using const_reverse_iterator = std::set<property*>::const_reverse_iterator;
 
 		const_iterator begin() const {
 			return std::set<property*>::begin();
@@ -385,7 +409,7 @@ public:
 
 		void save_all(bool write_out = false);
 
-		void load_all();
+		bool load_all();
 
 		void save_dirty(bool write_out = false);
 	};
@@ -396,32 +420,23 @@ public:
 	struct Disk : public PropertySet {
 		Disk(Settings* settings) : PropertySet(settings) {}
 
-		int_property save_compression_level
-				= {"config/disk/save_compression_level", 1, 0, 2, this};
+		int_property<> save_compression_level = {"config/disk/save_compression_level", 1, 0, 2, this};
 
-		int_property autosave_count
-				= {"config/disk/autosave_count", 5, 0,
-				   std::numeric_limits<int>::max(), this};
+		int_property<> autosave_count = {"config/disk/autosave_count", 5, 0, std::numeric_limits<int>::max(), this};
 
-		int_property quick_save_count
-				= {"config/disk/quick_save_count", 5, 1,
-				   std::numeric_limits<int>::max(), this};
+		int_property<> quick_save_count = {"config/disk/quick_save_count", 5, 1, std::numeric_limits<int>::max(), this};
 
-		enum_like_property<bool> use_old_style_save_load
-				= {"config/disk/use_old_style_save_load", false,
-				   Settings::boolyesnoany, true, this};
+		ReadOnly<enum_like_property<bool>> use_old_style_save_load
+				= {"config/disk/use_old_style_save_load", false, Settings::boolyesnoany, true, this};
 
 		enum_like_property<bool> savegame_sort_by_name
-				= {"config/disk/savegame_sort_by_name", false,
-				   Settings::boolyesnoany, true, this};
+				= {"config/disk/savegame_sort_by_name", false, Settings::boolyesnoany, true, this};
 
 		enum_like_property<bool> savegame_group_by_type
-				= {"config/disk/savegame_group_by_type", false,
-				   Settings::boolyesnoany, true, this};
+				= {"config/disk/savegame_group_by_type", false, Settings::boolyesnoany, true, this};
 
 		enum_like_property<bool> autosaves_write_to_gamedat
-				= {"config/disk/autosaves_write_to_gamedat", false,
-				   Settings::boolyesnoany, true, this};
+				= {"config/disk/autosaves_write_to_gamedat", false, Settings::boolyesnoany, true, this};
 	} disk{this};
 
 	static Settings& get() {

@@ -7,7 +7,7 @@ const std::vector<std::pair<std::string, bool>> Settings::boolyesnoany = {
         {   "no", false},
         { "true",  true},
         {"false", false},
-		{    "1",  true},
+        {    "1",  true},
         {    "0", false},
         {   "on",  true},
         {  "off", false}
@@ -17,7 +17,7 @@ const std::vector<std::pair<std::string, bool>> Settings::booltruefalseany = {
         {"false", false},
         {  "yes",  true},
         {   "no", false},
-		{    "1",  true},
+        {    "1",  true},
         {    "0", false},
         {   "on",  true},
         {  "off", false}
@@ -27,7 +27,7 @@ const std::vector<std::pair<std::string, bool>> Settings::boolonoffany = {
         {  "off", false},
         {  "yes",  true},
         {   "no", false},
-		{ "true",  true},
+        { "true",  true},
         {"false", false},
         {    "1",  true},
         {    "0", false},
@@ -42,8 +42,7 @@ bool Settings::property::config_write(const char* s, bool writeback) {
 	return true;
 }
 
-bool Settings::property::config_read(
-		std::string& s, const std::string& defaultvalue) {
+bool Settings::property::config_read(std::string& s, const std::string& defaultvalue) {
 	if (!instance.configuration) {
 		s = defaultvalue;
 		return false;
@@ -58,22 +57,6 @@ bool Settings::property::config_write(const std::string& s, bool writeback) {
 	instance.configuration->set(config_key, s, writeback);
 	return true;
 }
-
-bool Settings::property::config_read(int& i, int defaultvalue) {
-	if (!instance.configuration) {
-		i = defaultvalue;
-		return false;
-	}
-	return instance.configuration->value(config_key, i, defaultvalue);
-}
-
-bool Settings::property::config_write(int i, bool writeback) {
-	if (!instance.configuration) {
-		return false;
-	}
-		instance.configuration->set(config_key, i, writeback);
-	return true;
-	}
 
 void Settings::save_all(bool write_out) {
 	for (auto* set : property_sets) {
@@ -96,12 +79,16 @@ inline void Settings::save_dirty(bool write_out) {
 void Settings::load_all(Configuration* config) {
 	this->configuration = config;
 	if (configuration) {
+		bool write_out = false;
 		for (auto* set : property_sets) {
-			set->load_all();
+			write_out |= set->load_all();
+		}
+
+		if (write_out) {
+			instance.configuration->write_back();
 		}
 	}
-		
-	}
+}
 
 void Settings::PropertySet::save_all(bool write_out) {
 	for (auto* prop : *this) {
@@ -112,16 +99,14 @@ void Settings::PropertySet::save_all(bool write_out) {
 	}
 }
 
-void Settings::PropertySet::load_all() {
+bool Settings::PropertySet::load_all() {
 	bool write_out = false;
 	for (auto* prop : *this) {
 		if (!prop->get_synced_to_config()) {
 			write_out |= prop->load();
 		}
 	}
-	if (write_out) {
-		instance.configuration->write_back();
-	}
+	return write_out;
 }
 
 void Settings::PropertySet::save_dirty(bool write_out) {
