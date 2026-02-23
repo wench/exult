@@ -498,8 +498,7 @@ void Newfile_gump::Slot_widget::paint() {
 	int sx = 0, sy = 0;
 
 	local_to_screen(sx, sy);
-	Image_window8* iwin = gwin->get_win();
-	Image_buffer8* ibuf = iwin->get_ib8();
+	auto ibuf = Shape_frame::get_to_render();
 
 	auto     clipsave = ibuf->SaveClip();
 	TileRect newclip  = clipsave.Rect().intersect(get_rect());
@@ -578,14 +577,14 @@ void Newfile_gump::Slot_widget::paint() {
  */
 
 void Newfile_gump::paint() {
+	auto ibuf = Shape_frame::get_to_render();
+
 	if (old_style_mode || !show_settings || transition_start_time) {
 		paint_normal();
 	}
 	if (old_style_mode || !(show_settings || transition_start_time)) {
 		return;
 	}
-	Image_window8* iwin = gwin->get_win();
-	Image_buffer8* ibuf = iwin->get_ib8();
 
 	//
 	// create a barn door wipe using clipping rect to transition between normal
@@ -796,8 +795,7 @@ void Newfile_gump::paint_normal() {
 }
 
 void Newfile_gump::paint_settings() {
-	Image_window8* iwin = gwin->get_win();
-	Image_buffer8* ibuf = iwin->get_ib8();
+	auto ibuf = Shape_frame::get_to_render();
 
 	Modal_gump::paint();
 	TileRect usable = get_usable_area();
@@ -836,11 +834,11 @@ void Newfile_gump::paint_settings() {
 		}
 	}
 
-	font->paint_text(iwin->get_ib8(), Strings::AutosaveCount_(), sx + label_margin, sy + yForRow(y_index));
-	font->paint_text(iwin->get_ib8(), Strings::QuicksaveCount_(), sx + label_margin, sy + yForRow(++y_index));
-	font->paint_text(iwin->get_ib8(), Strings::SortSavegamesBy_(), sx + label_margin, sy + yForRow(++y_index));
-	font->paint_text(iwin->get_ib8(), Strings::GroupByType_(), sx + label_margin, sy + yForRow(++y_index));
-	font->paint_text(iwin->get_ib8(), Strings::AutosavesWriteToGamedat_(), sx + label_margin, sy + yForRow(++y_index));
+	font->paint_text(ibuf, Strings::AutosaveCount_(), sx + label_margin, sy + yForRow(y_index));
+	font->paint_text(ibuf, Strings::QuicksaveCount_(), sx + label_margin, sy + yForRow(++y_index));
+	font->paint_text(ibuf, Strings::SortSavegamesBy_(), sx + label_margin, sy + yForRow(++y_index));
+	font->paint_text(ibuf, Strings::GroupByType_(), sx + label_margin, sy + yForRow(++y_index));
+	font->paint_text(ibuf, Strings::AutosavesWriteToGamedat_(), sx + label_margin, sy + yForRow(++y_index));
 }
 
 void Newfile_gump::quit() {
