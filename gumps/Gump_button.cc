@@ -147,8 +147,7 @@ void Gump_button::set_pushed(bool set) {
 }
 
 void Basic_button::paint() {
-	Image_window8* iwin = gwin->get_win();
-	auto*          ib8  = iwin->get_ib8();
+	auto ib8 = Shape_frame::get_to_render();
 
 	int offset = 0;
 	int px     = 0;
