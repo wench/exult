@@ -52,6 +52,9 @@ Boston, MA  02111-1307, USA.
 struct SDL_Surface;
 struct SDL_IOStream;
 
+class Image_buffer8;
+class Palette;
+
 /*
  *   Here's the top-level class to use for image buffers.  Image_window
  *   should be derived from it.
@@ -595,4 +598,11 @@ public:
 
 	bool screenshot(SDL_IOStream* dst);
 };
+
+// Save SDL_Surface out to PNG using SDL_IOStream
+bool SaveIMG_RW(SDL_Surface* saveme, SDL_IOStream* dst, bool freedst, int guardband);
+
+// Save Imafe_buffer8 with specified palette out to PNG using SDL_IOStream
+bool SaveIMG_RW(Image_buffer8* saveme, Palette* pal, SDL_IOStream* dst, bool freedst, int guardband);
+
 #endif /* INCL_IMAGEWIN    */
