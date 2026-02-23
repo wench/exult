@@ -718,19 +718,18 @@ public:
 	void init_files(bool cycle = true);    // Load all files
 
 	// From Gamedat
-	void get_saveinfo(
-			std::unique_ptr<Shape_file>& map, std::unique_ptr<SaveGame_Details>& details, std::unique_ptr<SaveGame_Party[]>& party);
+	void get_saveinfo(std::unique_ptr<Shape_file>& map, SaveGame_Details& details, std::vector<SaveGame_Party>& party);
 	// From Savegame
 	bool get_saveinfo(
-			const std::string& filename, std::string& name, std::unique_ptr<Shape_file>& map,
-			std::unique_ptr<SaveGame_Details>& details, std::unique_ptr<SaveGame_Party[]>& party);
-	void read_saveinfo(IDataSource* in, std::unique_ptr<SaveGame_Details>& details, std::unique_ptr<SaveGame_Party[]>& party);
+			const std::string& filename, std::string& name, std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
+			std::vector<SaveGame_Party>& party);
+	void read_saveinfo(IDataSource* in, SaveGame_Details& details, std::vector<SaveGame_Party>& party);
 
 private:
 #ifdef HAVE_ZIP_SUPPORT
 	bool get_saveinfo_zip(
-			const char* fname, std::string& name, std::unique_ptr<Shape_file>& map, std::unique_ptr<SaveGame_Details>& details,
-			std::unique_ptr<SaveGame_Party[]>& party);
+			const char* fname, std::string& name, std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
+			std::vector<SaveGame_Party>& party);
 #endif
 	void restore_flex_files(IDataSource& in, const char* basepath);
 
