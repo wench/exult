@@ -150,11 +150,11 @@ protected:
 	bool                               is_readable = false;      // Is the save game readable
 	const char*                        filename    = nullptr;    // Filename of the savegame, if exists
 
-	int fieldcount;                         // Number of slots being shown by the gump: 14 in normal
-											// or restore mode, 10 in olde_style_mode
-	int  selected_slot = NoSlot;            // The savegame slot that has been selected
-	int  cursor        = -1;                // The position of the cursor ( -1 is no cursor)
-	char newname[MAX_SAVEGAME_NAME_LEN];    // The new name for the game
+	int fieldcount;                                   // Number of slots being shown by the gump: 14 in normal
+													  // or restore mode, 10 in olde_style_mode
+	int  selected_slot = NoSlot;                      // The savegame slot that has been selected
+	int  cursor        = -1;                          // The position of the cursor ( -1 is no cursor)
+	char newname[GameDat::MAX_SAVEGAME_NAME_SIZE];    // The new name for the game
 
 	// Run in reduced functionality restore mode. Can only load and delete
 	// games. Loading games only Restores Gamedat

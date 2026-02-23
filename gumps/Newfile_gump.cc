@@ -1122,7 +1122,7 @@ bool Newfile_gump::text_input(const char* text) {
 		return true;
 	}
 
-	if (cursor == -1 || strlen(text) >= MAX_SAVEGAME_NAME_LEN - 1) {
+	if (cursor == -1 || strlen(text) >= GameDat::MAX_SAVEGAME_NAME_SIZE - 1) {
 		return true;
 	}
 	// if (strcmp(text, newname) == 0) {    // Not changed
@@ -1234,11 +1234,11 @@ bool Newfile_gump::key_down(SDL_Keycode chr, SDL_Keycode unicode) {
 		break;
 
 	case SDLK_HOME:
-		repaint = MoveCursor(-MAX_SAVEGAME_NAME_LEN);
+		repaint = MoveCursor(-GameDat::MAX_SAVEGAME_NAME_SIZE);
 		break;
 
 	case SDLK_END:
-		repaint = MoveCursor(MAX_SAVEGAME_NAME_LEN);
+		repaint = MoveCursor(GameDat::MAX_SAVEGAME_NAME_SIZE);
 		break;
 
 	default:
@@ -1319,16 +1319,16 @@ int Newfile_gump::MoveCursor(int count) {
 }
 
 int Newfile_gump::AddCharacter(char c) {
-	if (cursor == -1 || cursor >= MAX_SAVEGAME_NAME_LEN - 1) {
+	if (cursor == -1 || cursor >= GameDat::MAX_SAVEGAME_NAME_SIZE - 1) {
 		return 0;
 	}
 
-	char text[MAX_SAVEGAME_NAME_LEN];
+	char text[GameDat::MAX_SAVEGAME_NAME_SIZE];
 
 	strncpy(text, newname, cursor);
 	text[cursor] = c;
-	strncpy(text + cursor + 1, newname + cursor, MAX_SAVEGAME_NAME_LEN - cursor - 1);
-	text[MAX_SAVEGAME_NAME_LEN - 1] = 0;
+	strncpy(text + cursor + 1, newname + cursor, GameDat::MAX_SAVEGAME_NAME_SIZE - cursor - 1);
+	text[GameDat::MAX_SAVEGAME_NAME_SIZE - 1] = 0;
 
 	// Now check the width of the text
 	if (font->get_text_width(text) >= textw) {
