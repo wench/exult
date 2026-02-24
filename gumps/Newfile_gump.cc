@@ -95,38 +95,26 @@ public:
 		return get_text_msg(0x667 - msg_file_start);
 	}
 
-	static auto GameTime() {
+	static auto SaveCount() {
 		return get_text_msg(0x668 - msg_file_start);
 	}
 
-	static auto SaveCount() {
+	static auto File() {
 		return get_text_msg(0x669 - msg_file_start);
 	}
 
-	static auto Date() {
+	static auto LOAD() {
 		return get_text_msg(0x66A - msg_file_start);
 	}
 
-	static auto Time() {
-		return get_text_msg(0x66B - msg_file_start);
-	}
-
-	static auto File() {
-		return get_text_msg(0x66C - msg_file_start);
-	}
-
-	static auto LOAD() {
-		return get_text_msg(0x66D - msg_file_start);
-	}
-
 	static auto SAVE() {
-		return get_text_msg(0x66E - msg_file_start);
+		return get_text_msg(0x66B - msg_file_start);
 	}
 #ifdef DELETE
 #	undef DELETE
 #endif
 	static auto DELETE() {
-		return get_text_msg(0x66F - msg_file_start);
+		return get_text_msg(0x66C - msg_file_start);
 	}
 
 	static auto month_Abbreviation(int month) {
@@ -401,9 +389,8 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 				font, num_width, true, false);
 
 		widgets[id_button_sortby] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
-				this, std::vector<std::string>{Strings::RealTime(), Strings::Name(), Strings::GameTime()},
-				Settings::get().disk.savegame_sort_by, get_button_pos_for_label(Strings::SortSavegamesBy_()), yForRow(yindex++) - 2,
-				64, 0);
+				this, std::vector<std::string>{Strings::RealTime(), Strings::Name()}, Settings::get().disk.savegame_sort_by,
+				get_button_pos_for_label(Strings::SortSavegamesBy_()), yForRow(yindex++) - 2, 64, 0);
 
 		widgets[id_button_groupbytype] = std::make_unique<SelfManaged<Gump_ToggleTextButton>>(
 				this, std::vector<std::string>{Strings::No(), Strings::Yes()}, Settings::get().disk.savegame_group_by_type,
@@ -794,10 +781,10 @@ void Newfile_gump::paint_normal() {
 	// Paint the savegame details
 
 	if (screenshot) {
-		sman->paint_shape(x + 222, y + 2, screenshot->get_frame(0), false, palette_map);
+		sman->paint_shape(x + 222, y + 1, screenshot->get_frame(0), false, palette_map);
 	} else {
 		// Paint No Screenshot background
-		ibuf->draw_box(x + 222, y + 2, 96, 60, 0, 143, 142);
+		ibuf->draw_box(x + 222, y + 1, 96, 60, 0, 143, 142);
 
 		auto msg = Strings::No_Screenshot();
 		int  tw, th;
@@ -809,7 +796,7 @@ void Newfile_gump::paint_normal() {
 		sman->paint_text_box(5, Strings::CheatsUsed(), x + 222, y + 54, 96, 8, 0, false, true);
 	}
 	// Draw details background
-	ibuf->draw_beveled_box(x + 222, y + 63, 96, 68, 1, 137, 144, 145, 140, 139, 142);
+	ibuf->draw_beveled_box(x + 222, y + 62, 96, 70, 1, 137, 144, 145, 140, 139, 142);
 
 	if (details && party && party->size()) {
 		for (int i = party->size() - 1; i >= 0; --i) {
@@ -826,7 +813,7 @@ void Newfile_gump::paint_normal() {
 				}
 			}
 			ShapeID shape(shape_num, 16, shape_file);
-			shape.paint_shape(x + 249 + (i & 3) * 23, y + 157 + i / 4 * 27, true);
+			shape.paint_shape(x + 249 + (i & 3) * 23, y + 158 + i / 4 * 26, true);
 		}
 
 		char info[320];
@@ -838,20 +825,17 @@ void Newfile_gump::paint_normal() {
 				"%s: %i  %s %i\n"
 				"%s: %i  %s: %i\n"
 				"\n"
-				"%s: %i\n"
-				"%s: %02i:%02i\n"
+				"%s: %i %02i:%02i\n"
 				"\n"
 				"%s: %i\n"
-				"%s: %i%s %s %04i\n"
-				"%s: %02i:%02i",
+				"%i%s %s %04i %02i:%02i",
 
 				Strings::Avatar(), party->front().name, Strings::Exp(), party->front().exp, Strings::Hp(), party->front().health,
 				Strings::Str(), party->front().str, Strings::Dxt(), party->front().dext, Strings::Int(), party->front().intel,
-				Strings::Trn(), party->front().training, Strings::GameDay(), details->game_day, Strings::GameTime(),
-				details->game_hour, details->game_minute, Strings::SaveCount(), details->save_count, Strings::Date(),
-				details->real_day, Strings::ordinal_numeral_suffix(details->real_day),
-				Strings::month_Abbreviation(details->real_month - 1), details->real_year, Strings::Time(), details->real_hour,
-				details->real_minute);
+				Strings::Trn(), party->front().training, Strings::GameDay(), details->game_day, details->game_hour,
+				details->game_minute, Strings::SaveCount(), details->save_count, details->real_day,
+				Strings::ordinal_numeral_suffix(details->real_day), Strings::month_Abbreviation(details->real_month - 1),
+				details->real_year, details->real_hour, details->real_minute);
 		info[std::size(info) - 1] = 0;
 
 		if (filename) {
