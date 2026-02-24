@@ -18,7 +18,6 @@ EXULT_FLX_OBJECTS = \
 	exultmsg_es.txt \
 	exultmsg_fr.txt \
 	checkmark_background.shp \
-	mixer.shp \
 	fs_badges.shp
 
 EXULT_FONTS_ORIGINAL_VGA_OBJECTS = \
