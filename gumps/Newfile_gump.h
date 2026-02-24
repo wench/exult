@@ -110,7 +110,7 @@ protected:
 
 	// Info box info
 	constexpr static short infox = 224;
-	constexpr static short infoy = 65;
+	constexpr static short infoy = 62;
 	constexpr static short infow = 92;
 	constexpr static short infoh = 79;
 
