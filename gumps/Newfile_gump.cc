@@ -1051,6 +1051,7 @@ bool Newfile_gump::Slot_widget::mouse_down(int mx, int my, MouseButton button) {
 #ifdef DEBUG
 		cout << "Hit a save game field" << endl;
 #endif
+		nfg->last_selected = nfg->selected_slot;
 		nfg->SelectSlot(hit + nfg->FirstSlot());
 		return true;
 	}
