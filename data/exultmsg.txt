@@ -344,6 +344,9 @@
 0x66A:LOAD
 0x66B:SAVE
 0x66C:DELETE
+0x66D:Regular
+0x66E:QuickSaves
+0x66F:AutoSaves
 
 #Month Avbbreviations
 0x670:Jan
