@@ -35,6 +35,7 @@ private:
 													// on_button will return nullptr if self managed
 	MouseButton dragging = MouseButton::Unknown;    // Button beingg held while
 													// dragging mouse
+	bool toggled = false;                           // Sticky toggle state: when true, button renders as pushed
 
 public:
 	friend class Gump;
@@ -78,7 +79,15 @@ public:
 	}
 
 	bool is_pushed() const {
-		return pushed_button != MouseButton::Unknown;
+		return pushed_button != MouseButton::Unknown || toggled;
+	}
+
+	void set_toggled(bool on) {
+		toggled = on;
+	}
+
+	bool is_toggled() const {
+		return toggled;
 	}
 
 	void set_pushed(MouseButton button);

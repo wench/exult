@@ -68,6 +68,11 @@ protected:
 		id_speech,
 		id_effects,
 
+		// Filter buttons (new style non-settings mode)
+		id_filter_regular,
+		id_filter_quicksave,
+		id_filter_autosave,
+
 		id_count,
 
 		id_normal_start    = id_scroll,
@@ -76,6 +81,8 @@ protected:
 		id_settings_last   = id_button_autosaves_write_to_gamedat,
 		id_old_style_start = id_music,
 		id_old_style_last  = id_effects,
+		id_filter_start    = id_filter_regular,
+		id_filter_last     = id_filter_autosave,
 	};
 
 	std::array<std::unique_ptr<Gump_widget>, id_count> widgets;
@@ -130,6 +137,8 @@ protected:
 	const std::vector<SaveInfo>* games = nullptr;    // The list of savegames being shown
 	std::vector<SaveInfo>        old_games;          // Backing storage for the  list of
 													 // savegames in old_style_mode
+	std::vector<size_t> filtered_indices;            // Maps display slot to index in games (when filtering)
+	bool                filter_active = false;       // True when any filter button is toggled
 
 	std::unique_ptr<Shape_file> cur_shot;       // Screenshot for current game
 	SaveGame_Details            cur_details;    // Details of current game
@@ -150,7 +159,7 @@ protected:
 	bool                               is_readable = false;      // Is the save game readable
 	const char*                        filename    = nullptr;    // Filename of the savegame, if exists
 
-	int fieldcount;                                   // Number of slots being shown by the gump: 14 in normal
+	int fieldcount;                                   // Number of slots being shown by the gump: 13 in normal
 													  // or restore mode, 10 in olde_style_mode
 	int  selected_slot = NoSlot;                      // The savegame slot that has been selected
 	int  cursor        = -1;                          // The position of the cursor ( -1 is no cursor)
@@ -183,6 +192,7 @@ protected:
 	static void SaveGameDetailsChanging();    // Notification from GameDat that save infos are about to change
 	void        LoadSaveGameDetails();        // Loads (and sorts) all the savegame details
 	void        FreeSaveGameDetails();        // Frees all the savegame details
+	void        rebuild_filter();             // Rebuild filtered_indices from current filter state
 
 	void SetTextInputArea(SDL_Window* window);
 
@@ -201,6 +211,7 @@ public:
 	void toggle_settings(int state);    // 'Settings' was clicked.
 	void apply_settings();              // 'Apply' was clicked.
 	void revert_settings();             // 'Revert' was clicked.
+	void set_filter(int filter);        // Filter button was clicked.
 	bool run() override;                // Run the gump.
 
 	// Get the first slot
@@ -215,9 +226,31 @@ public:
 		}
 	}
 
+	// Is any filter active?
+	bool is_filtered() const {
+		return filter_active;
+	}
+
+	// Number of visible savegames after filtering
+	size_t filtered_game_count() const {
+		if (!games) {
+			return 0;
+		}
+		return is_filtered() ? filtered_indices.size() : games->size();
+	}
+
+	// Map display slot (>=SavegameSlots) to actual games index
+	size_t game_index(int slot) const {
+		size_t display_idx = slot - SavegameSlots;
+		if (is_filtered() && display_idx < filtered_indices.size()) {
+			return filtered_indices[display_idx];
+		}
+		return display_idx;
+	}
+
 	// Get the last slot
 	sint64 LastSlot() const {
-		return std::max<sint64>(fieldcount - (SavegameSlots - FirstSlot()), SavegameSlots + (games ? games->size() : 0));
+		return std::max<sint64>(fieldcount - (SavegameSlots - FirstSlot()), SavegameSlots + sint64(filtered_game_count()));
 	}
 
 	// Get the total nuber of slots
