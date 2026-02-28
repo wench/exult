@@ -84,6 +84,11 @@ bool Scrollable_widget::run() {
 	// Work out how much scroling we cando
 	scroll_max = std::max(0, Get_ChildHeight() - GetUsableArea().h);
 
+	if (get_scroll_offset() > scroll_max) {
+		set_scroll_offset(scroll_max);
+		repaint = true;
+	}
+
 	// Hide/show scrolbar elements as needed
 	if ((scroll_max == 0 && type == ScrollbarType::Auto) || type == ScrollbarType::None) {
 		for (int i = id_first_button; i <= id_last_button; i++) {

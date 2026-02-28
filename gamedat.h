@@ -143,8 +143,12 @@ public:
 	};
 
 	class SaveInfo {
-		// No direct access to filename
-		std::string filename_;
+		// No direct access to filename, screenshot or palette
+		std::string                         filename_;
+		mutable std::unique_ptr<Shape_file> screenshot_ = nullptr;
+		mutable std::unique_ptr<Palette>    palette_    = nullptr;
+		// GameDat class is allowed full access to everything
+		friend GameDat;
 
 	public:
 		int num = -1;
@@ -153,8 +157,6 @@ public:
 		bool                        readable = false;
 		SaveGame_Details            details;
 		std::vector<SaveGame_Party> party;
-		std::unique_ptr<Shape_file> screenshot = nullptr;
-		std::unique_ptr<Palette>    palette    = nullptr;
 
 		// Default constructor is allowed
 		SaveInfo() {}
@@ -171,7 +173,7 @@ public:
 		// Copy from exising object but with move for a Screenshot
 		SaveInfo(const SaveInfo& other, std::unique_ptr<Shape_file>&& newscreenshot)
 				: filename_(other.filename_), num(other.num), savename(other.savename), readable(other.readable),
-				  details(other.details), party(other.party), screenshot(std::move(newscreenshot)) {
+				  details(other.details), party(other.party), screenshot_(std::move(newscreenshot)) {
 			// Copy the party
 		}
 
@@ -196,11 +198,22 @@ public:
 			return filename_;
 		}
 
+		const auto& screenshot() const {
+			return screenshot_;
+		}
+
+		const auto& palette() const {
+			return palette_;
+		}
+
 		int compare(const SaveInfo& other) const noexcept;
 
 		bool operator<(const SaveInfo& other) const noexcept {
 			return compare(other) < 0;
 		}
+
+		// Load screenshot and palette on demand
+		void load_save_screenshot() const;
 	};
 
 	int save_count = 0;
@@ -333,7 +346,7 @@ private:
 
 	bool get_saveinfo(
 			const std::string& filename, std::string& name, std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-			std::vector<SaveGame_Party>& party, std::unique_ptr<Palette>& palette);
+			std::vector<SaveGame_Party>& party, std::unique_ptr<Palette>& palette, bool load_screenshot = true);
 
 	void clear_saveinfos();
 
@@ -352,7 +365,7 @@ private:
 #ifdef HAVE_ZIP_SUPPORT
 	bool get_saveinfo_zip(
 			const char* fname, std::string& name, std::unique_ptr<Shape_file>& map, SaveGame_Details& details,
-			std::vector<SaveGame_Party>& party, std::unique_ptr<Palette>& palette);
+			std::vector<SaveGame_Party>& party, std::unique_ptr<Palette>& palette, bool load_screenshot = true);
 	bool save_gamedat_zip(const std::string& fname, const char* savename);
 	bool Restore_level2(unzFile& unzipfile, const char* dirname, int dirlen);
 	bool restore_gamedat_zip(const char* fname);

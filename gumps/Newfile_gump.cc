@@ -66,7 +66,6 @@ public:
 	static inline const String<0x660> Avatar;
 
 	static inline const String<0x661> Exp;
-	
 
 	static inline const String<0x662> Hp;
 
@@ -79,7 +78,7 @@ public:
 	static inline const String<0x666> Trn;
 
 	static inline const String<0x667> GameDay;
-	
+
 	static inline const String<0x668> SaveCount;
 
 	static inline const String<0x669> File;
@@ -91,6 +90,12 @@ public:
 #	undef DELETE
 #endif
 	static inline const String<0x66C> DELETE;
+
+	static inline const String<0x66D> REGULAR_SAVES;
+
+	static inline const String<0x66E> QUICK_SAVES;
+
+	static inline const String<0x66F> AUTO_SAVES;
 
 	static inline const String<0x670, 12> month_Abbreviation;
 
@@ -105,7 +110,7 @@ public:
 		return get_text_msg(0x67F - msg_file_start);    // th
 	}
 
-	static inline const NewlineCString<0x6D2> No_Screenshot;	
+	static inline const NewlineCString<0x6D2> No_Screenshot;
 
 	static inline const String<0x6D3> QUIT;
 
@@ -141,7 +146,6 @@ public:
 
 	static inline const String<0x6E1> GlobalFlagAutosaveCount_;
 	;
-	
 };
 
 //
@@ -226,7 +230,7 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 		HorizontalArrangeWidgets(tcb::span(widgets.data() + id_old_style_start, id_old_style_last + 1 - id_old_style_start), 9);
 
 	} else {
-		fieldcount = 14;
+		fieldcount = 13;
 		SetProceduralBackground(TileRect(0, 0, 320, 200), -1, false);
 
 		// Cancel
@@ -316,6 +320,17 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 		RightAlignWidgets(tcb::span(widgets.data() + id_slider_autocount, 6));
 		// RightAlignWidgets(tcb::span(widgets.data() + id_button_sortbyname,
 		// 3),num_width+4);
+
+		// Filter buttons in the first row
+		widgets[id_filter_regular] = std::make_unique<SelfManaged<CallbackTextButton<Newfile_gump, int>>>(
+				this, &Newfile_gump::set_filter, std::make_tuple(0), Strings::REGULAR_SAVES(), fieldx, fieldy);
+		widgets[id_filter_quicksave] = std::make_unique<SelfManaged<CallbackTextButton<Newfile_gump, int>>>(
+				this, &Newfile_gump::set_filter, std::make_tuple(1), Strings::QUICK_SAVES(), fieldx, fieldy);
+		widgets[id_filter_autosave] = std::make_unique<SelfManaged<CallbackTextButton<Newfile_gump, int>>>(
+				this, &Newfile_gump::set_filter, std::make_tuple(2), Strings::AUTO_SAVES(), fieldx, fieldy);
+		// Default: filter out autosaves
+		widgets[id_filter_autosave]->as_button()->set_toggled(true);
+		HorizontalArrangeWidgets(tcb::span(widgets.data() + id_filter_start, id_filter_last + 1 - id_filter_start), 4, fieldw);
 	}
 
 	// Reposition the gump
@@ -323,9 +338,10 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 	x         = (gwin->get_width() + area.x - area.w) / 2;
 	y         = (gwin->get_height() + area.y - area.h) / 2;
 
-	auto scroll = std::make_unique<Scrollable_widget>(
-			this, fieldx, fieldy, fieldw, fieldcount * (fieldh + fieldgap) - fieldgap, 0,
-			old_style_mode ? Scrollable_widget::ScrollbarType::None : Scrollable_widget::ScrollbarType::Always, false, 0xff, 1);
+	const int scroll_fieldy = old_style_mode ? fieldy : fieldy + fieldh + fieldgap;
+	auto      scroll        = std::make_unique<Scrollable_widget>(
+            this, fieldx, scroll_fieldy, fieldw, fieldcount * (fieldh + fieldgap) - fieldgap, 0,
+            old_style_mode ? Scrollable_widget::ScrollbarType::None : Scrollable_widget::ScrollbarType::Always, false, 0xff, 1);
 	scroll->add_child(std::make_shared<Slot_widget>(this));
 	scroll->set_line_height(fieldh + fieldgap, false);
 	widgets[id_scroll] = std::move(scroll);
@@ -366,7 +382,7 @@ void Newfile_gump::load() {
 
 	// Aborts if unsuccessful.
 	if (selected_slot >= SavegameSlots && selected_slot <= LastSlot()) {
-		gamedat->Extractgame((*games)[selected_slot - SavegameSlots].filename().c_str(), !restore_mode);
+		gamedat->Extractgame((*games)[game_index(selected_slot)].filename().c_str(), !restore_mode);
 	} else if (selected_slot == GamedatSlot) {
 		gamedat->Extractgame(nullptr, !restore_mode);
 	}
@@ -389,10 +405,11 @@ void Newfile_gump::save() {
 		return;
 	}
 
-	size_t save_num = selected_slot - SavegameSlots;
+	size_t save_num    = game_index(selected_slot);
+	size_t display_num = selected_slot - SavegameSlots;
 
 	// Already a game in this slot? If so ask to delete
-	if (selected_slot >= SavegameSlots && games && games->size() > save_num && !(*games)[save_num].savename.empty()
+	if (selected_slot >= SavegameSlots && games && filtered_game_count() > display_num && !(*games)[save_num].savename.empty()
 		&& (*games)[save_num].details) {
 		if (!Yesno_gump::ask("Okay to write over existing saved game?")) {
 			return;
@@ -401,7 +418,7 @@ void Newfile_gump::save() {
 
 	const SaveInfo* info = nullptr;
 	// Use actual savegame num if overwriting existing game
-	if (games && games->size() > size_t(save_num)) {
+	if (games && filtered_game_count() > display_num) {
 		info     = &((*games)[save_num]);
 		save_num = (*games)[save_num].num;
 	}
@@ -446,7 +463,7 @@ void Newfile_gump::delete_file() {
 		return;
 	}
 
-	gamedat->DeleteSaveGame((*games)[selected_slot].filename());
+	gamedat->DeleteSaveGame((*games)[game_index(selected_slot)].filename());
 	filename    = nullptr;
 	is_readable = false;
 
@@ -513,6 +530,71 @@ void Newfile_gump::revert_settings() {
 	widgets[id_button_sortby]->setselection(settings.savegame_sort_by);
 	widgets[id_button_groupbytype]->setselection(settings.savegame_group_by_type);
 	widgets[id_button_autosaves_write_to_gamedat]->setselection(settings.autosaves_write_to_gamedat);
+}
+
+void Newfile_gump::set_filter(int filter) {
+	// Toggle the clicked filter button
+	constexpr widget_ids filter_ids[] = {id_filter_regular, id_filter_quicksave, id_filter_autosave};
+	if (filter >= 0 && filter < 3) {
+		auto* btn = widgets[filter_ids[filter]]->as_button();
+		if (btn) {
+			btn->set_toggled(!btn->is_toggled());
+		}
+	}
+	rebuild_filter();
+	SelectSlot(NoSlot);
+	if (widgets[id_scroll]) {
+		widgets[id_scroll]->run();
+	}
+	paint();
+}
+
+void Newfile_gump::rebuild_filter() {
+	filtered_indices.clear();
+	if (!games) {
+		return;
+	}
+
+	// Check which filter buttons are toggled
+	bool hide_regular = widgets[id_filter_regular] && widgets[id_filter_regular]->as_button()
+						&& widgets[id_filter_regular]->as_button()->is_toggled();
+	bool hide_quicksave = widgets[id_filter_quicksave] && widgets[id_filter_quicksave]->as_button()
+						  && widgets[id_filter_quicksave]->as_button()->is_toggled();
+	bool hide_autosave = widgets[id_filter_autosave] && widgets[id_filter_autosave]->as_button()
+						 && widgets[id_filter_autosave]->as_button()->is_toggled();
+
+	// If no filter is active, leave filtered_indices empty to indicate no filtering
+	if (!hide_regular && !hide_quicksave && !hide_autosave) {
+		filter_active = false;
+		return;
+	}
+
+	filter_active = true;
+
+	for (size_t i = 0; i < games->size(); i++) {
+		const auto& info = (*games)[i];
+		bool        hide = false;
+		switch (info.type) {
+		case SaveInfo::Type::REGULAR:
+			hide = hide_regular;
+			break;
+		case SaveInfo::Type::QUICKSAVE:
+			hide = hide_quicksave;
+			break;
+		case SaveInfo::Type::AUTOSAVE:
+		case SaveInfo::Type::FLAG_AUTOSAVE:
+		case SaveInfo::Type::CRASHSAVE:
+			hide = hide_autosave;
+			break;
+		default:
+			hide = hide_regular;
+			break;
+		}
+		if (!hide) {
+			filtered_indices.push_back(i);
+		}
+	}
+	SelectSlot(SaveSlots::NoSlot);
 }
 
 bool Newfile_gump::run() {
@@ -600,8 +682,8 @@ void Newfile_gump::Slot_widget::paint() {
 			// the slot being drawn is a savegame
 		} else if (
 				nfg->games && actual_slot >= SavegameSlots && actual_slot <= nfg->LastSlot()
-				&& nfg->games->size() > size_t(actual_slot - SavegameSlots)) {
-			text = (*nfg->games)[actual_slot - SavegameSlots].savename.c_str();
+				&& nfg->filtered_game_count() > size_t(actual_slot - SavegameSlots)) {
+			text = (*nfg->games)[nfg->game_index(actual_slot)].savename.c_str();
 		} else {
 			text = "";
 		}
@@ -656,10 +738,11 @@ void Newfile_gump::paint_normal() {
 
 	// draw button backgrounds
 	if (!old_style_mode) {
-		ibuf->draw_box(x + 212, y + 3, 7, 25, 0, 145, 142);
+		ibuf->draw_box(x + 212, y + 4, 7, 25, 0, 145, 142);
 		ibuf->draw_box(x + 212, y + 28, 7, 129, 0, 143, 142);
 		ibuf->draw_box(x + 212, y + 157, 7, 38, 0, 145, 142);
 
+		ibuf->draw_box(x, y + 4, 212, 7, 0, 145, 142);
 		ibuf->draw_box(x, y + 188, get_usable_area().w, 7, 0, 145, 142);
 	} else {
 		ibuf->draw_box(x, y + 134, get_usable_area().w, 7, 0, 145, 142);
@@ -846,7 +929,8 @@ void Newfile_gump::paint_settings() {
 	for (int i = id_first; i < id_count; i++) {
 		auto& widget = widgets[i];
 
-		if ((i >= id_normal_start && i <= id_normal_last) || (i >= id_old_style_start && i <= id_old_style_last)) {
+		if ((i >= id_normal_start && i <= id_normal_last) || (i >= id_old_style_start && i <= id_old_style_last)
+			|| (i >= id_filter_start && i <= id_filter_last)) {
 			continue;
 		}
 
@@ -900,7 +984,8 @@ inline bool Newfile_gump::forward_input(std::function<bool(Gump_widget*)> func) 
 		// Skip widgets not in current mode
 		if ((!do_normal && i >= id_normal_start && i <= id_normal_last)
 			|| (!do_settings && i >= id_settings_start && i <= id_settings_last)
-			|| (!old_style_mode && i >= id_old_style_start && i <= id_old_style_last)) {
+			|| (!old_style_mode && i >= id_old_style_start && i <= id_old_style_last)
+			|| (!do_normal && i >= id_filter_start && i <= id_filter_last)) {
 			continue;
 		}
 		if (widget && func(widget.get())) {
@@ -1280,37 +1365,40 @@ void Newfile_gump::SelectSlot(int slot) {
 		cursor      = -1;    // No cursor
 		is_readable = true;
 		filename    = nullptr;
-	} else if (selected_slot >= SavegameSlots && selected_slot < NumSlots() && games && games->size() > savegame_index) {
-		screenshot = (*games)[savegame_index].screenshot.get();
-		details    = &((*games)[savegame_index].details);
-		party      = &((*games)[savegame_index].party);
-		strcpy(newname, (*games)[savegame_index].savename.c_str());
+	} else if (selected_slot >= SavegameSlots && selected_slot < NumSlots() && games && filtered_game_count() > savegame_index) {
+		const size_t gi = game_index(selected_slot);
+		// Load screenshot and palette on demand if not yet loaded
+		(*games)[gi].load_save_screenshot();
+		screenshot = (*games)[gi].screenshot().get();
+		details    = &((*games)[gi].details);
+		party      = &((*games)[gi].party);
+		strcpy(newname, (*games)[gi].savename.c_str());
 		cursor      = static_cast<int>(strlen(newname));
-		is_readable = want_load = (*games)[savegame_index].readable;
-		filename                = (*games)[savegame_index].filename().c_str();
+		is_readable = want_load = (*games)[gi].readable;
+		filename                = (*games)[gi].filename().c_str();
 		// We have a palette so create a palette map
-		if (screenshot && (*games)[savegame_index].palette) {
+		if (screenshot && (*games)[gi].palette()) {
 			std::unique_ptr<Palette> newpal;
 			const Palette*           gumppal = gumpman->get_pal();
 			// It's faded out so create a partly faded intermediate
-			if ((*games)[savegame_index].palette->is_faded_out()) {
-				newpal = (*games)[savegame_index].palette->create_fadeintermediate(3, 1);
+			if ((*games)[gi].palette()->is_faded_out()) {
+				newpal = (*games)[gi].palette()->create_fadeintermediate(3, 1);
 			}
 			// Palette is -1 or is not same as current and is not 0 , Create intermediate palette between this
 			// one and current so it looks better
 			else if (
-					((*games)[savegame_index].palette->get_palette_index() == -1
-					 || (*games)[savegame_index].palette->get_palette_index() != gumppal->get_palette_index())
-					&& (*games)[savegame_index].palette->get_palette_index() != 0) {
-				newpal = (*games)[savegame_index].palette->create_intermediate(*gumppal, 3, 1, false);
+					((*games)[gi].palette()->get_palette_index() == -1
+					 || (*games)[gi].palette()->get_palette_index() != gumppal->get_palette_index())
+					&& (*games)[gi].palette()->get_palette_index() != 0) {
+				newpal = (*games)[gi].palette()->create_intermediate(*gumppal, 3, 1, false);
 			}
 			palette_map = sg_palette_map;
 			if (newpal) {
 				newpal->create_palette_map(gumppal, sg_palette_map, true);
 			} else if (
-					(*games)[savegame_index].palette->get_palette_index() == -1
-					|| (*games)[savegame_index].palette->get_palette_index() != gumppal->get_palette_index()) {
-				(*games)[savegame_index].palette->create_palette_map(gumppal, sg_palette_map, true);
+					(*games)[gi].palette()->get_palette_index() == -1
+					|| (*games)[gi].palette()->get_palette_index() != gumppal->get_palette_index()) {
+				(*games)[gi].palette()->create_palette_map(gumppal, sg_palette_map, true);
 			} else {
 				palette_map = nullptr;
 			}
@@ -1393,6 +1481,8 @@ void Newfile_gump::LoadSaveGameDetails() {
 		games = &old_games;
 	}
 
+	rebuild_filter();
+
 	// We'll now output the info if debugging
 #ifdef DEBUG
 	cout << "Listing " << (games ? games->size() : 0) << " Save games" << endl;
@@ -1423,6 +1513,8 @@ void Newfile_gump::FreeSaveGameDetails() {
 	// The SaveInfo struct will delete everything that it's got allocated
 	// So we don't need to worry about that
 	games = nullptr;
+	filtered_indices.clear();
+	filter_active = false;
 }
 
 void Newfile_gump::toggle_audio_option(Gump_widget* btn, int state) {
