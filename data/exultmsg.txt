@@ -344,9 +344,9 @@
 0x66A:LOAD
 0x66B:SAVE
 0x66C:DELETE
-0x66D:Regular
-0x66E:QuickSaves
-0x66F:AutoSaves
+0x66D:Named
+0x66E:Quick
+0x66F:Auto
 
 #Month Avbbreviations
 0x670:Jan
@@ -452,6 +452,7 @@
 0x6DF:Name
 0x6E0:Cheats Used
 0x6E1:Global Flag Autosave Count:
+0x6E2:Hide:
 
 #Gamedat
 0x6EA:AutoSave 

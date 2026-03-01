@@ -204,14 +204,18 @@ public:
 	//! @param min_gap Minimum gap between the widgets/
 	//! @param preferred_width constrain layout to this width if the widgets
 	//! would fit
+	//! @param fixed_width if true the layout constraint will be enforced
+	//! @param x_offset offset to place the begin of the span at another position
 	template <typename WidgetPointer>
-	void HorizontalArrangeWidgets(tcb::span<WidgetPointer> widgets, int min_gap = 8, int preferred_width = 0) {
+	void HorizontalArrangeWidgets(
+			tcb::span<WidgetPointer> widgets, int min_gap = 8, int preferred_width = 0, bool fixed_width = false,
+			int x_offset = 0) {
 		if (!procedural_background) {
 			return;
 		}
 		int       count         = 0;
-		const int x_origin      = procedural_background.x + 2;
-		int       usable_width  = procedural_background.w - 4;
+		const int x_origin      = procedural_background.x + 2 + x_offset;
+		int       usable_width  = procedural_background.w - 4 - x_offset;
 		int       width_widgets = 0;
 		for (const auto& widget : widgets) {
 			if (widget) {
@@ -221,22 +225,44 @@ public:
 			}
 		}
 		int min_width = width_widgets + (count)*min_gap;
-		if (preferred_width >= min_width && preferred_width < usable_width) {
+		if (fixed_width && preferred_width > 0) {
+			usable_width = preferred_width;
+		} else if (preferred_width >= min_width && preferred_width < usable_width) {
 			usable_width = preferred_width;
 		}
-		if (min_width > usable_width) {
+		if (!fixed_width && min_width > usable_width) {
 			procedural_background.w += min_width - usable_width;
 			usable_width = min_width;
 			set_pos();
 		}
-		int gap = (usable_width - width_widgets) / (count);
 
-		int new_x = gap / 2 + x_origin;
-		for (const auto& widget : widgets) {
-			if (widget) {
-				widget->set_pos(new_x + widget->get_xleft(), widget->get_y());
+		if (fixed_width && width_widgets > usable_width && count > 1) {
+			// Widgets overflow: start at x_origin, negative gaps only between widgets
+			int space_left = usable_width - width_widgets;
+			int gaps_left  = count - 1;
+			int new_x      = x_origin;
+			for (const auto& widget : widgets) {
+				if (widget) {
+					widget->set_pos(new_x + widget->get_xleft(), widget->get_y());
+					new_x += widget->get_width();
+					if (gaps_left > 0) {
+						int this_gap = space_left / gaps_left;
+						new_x += this_gap;
+						space_left -= this_gap;
+						gaps_left--;
+					}
+				}
+			}
+		} else {
+			int gap = (usable_width - width_widgets) / (count);
 
-				new_x += widget->get_width() + gap;
+			int new_x = gap / 2 + x_origin;
+			for (const auto& widget : widgets) {
+				if (widget) {
+					widget->set_pos(new_x + widget->get_xleft(), widget->get_y());
+
+					new_x += widget->get_width() + gap;
+				}
 			}
 		}
 	}

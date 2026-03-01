@@ -241,6 +241,10 @@ public:
 	static auto GlobalFlagAutosaveCount_() {
 		return get_text_msg(0x6E1 - msg_file_start);
 	}
+
+	static auto Hide_() {
+		return get_text_msg(0x6E2 - msg_file_start);
+	}
 };
 
 //
@@ -416,7 +420,7 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 		// RightAlignWidgets(tcb::span(widgets.data() + id_button_sortbyname,
 		// 3),num_width+4);
 
-		// Filter buttons in the first row
+		// Filter buttons in the first row, after "Hide:" label
 		widgets[id_filter_regular] = std::make_unique<SelfManaged<CallbackTextButton<Newfile_gump, int>>>(
 				this, &Newfile_gump::set_filter, std::make_tuple(0), Strings::REGULAR_SAVES(), fieldx, fieldy);
 		widgets[id_filter_quicksave] = std::make_unique<SelfManaged<CallbackTextButton<Newfile_gump, int>>>(
@@ -425,7 +429,10 @@ Newfile_gump::Newfile_gump(bool restore_mode_, bool old_style_mode_)
 				this, &Newfile_gump::set_filter, std::make_tuple(2), Strings::AUTO_SAVES(), fieldx, fieldy);
 		// Default: filter out autosaves
 		widgets[id_filter_autosave]->as_button()->set_toggled(true);
-		HorizontalArrangeWidgets(tcb::span(widgets.data() + id_filter_start, id_filter_last + 1 - id_filter_start), 4, fieldw);
+		const int hide_label_w = font->get_text_width(Strings::Hide_()) + 2;
+		HorizontalArrangeWidgets(
+				tcb::span(widgets.data() + id_filter_start, id_filter_last + 1 - id_filter_start), 4, 210 - hide_label_w, true,
+				hide_label_w);
 	}
 
 	// Reposition the gump
@@ -837,7 +844,8 @@ void Newfile_gump::paint_normal() {
 		ibuf->draw_box(x + 212, y + 28, 7, 129, 0, 143, 142);
 		ibuf->draw_box(x + 212, y + 157, 7, 38, 0, 145, 142);
 
-		ibuf->draw_box(x, y + 4, 212, 7, 0, 145, 142);
+		const int hide_label_w = font->get_text_width(Strings::Hide_()) + 3;
+		ibuf->draw_box(x + hide_label_w, y + 4, 212 - hide_label_w, 7, 0, 145, 142);
 		ibuf->draw_box(x, y + 188, get_usable_area().w, 7, 0, 145, 142);
 	} else {
 		ibuf->draw_box(x, y + 134, get_usable_area().w, 7, 0, 145, 142);
@@ -862,6 +870,11 @@ void Newfile_gump::paint_normal() {
 		if (btn) {
 			btn->paint();
 		}
+	}
+
+	// Paint "Hide:" label for filter buttons
+	if (!old_style_mode) {
+		font->paint_text(ibuf, Strings::Hide_(), x + fieldx, y + fieldy + 2);
 	}
 
 	// If in old style mode, don't paint the savegame details
