@@ -172,8 +172,8 @@ public:
 
 		// Copy from exising object but with move for a Screenshot
 		SaveInfo(const SaveInfo& other, std::unique_ptr<Shape_file>&& newscreenshot)
-				: filename_(other.filename_), num(other.num), savename(other.savename), readable(other.readable),
-				  details(other.details), party(other.party), screenshot_(std::move(newscreenshot)) {
+				: filename_(other.filename_), screenshot_(std::move(newscreenshot)), num(other.num), savename(other.savename),
+				  readable(other.readable), details(other.details), party(other.party) {
 			// Copy the party
 		}
 
