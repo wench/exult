@@ -184,7 +184,7 @@ bool save_image(
 			return false;
 		}
 		colortype |= PNG_COLOR_MASK_PALETTE;
-		png_color png_pal[256] = {0};
+		png_color png_pal[256] = {{}};
 		for (i = 0; i < pal.ncolors(); i++) {
 			SDL_Color col    = pal[i];
 			png_pal[i].red   = col.r;

@@ -359,8 +359,7 @@ void Palette::load(const File_spec& fname0, const File_spec& fname1, int index, 
 void Palette::load(
 		const File_spec& fname0, const File_spec& fname1, const File_spec& fname2, int index, const char* xfname, int xindex) {
 	set_loaded(Cache::Load(fname0, fname1, fname2, index), xfname, xindex);
-	std::array<std::string_view, 1> fnames = {};
-	is_palettes_flx                        = fname0.name == PALETTES_FLX;
+	is_palettes_flx = fname0.name == PALETTES_FLX;
 	if (is_palettes_flx) {
 		palette = index;
 	}

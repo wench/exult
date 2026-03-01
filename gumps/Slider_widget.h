@@ -109,7 +109,6 @@ private:
 	std::shared_ptr<Font>        font;
 	int                          max_digits_width = 0;
 	bool                         left_align;
-	Gump_button*                 pushed;
 
 public:
 	int getselection() const override {    // Get last value set.
