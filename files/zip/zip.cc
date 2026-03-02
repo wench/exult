@@ -72,8 +72,6 @@ using namespace std;
 
 // const char zip_copyright[] = " zip 0.15 Copyright 1998 Gilles Vollant ";
 
-#	define SIZEDATA_INDATABLOCK (4096 - (4 * 4))
-
 #	define LOCALHEADERMAGIC   (0x04034b50)
 #	define CENTRALHEADERMAGIC (0x02014b50)
 #	define ENDHEADERMAGIC     (0x06054b50)
@@ -98,8 +96,13 @@ struct linkedlist_datablock_internal {
 	linkedlist_datablock_internal* next_datablock;
 	uLong                          avail_in_this_block;
 	uLong                          filled_in_this_block;
-	uLong                          unused; /* for future use and alignement */
-	unsigned char                  data[SIZEDATA_INDATABLOCK];
+
+	// Origially the code sized this buffer so the entire structure was 4096 bytes.
+	// For some platforms 4096 byte objects could be allocated an entire page to themself giving some small speed improvement
+	// However the way things work in exult the object is unlikely to ever be page aligned so its just simpler to make the buffer
+	// 4096 bytes and not mess around calculating the size of the rest of the structure The original code assumed 32 bit pointers so
+	// this code compiled for 64 bit platforms never had a 4096 byte structure
+	unsigned char data[4096];
 };
 
 struct linkedlist_data {
@@ -141,7 +144,7 @@ static linkedlist_datablock_internal* allocate_new_datablock() {
 	if (ldi != nullptr) {
 		ldi->next_datablock       = nullptr;
 		ldi->filled_in_this_block = 0;
-		ldi->avail_in_this_block  = SIZEDATA_INDATABLOCK;
+		ldi->avail_in_this_block  = std::size(ldi->data);
 	}
 	return ldi;
 }
