@@ -334,7 +334,7 @@ void GameDat::save_gamedat(
 	// Try to save as a zip file
 	if (Settings::get().disk.save_compression_level > 0 && save_gamedat_zip(fname, savename)) {
 		gamedat_in_memory.disable();
-		read_save_infos_async(true);
+		update_save_info(fname);
 
 		return;
 	}
@@ -410,7 +410,7 @@ void GameDat::save_gamedat(
 	// Done with gamedat in memory so disable it before reading save infos
 	gamedat_in_memory.disable();
 
-	read_save_infos_async(true);
+	update_save_info(fname);
 }
 
 void GameDat::DeleteSaveGame(const std::string& fname) {
@@ -431,13 +431,43 @@ void GameDat::DeleteSaveGame(const std::string& fname) {
 			first_free[itype] = it->num;
 		}
 
-		Newfile_gump::SaveGameDetailsChanging();
 		save_infos.erase(it);
 	} else {
 		// This shouldn't happen unless someone called this function
 		// with a filename that wasn't a save game
 		// But just incase reload all the save infos
 		read_save_infos_async(true);
+	}
+}
+
+void GameDat::update_save_info(const std::string& fname) {
+	// Update save_info
+	std::lock_guard lock(save_info_mutex);
+
+	auto it = std::find_if(save_infos.begin(), save_infos.end(), [&fname](const SaveInfo& si) {
+		return si.filename() == fname;
+	});
+
+	// update existing saveinfo or create a new one
+	auto& saveinfo = it != save_infos.end()?*it:save_infos.emplace_back(std::string(fname));
+
+	saveinfo.screenshot_.reset();
+	saveinfo.palette_.reset();
+
+	saveinfo.readable = get_saveinfo(
+			saveinfo.filename(), saveinfo.savename, saveinfo.screenshot_, saveinfo.details, saveinfo.party, saveinfo.palette_,
+			false);
+
+	// Resort the saveinfo asyncronously
+	if ((!saveinfo_future.valid() || saveinfo_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready)) {
+		save_info_cancel = false;
+		saveinfo_future  = std::async(std::launch::async, [this]() {
+            try {
+                sort_save_infos();
+            } catch (const std::exception& e) {
+                std::cerr << "Error sorting save infos: " << e.what() << std::endl;
+            }
+        });
 	}
 }
 
@@ -630,6 +660,24 @@ void GameDat::read_save_infos() {
 		save_infos.emplace_back(std::string(filename));
 	}
 
+	// Read and cache all details
+	for (auto& saveinfo : save_infos) {
+		if (save_info_cancel) {
+			return;
+		}
+		saveinfo.readable = get_saveinfo(
+				saveinfo.filename(), saveinfo.savename, saveinfo.screenshot_, saveinfo.details, saveinfo.party, saveinfo.palette_,
+				false);
+	}
+	sort_save_infos();
+}
+
+void GameDat::sort_save_infos() {
+	std::lock_guard lock(save_info_mutex);
+
+	// wait for the memory lock to be released
+	std::unique_lock memlock(gamedat_in_memory.get_mutex());
+
 	first_free.fill(-1);
 	oldest.fill(0);
 
@@ -639,15 +687,8 @@ void GameDat::read_save_infos() {
 	std::array<SaveInfo*, SaveInfo::NUM_TYPES> oldestinfo;
 	oldestinfo.fill(nullptr);
 
-	// Read and cache all details
+	// Calculate oldest and first free
 	for (auto& saveinfo : save_infos) {
-		if (save_info_cancel) {
-			return;
-		}
-		saveinfo.readable = get_saveinfo(
-				saveinfo.filename(), saveinfo.savename, saveinfo.screenshot_, saveinfo.details, saveinfo.party, saveinfo.palette_,
-				false);
-
 		// Handling of regular savegame with a savegame number
 		if (saveinfo.type != SaveInfo::Type::UNKNOWN && saveinfo.num >= 0) {
 			int itype = int(saveinfo.type);
