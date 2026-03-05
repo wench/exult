@@ -672,6 +672,7 @@ private:
 #endif
 
 	void read_save_infos();
+	void sort_save_infos();
 
 	class Autosave_Event : public Time_sensitive {
 	public:
@@ -721,6 +722,7 @@ public:
 
 	// Delete a savegame file. This will invalidate any existing SaveInfo
 	// vectors
-	void DeleteSaveGame(const std::string& fname);
+	void DeleteSaveGame(const std::string_view fname);
+	void update_save_info(const std::string_view fname);
 };
 #endif    // SAVEINFO_H_INCLUDED
