@@ -544,10 +544,10 @@ void Newfile_gump::save() {
 
 	cout << "Saved game #" << selected_slot << " successfully." << endl;
 
-	// Reset everything
 	gwin->set_all_dirty();
 	gwin->got_bad_feeling(4);
 	SelectSlot(NoSlot);
+	FreeSaveGameDetails();
 }
 
 /*
@@ -571,6 +571,7 @@ void Newfile_gump::delete_file() {
 
 	// Reset everything
 	SelectSlot(NoSlot);
+	FreeSaveGameDetails();
 	gwin->set_all_dirty();
 }
 
