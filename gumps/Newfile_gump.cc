@@ -586,6 +586,9 @@ void Newfile_gump::toggle_settings(int state) {
 	} else {
 		// Update the rect in case the usable area has changed
 		page_turn_effect->UpdateRect(usable);
+
+
+		
 	}
 
 	if (!show_settings) {
@@ -594,6 +597,86 @@ void Newfile_gump::toggle_settings(int state) {
 		GameDat::get()->ResortSaveInfos();
 		LoadSaveGameDetails();
 		SelectSlot(selected_before);
+	}
+	else {
+		// Update settings widgets 
+		if (games && !games->empty())
+		{
+			// Count saves for each type
+			int num_quick = 0, num_flag = 0, num_auto = 0;
+
+			for (const auto& si : *games)
+			{
+				switch (si.type) {
+				case GameDat::SaveInfo::Type::AUTOSAVE:
+					++num_auto;
+					break;
+
+				case GameDat::SaveInfo::Type::FLAG_AUTOSAVE:
+					++num_flag;
+					break;
+
+				case GameDat::SaveInfo::Type::QUICKSAVE:
+					++num_quick;
+					break;
+
+				default:
+					break;
+				}
+			}
+			if (auto slider = dynamic_cast<Slider_widget*>(widgets[id_slider_autocount].get())) {
+				bool zero;
+				int min, max;
+				slider->get_range(min, max, zero);
+				if (num_auto) {
+					min = num_auto-1;
+				}
+				else min = 1;
+				if (min > max) max = std::max(min,slider->getselection());
+
+				if (max <= 100) {
+					max = 100;
+				} else if (max < 1000) {
+					max = std::max(1000, max);
+				}
+				slider->set_range(min, max, true);
+			}
+			if (auto slider = dynamic_cast<Slider_widget*>(widgets[id_slider_flagautocount].get())) {
+				bool zero;
+				int min, max;
+				slider->get_range(min, max, zero);
+				if (num_flag) {
+					min = num_flag-1;
+				}
+				else min = 1;
+				if (min > max) max = std::max(min,slider->getselection());
+
+				if (max <= 100) {
+					max = 100;
+				} else if (max < 1000) {
+					max = std::max(1000, max);
+				}
+				slider->set_range(min, max, true);
+			}
+			if (auto slider = dynamic_cast<Slider_widget*>(widgets[id_slider_quickcount].get())) {
+				bool zero;
+				int min, max;
+				slider->get_range(min, max, zero);
+				if (num_quick) {
+					min = num_quick;
+				}
+				else min = 1;
+				if (min > max) max = std::max(min,slider->getselection());
+
+				if (max <= 100) {
+					max = 100;
+				} else if (max < 1000) {
+					max = std::max(1000, max);
+				}
+				slider->set_range(min, max, false);
+			}
+
+		}
 	}
 	page_turn_effect->start(show_settings);
 

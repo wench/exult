@@ -97,6 +97,7 @@ public:
 private:
 	bool logarithmic;
 	int  min_val, max_val;    // Max., min. values to choose from.
+	bool min_is_zero = false; // Minimum value is actualy zero
 	int  step_val;            // Amount to step by.
 	int  val;                 // Current value.
 	int  prev_dragx;          // Prev. x-coord. of mouse.
@@ -112,6 +113,10 @@ private:
 
 public:
 	int getselection() const override {    // Get last value set.
+		if (min_is_zero && val == min_val) {
+			return 0;
+		}
+
 		return val;
 	}
 
@@ -124,6 +129,36 @@ public:
 	void clicked_right_arrow();
 	void move_diamond(int dir);
 	void set_val(int newval, bool recalcdiamond = true);    // Set to new value.
+	void set_range(int min, int max, bool min_is_zero) {
+
+		min_val = min;
+		max_val = max;
+
+		this->min_is_zero = min_is_zero && min != 0;
+
+		if (this->min_is_zero) {
+			min_val--;
+		}
+		int new_val = val;
+
+		if (new_val < min) {
+			new_val = min;
+		}
+		else  if (new_val > max) {
+			new_val = max;
+		}
+		// Update val forcing recalc of diamond
+		set_val(new_val,true);
+	}
+	void get_range(int& min, int& max, bool &min_is_zero) {
+		min_is_zero = this->min_is_zero;
+		min = min_val;
+		max = max_val;
+		if (min_is_zero) {
+			min++;
+		}
+
+	}
 
 	TileRect get_rect() const override;
 

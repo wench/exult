@@ -191,7 +191,7 @@ void Slider_widget::paint() {
 	if (font) {
 		auto rect = right->get_rect();
 		gumpman->paint_num(
-				val, rect.x + rect.w + (left_align ? 2 : max_digits_width), rect.y + (rect.h - font->get_text_height() + 1) / 2,
+				getselection(), rect.x + rect.w + (left_align ? 2 : max_digits_width), rect.y + (rect.h - font->get_text_height() + 1) / 2,
 				font, left_align);
 	}
 }
