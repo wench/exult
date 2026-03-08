@@ -327,6 +327,9 @@ private:
 		}
 	}
 
+	// Clean gamedat directory deleting files
+	void clean_directory();
+
 	// Explode a savegame into "gamedat".
 	void restore_gamedat(const char* fname);
 
