@@ -544,7 +544,7 @@ int U7rmdir(const char* dirname, bool recursive) {
 					return -1;
 				}
 			} else {
-				if (!std::remove(filename.c_str())) {
+				if(std::remove(filename.c_str())) {
 					return -1;
 				}
 			}
