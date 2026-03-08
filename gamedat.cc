@@ -261,7 +261,7 @@ void GameDat::restore_gamedat(const char* fname    // Name of savegame file.
 }
 
 /*
- *  List of 'gamedat' files to save (in addition to 'iregxx'):
+ *  List of 'gamedat' files to save (in addition to 'iregxx' and 'ifixXX'):
  */
 constexpr static const std::array bgsavefiles{GEXULTVER, GNEWGAMEVER, GPALETTE, NPC_DAT,   MONSNPCS,   USEVARS,
 											  USEDAT,    FLAGINIT,    GWINDAT,  GSCHEDULE, NOTEBOOKXML};
@@ -304,15 +304,22 @@ void GameDat::SaveToFlex(
 inline void GameDat::save_chunks_to_flex(Game_map* map, Flex_writer& flex) {
 	for (int schunk = 0; schunk < 12 * 12; schunk++) {
 		char iname[128];
-		// Check to see if the ireg exists before trying to
-		// save it; prevents crash when creating new maps
-		// for existing games
-		std::string iname_pmr(map->get_schunk_file_name(U7IREG, schunk, iname));
-		if (fileExists(iname_pmr)) {
-			SaveToFlex(flex, iname_pmr);
-		} else {
-			flex.empty_object();    // TODO: Get rid of this by making it
-									// redundant.
+
+		// ireg first then ifix
+		const char* prefixes[] = {U7IREG, GAMEDAT_U7IFIX};
+
+		for (const auto prefix : prefixes) {
+			// Check to see if the file exists before trying to
+			// save it; prevents crash when creating new maps
+			// for existing games
+
+			std::string iname_pmr(map->get_schunk_file_name(prefix, schunk, iname));
+			if (fileExists(iname_pmr)) {
+				SaveToFlex(flex, iname_pmr);
+			} else {
+				flex.empty_object();    // TODO: Get rid of this by making it
+										// redundant.
+			}
 		}
 	}
 }
@@ -349,10 +356,10 @@ void GameDat::save_gamedat(
 	}
 
 	// Count up #files to write.
-	// First map outputs IREG's directly to
+	// First map outputs IREG's and IFIX's directly to
 	// gamedat flex, while all others have a flex
 	// of their own contained in gamedat flex.
-	size_t count = savefiles.size() + 12 * 12 + 2;
+	size_t count = savefiles.size() + 12 * 12 * 2 + 2;
 	for (auto* map : gwin->get_maps()) {
 		if (map) {
 			count++;
@@ -382,12 +389,9 @@ void GameDat::save_gamedat(
 		std::string savefile_pmr(savefile);
 		SaveToFlex(flex, savefile_pmr);
 	}
-	// Now the Ireg's.
-	auto map_buffer = std::pmr::polymorphic_allocator<uint8_t>().allocate(Flex_writer::BufferSize(12 * 12));
+	// Now the Ireg's and IFIX's.
+	auto map_buffer = std::pmr::polymorphic_allocator<uint8_t>().allocate(Flex_writer::BufferSize(12 * 12 * 2));
 
-	std::vector<uint8_t> outbuf;
-	outbuf.reserve(1024 * 512);    // preallocate 512KB for map flex files.144 superchunks
-								   // can be expected to be in this order of size.
 	for (auto* map : gwin->get_maps()) {
 		if (!map) {
 			continue;
@@ -401,7 +405,7 @@ void GameDat::save_gamedat(
 			{
 				char dname[128];
 				map->get_mapped_name(GAMEDAT, dname);
-				Flex_writer mapflex = flex.start_nested_flex(dname, 12 * 12, Flex_header::orig, map_buffer);
+				Flex_writer mapflex = flex.start_nested_flex(dname, 12 * 12 * 2, Flex_header::orig, map_buffer);
 				// Save chunks to nested flex
 				save_chunks_to_flex(map, mapflex);
 			}
@@ -449,7 +453,7 @@ void GameDat::update_save_info(const std::string& fname) {
 	});
 
 	// update existing saveinfo or create a new one
-	auto& saveinfo = it != save_infos.end()?*it:save_infos.emplace_back(std::string(fname));
+	auto& saveinfo = it != save_infos.end() ? *it : save_infos.emplace_back(std::string(fname));
 
 	saveinfo.screenshot_.reset();
 	saveinfo.palette_.reset();
@@ -1671,13 +1675,17 @@ bool GameDat::save_gamedat_zip(
 				continue;
 			}
 			for (int schunk = 0; schunk < 12 * 12; schunk++) {
-				// Check to see if the ireg exists before trying to
+				// Check to see if the files exist before trying to
 				// save it; prevents crash when creating new maps
 				// for existing games
-				std::string iname_pmr(map->get_schunk_file_name(U7IREG, schunk, iname));
-				if (fileExists(iname_pmr)) {
-					if (!Save_level1(zipfile, iname_pmr)) {
-						throw file_write_exception(fname);
+				const char* prefixes[] = {U7IREG, GAMEDAT_U7IFIX};
+
+				for (const auto prefix : prefixes) {
+					map->get_schunk_file_name(prefix, schunk, iname);
+					if (fileExists(iname)) {
+						if (!Save_level1(zipfile, iname)) {
+							throw file_write_exception(fname);
+						}
 					}
 				}
 			}
@@ -1708,13 +1716,17 @@ bool GameDat::save_gamedat_zip(
 				}
 			}
 			for (int schunk = 0; schunk < 12 * 12; schunk++) {
-				// Check to see if the ireg exists before trying to
-				// save it; prevents crash when creating new maps
-				// for existing games
-				std::string iname_pmr(map->get_schunk_file_name(U7IREG, schunk, iname));
-				if (fileExists(iname_pmr)) {
-					if (!Save_level2(zipfile, iname_pmr)) {
-						throw file_write_exception(fname);
+				const char* prefixes[] = {U7IREG, GAMEDAT_U7IFIX};
+
+				for (const auto prefix : prefixes) {
+					// Check to see if the file exists before trying to
+					// save it; prevents crash when creating new maps
+					// for existing games
+					map->get_schunk_file_name(prefix, schunk, iname);
+					if (fileExists(iname)) {
+						if (!Save_level2(zipfile, iname)) {
+							throw file_write_exception(fname);
+						}
 					}
 				}
 			}
