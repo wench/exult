@@ -456,10 +456,10 @@ public:
 				Deleter() {}
 
 				// Constructor for array types
-				Deleter(BlockPoolResource* bpr, size_t array_size) : bpr(bpr), array_size(array_size) {				}
+				Deleter(BlockPoolResource* bpr, size_t array_size) : bpr(bpr), array_size(array_size) {}
 
 				// Constructor for Non array types
-				Deleter(BlockPoolResource* bpr) : bpr(bpr) { 
+				Deleter(BlockPoolResource* bpr) : bpr(bpr) {
 					assert(std::is_array<T>::value == false);
 				}
 
@@ -476,20 +476,20 @@ public:
 			};
 
 			// Make_unique for array type
-			template <typename T, std::enable_if_t<std::is_array<T>::value,bool> =true>
+			template <typename T, std::enable_if_t<std::is_array<T>::value, bool> = true>
 			auto make_unique(std::size_t size) {
 				using Base_T = typename std::remove_all_extents<T>::type;
 				return std::unique_ptr<T, Deleter<T>>(new_array<Base_T>(size, true), {this, size});
 			}
 
-			template <typename T,  std::enable_if_t<std::is_array<T>::value,bool> =true>
+			template <typename T, std::enable_if_t<std::is_array<T>::value, bool> = true>
 			auto make_unique_for_overwrite(std::size_t size) {
 				using Base_T = typename std::remove_all_extents<T>::type;
 				return std::unique_ptr<T, Deleter<T>>(new_array<Base_T>(size, false), {this, size});
 			}
 
 			// Make_unique for non array type
-			template <typename T, typename... Args, std::enable_if_t<!std::is_array<T>::value,bool> =true>
+			template <typename T, typename... Args, std::enable_if_t<!std::is_array<T>::value, bool> = true>
 			auto make_unique(Args&&... args) {
 				return std::unique_ptr<T, Deleter<T>>(new_object<T>(std::forward<Args>(args)...), {this});
 			}
@@ -612,6 +612,9 @@ private:
 			return gamedat_in_memory.pool.make_shared<IFileDataSource>(U7open_in(fname, false));
 		}
 	}
+
+	// Clean gamedat directory deleting files
+	void clean_directory();
 
 	// Explode a savegame into "gamedat".
 	void restore_gamedat(const char* fname);

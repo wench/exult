@@ -92,6 +92,15 @@ using std::time;
 using std::time_t;
 using std::tm;
 
+/*
+ *  List of 'gamedat' files to save (in addition to 'iregxx' and 'ifixXX'):
+ */
+constexpr static const std::array bgsavefiles{GEXULTVER, GNEWGAMEVER, GPALETTE, NPC_DAT,   MONSNPCS,   USEVARS,
+											  USEDAT,    FLAGINIT,    GWINDAT,  GSCHEDULE, NOTEBOOKXML};
+
+constexpr static const std::array sisavefiles{GEXULTVER, GNEWGAMEVER, GPALETTE, NPC_DAT,   MONSNPCS,   USEVARS,
+											  USEDAT,    FLAGINIT,    GWINDAT,  GSCHEDULE, KEYRINGDAT, NOTEBOOKXML};
+
 void GameDat::clear_saveinfos() {
 	if (saveinfo_future.valid()) {
 		save_info_cancel = true;
@@ -180,6 +189,45 @@ void GameDat::restore_flex_files(IDataSource& in, const char* basepath) {
 	}
 }
 
+void GameDat::clean_directory() {
+	// Do it this way instead of deleting everything so we don't try to delete exultserver or other important files that we may
+	// want to put in gamedat for whatever reason
+
+	for (const auto filename : bgsavefiles) {
+		U7remove(filename);
+	}
+	for (const auto filename : sisavefiles) {
+		U7remove(filename);
+	}
+
+	// Remove files not in savefiles arrays
+
+	U7remove(GSCRNSHOT);
+	U7remove(GSAVEINFO);
+	U7remove(IDENTITY);
+
+	FileList filenames;
+	// All IREGs
+	U7ListFiles(U7IREG "*", filenames, true);
+	for (const auto filename : filenames) {
+		U7remove(filename);
+	}
+
+	// All IFIXes
+	filenames.clear();
+	U7ListFiles(GAMEDAT_U7IFIX "*", filenames, true);
+	for (const auto filename : filenames) {
+		U7remove(filename);
+	}
+
+	// All Gamedat Multimap dirs
+	filenames.clear();
+	U7ListFiles("<GAMEDAT>" MULTIMAP_DIR "*", filenames, true);
+	for (const auto filename : filenames) {
+		U7rmdir(filename, true);
+	}
+}
+
 // In gamemgr/modmgr.cc because it is also needed by ES.
 extern string get_game_identity(const char* savename, const string& title);
 
@@ -228,22 +276,7 @@ void GameDat::restore_gamedat(const char* fname    // Name of savegame file.
 		return;
 	}
 
-	U7remove(USEDAT);
-	U7remove(USEVARS);
-	U7remove(U7NBUF_DAT);
-	U7remove(NPC_DAT);
-	U7remove(MONSNPCS);
-	U7remove(FLAGINIT);
-	U7remove(GWINDAT);
-	U7remove(IDENTITY);
-	U7remove(GSCHEDULE);
-	U7remove("<STATIC>/flags.flg");
-	U7remove(GSCRNSHOT);
-	U7remove(GSAVEINFO);
-	U7remove(GNEWGAMEVER);
-	U7remove(GEXULTVER);
-	U7remove(KEYRINGDAT);
-	U7remove(NOTEBOOKXML);
+	clean_directory();
 
 	cout.flush();
 
@@ -259,15 +292,6 @@ void GameDat::restore_gamedat(const char* fname    // Name of savegame file.
 		out.write(static_identity);
 	}
 }
-
-/*
- *  List of 'gamedat' files to save (in addition to 'iregxx' and 'ifixXX'):
- */
-constexpr static const std::array bgsavefiles{GEXULTVER, GNEWGAMEVER, GPALETTE, NPC_DAT,   MONSNPCS,   USEVARS,
-											  USEDAT,    FLAGINIT,    GWINDAT,  GSCHEDULE, NOTEBOOKXML};
-
-constexpr static const std::array sisavefiles{GEXULTVER, GNEWGAMEVER, GPALETTE, NPC_DAT,   MONSNPCS,   USEVARS,
-											  USEDAT,    FLAGINIT,    GWINDAT,  GSCHEDULE, KEYRINGDAT, NOTEBOOKXML};
 
 void GameDat::SaveToFlex(
 		Flex_writer&      flex,
@@ -1346,26 +1370,8 @@ bool GameDat::restore_gamedat_zip(const char* fname    // Name of savegame file.
 		return false;
 	}
 
-	U7mkdir("<GAMEDAT>", 0755);    // Create dir. if not already there. Don't
-	// use GAMEDAT define cause that's got a
-	// trailing slash
-	U7remove(USEDAT);
-	U7remove(USEVARS);
-	U7remove(U7NBUF_DAT);
-	U7remove(NPC_DAT);
-	U7remove(MONSNPCS);
-	U7remove(FLAGINIT);
-	U7remove(GWINDAT);
-	U7remove(IDENTITY);
-	U7remove(GSCHEDULE);
-	U7remove("<STATIC>/flags.flg");
-	U7remove(GSCRNSHOT);
-	U7remove(GSAVEINFO);
-	U7remove(GNEWGAMEVER);
-	U7remove(GEXULTVER);
-	U7remove(KEYRINGDAT);
-	U7remove(NOTEBOOKXML);
-	U7remove(GPALETTE);
+	U7mkdir("<GAMEDAT>", 0755);
+	clean_directory();
 
 	cout.flush();
 
