@@ -75,6 +75,7 @@
 #define PATCH_EXULTMSG_ES    "<PATCH>/exultmsg_es.txt"
 #define U7IFIX               "<STATIC>/u7ifix"
 #define PATCH_U7IFIX         "<PATCH>/u7ifix"
+#define GAMEDAT_U7IFIX       "<GAMEDAT>/u7ifix"
 #define U7IREG               "<GAMEDAT>/u7ireg"
 #define MULTIMAP_DIR         "/map"
 #define PALETTES_FLX         "<STATIC>/palettes.flx"
