@@ -1573,7 +1573,7 @@ bool GameDat::Save_level2(zipFile& zipfile, const std::string& fname, bool requi
 	// Must be platform independent
 	auto* ptr = gamedat_in_memory.save_buffer.get();
 	little_endian::Write4(ptr, size);
-	if (zipWriteInFileInZip(zipfile, ptr, 4) != ZIP_OK) {
+	if (zipWriteInFileInZip(zipfile, ptr - 4, 4) != ZIP_OK) {
 		return false;
 	}
 
