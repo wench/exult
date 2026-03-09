@@ -459,7 +459,7 @@ void GameDat::DeleteSaveGame(const std::string& fname) {
 		int itype = static_cast<int>(it->type);
 
 		// Update first_free if needed
-		if (itype > 0 && itype < SaveInfo::NUM_TYPES && first_free[itype] > it->num) {
+		if (itype >= 0 && itype < SaveInfo::NUM_TYPES && first_free[itype] > it->num) {
 			first_free[itype] = it->num;
 		}
 
