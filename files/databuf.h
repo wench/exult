@@ -102,6 +102,8 @@ public:
 			str += character;
 		}
 	}
+
+	virtual void close() {}
 };
 
 /**
@@ -261,6 +263,7 @@ public:
 			size = get_file_size(*in);
 		}
 	}
+
 	explicit IFileDataSource(std::unique_ptr<std::istream>&& tomove) : IStreamDataSource(nullptr), pFin(std::move(tomove)) {
 		if (pFin) {
 			in = pFin.get();
@@ -268,6 +271,14 @@ public:
 				size = get_file_size(*in);
 			}
 		}
+	}
+
+	void close() final {
+		if (auto fin = dynamic_cast<std::ifstream*>(in)) {
+			fin->close();
+		}
+		pFin.reset();
+		in = nullptr;
 	}
 };
 
@@ -525,6 +536,8 @@ public:
 	operator bool() const {
 		return good();
 	}
+
+	virtual void close() {}
 };
 
 /**
@@ -642,6 +655,14 @@ public:
 		if (fout) {
 			out = fout.get();
 		}
+	}
+
+	void close() final {
+		if (auto fout = dynamic_cast<std::ofstream*>(out)) {
+			fout->close();
+		}
+		fout.reset();
+		out = nullptr;
 	}
 };
 
@@ -905,7 +926,9 @@ protected:
 
 public:
 	ODataSourceODataSource() : ds(nullptr) {}
-	ODataSourceODataSource(ODataSource*ds):ds(ds) {}
+
+	ODataSourceODataSource(ODataSource* ds) : ds(ds) {}
+
 	bool good() const final {
 		return ds && ds->good();
 	}
@@ -993,18 +1016,25 @@ public:
 		}
 		return ds->getPos();
 	}
+
+	void close() final {
+		if (!ds) {
+			return;
+		}
+
+		ds->close();
+		ds = nullptr;
+	}
 };
 
 class ODataSourceFileOrVector : public ODataSourceODataSource {
 	OVectorDataSource vec_ds;
-	OFileDataSource                             file_ds;
+	OFileDataSource   file_ds;
 
 public:
 	ODataSourceFileOrVector() : ODataSourceODataSource(&vec_ds) {}
 
-	ODataSourceFileOrVector(
-			std::vector<unsigned char>*            vec,
-			const char *fname)
+	ODataSourceFileOrVector(std::vector<unsigned char>* vec, const char* fname)
 			: vec_ds(vec), file_ds(vec ? nullptr : U7open_out(fname, false)) {
 		if (vec) {
 			ds = &vec_ds;
@@ -1028,14 +1058,13 @@ public:
 
 private:
 	class streambuf : public std::basic_streambuf<char_type, traits_type> {
-
 		std::unique_ptr<ODataSource> owned;
-		ODataSource* ds;
+		ODataSource*                 ds;
 
 	public:
 		streambuf(ODataSource* ds) : std::basic_streambuf<char_type, traits_type>(), ds(ds) {}
 
-		streambuf(std::unique_ptr<ODataSource> &&tomove)
+		streambuf(std::unique_ptr<ODataSource>&& tomove)
 				: std::basic_streambuf<char_type, traits_type>(), owned(std::move(tomove)), ds(owned.get()) {}
 
 		std::streamsize xsputn(const char_type* s, std::streamsize count) override {
@@ -1110,7 +1139,7 @@ public:
 		init(&dsbuf);
 	}
 
-	explicit ODataSource_ostream(std::unique_ptr<ODataSource> &&tomove) : std::ostream(nullptr), dsbuf(std::move(tomove)) {
+	explicit ODataSource_ostream(std::unique_ptr<ODataSource>&& tomove) : std::ostream(nullptr), dsbuf(std::move(tomove)) {
 		init(&dsbuf);
 	}
 };
