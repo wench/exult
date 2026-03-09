@@ -435,6 +435,10 @@ void GameDat::save_gamedat(
 			}
 		}
 	}
+// Finish writing the flex and close the file. Must do this before calling update_save_info
+	flex.flush();
+	out.close();
+
 	// Done with gamedat in memory so disable it before reading save infos
 	gamedat_in_memory.disable();
 
