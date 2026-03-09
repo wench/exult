@@ -435,7 +435,7 @@ void GameDat::save_gamedat(
 			}
 		}
 	}
-// Finish writing the flex and close the file. Must do this before calling update_save_info
+	// Finish writing the flex and close the file. Must do this before calling update_save_info
 	flex.flush();
 	out.close();
 
@@ -677,11 +677,6 @@ void GameDat::read_save_infos() {
 	this->save_mask = save_mask;
 	save_infos.clear();
 
-	// Sort filenames
-	if (filenames.size()) {
-		std::sort(filenames.begin(), filenames.end());
-	}
-
 	// Setup basic details
 	save_infos.reserve(filenames.size());
 	for (auto& filename : filenames) {
@@ -725,6 +720,13 @@ void GameDat::sort_save_infos() {
 	std::array<SaveInfo*, SaveInfo::NUM_TYPES> oldestinfo;
 	oldestinfo.fill(nullptr);
 
+	// Sort by Num
+	if (!save_info_cancel && save_infos.size()) {
+		std::sort(save_infos.begin(), save_infos.end(), [](const auto& left, const auto& right) {
+			return left.num < right.num;
+		});
+	}
+
 	// Calculate oldest and first free
 	for (auto& saveinfo : save_infos) {
 		// Handling of regular savegame with a savegame number
@@ -759,7 +761,7 @@ void GameDat::sort_save_infos() {
 		}
 	}
 
-	// Sort infos
+	// Final Sort of loaded saveinfos
 	if (!save_info_cancel && save_infos.size()) {
 		std::sort(save_infos.begin(), save_infos.end());
 	}
