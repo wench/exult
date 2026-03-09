@@ -441,7 +441,7 @@ void GameDat::save_gamedat(
 	update_save_info(fname);
 }
 
-void GameDat::DeleteSaveGame(const std::string_view fname) {
+void GameDat::DeleteSaveGame(std::string_view fname) {
 	U7remove(fname);
 
 	// Update save_info
@@ -468,7 +468,7 @@ void GameDat::DeleteSaveGame(const std::string_view fname) {
 	}
 }
 
-void GameDat::update_save_info(const std::string_view fname) {
+void GameDat::update_save_info(std::string_view fname) {
 	// Update save_info
 	std::lock_guard lock(save_info_mutex);
 
