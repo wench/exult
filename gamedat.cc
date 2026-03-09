@@ -688,8 +688,14 @@ void GameDat::read_save_infos() {
 		if (save_info_cancel) {
 			return;
 		}
+		auto base_filename = get_filename_from_path(filename);
 
-		save_infos.emplace_back(std::string(filename));
+		std::string exult_filename;
+		exult_filename.reserve(base_filename.size() + 11);
+		exult_filename += "<SAVEGAME>/";
+		exult_filename += base_filename;
+
+		save_infos.emplace_back(std::move(exult_filename));
 	}
 
 	// Read and cache all details
