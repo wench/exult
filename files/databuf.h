@@ -102,6 +102,8 @@ public:
 			str += character;
 		}
 	}
+
+	virtual void close() {}
 };
 
 /**
@@ -269,6 +271,14 @@ public:
 				size = get_file_size(*in);
 			}
 		}
+	}
+
+	void close() final {
+		if (auto fin = dynamic_cast<std::ifstream*>(in)) {
+			fin->close();
+		}
+		pFin.reset();
+		in = nullptr;
 	}
 };
 
@@ -526,6 +536,8 @@ public:
 	operator bool() const {
 		return good();
 	}
+
+	virtual void close() {}
 };
 
 /**
@@ -648,6 +660,14 @@ public:
 		if (fout) {
 			out = fout.get();
 		}
+	}
+
+	void close() final {
+		if (auto fout = dynamic_cast<std::ofstream*>(out)) {
+			fout->close();
+		}
+		fout.reset();
+		out = nullptr;
 	}
 };
 
@@ -997,6 +1017,15 @@ public:
 			return 0;
 		}
 		return ds->getPos();
+	}
+
+	void close() final {
+		if (!ds) {
+			return;
+		}
+
+		ds->close();
+		ds = nullptr;
 	}
 };
 
