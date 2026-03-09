@@ -725,7 +725,7 @@ public:
 
 	// Delete a savegame file. This will invalidate any existing SaveInfo
 	// vectors
-	void DeleteSaveGame(const std::string_view fname);
-	void update_save_info(const std::string_view fname);
+	void DeleteSaveGame(std::string_view fname);
+	void update_save_info(std::string_view fname);
 };
 #endif    // SAVEINFO_H_INCLUDED
