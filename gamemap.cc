@@ -535,22 +535,33 @@ void Game_map::write_static() {
  *  Output: Errors reported.
  */
 
-void Game_map::write_ifix_objects(int schunk    // Superchunk # (0-143).
-) {
-	char            fname[128];    // Set up name.
-	OFileDataSource ifix(get_schunk_file_name(PATCH_U7IFIX, schunk, fname));
+void Game_map::write_ifix_objects(
+		int  schunk,    // Superchunk # (0-143).
+		bool only_modified, bool gamedat) {
+	if (schunk < 0 || schunk > 143 || (gamedat && !ifix_in_gamedat[schunk])) {
+		return;
+	}
+	char fname[128];    // Set up name.
+	get_schunk_file_name(gamedat ? GAMEDAT_U7IFIX : PATCH_U7IFIX, schunk, fname);
+
+	if (only_modified && !schunk_modified[schunk] && U7exists(fname)) {
+		// Don't overrwrite existing files if schunk is not modified
+		return;
+	}
+	auto ifix = GameDat::get()->Open_ODataSource(fname, !gamedat);
 	// +++++Use game title.
 	const int count = c_chunks_per_schunk * c_chunks_per_schunk;
 
 	// Always save as V2 to support 8 bit lift
 	bool        v2 = true;
-	Flex_writer writer(ifix, "Exult", count, Flex_header::exult_v2);
+	Flex_writer writer(ifix, "Exult IFIX", count, Flex_header::exult_v2);
 	const int   scy = 16 * (schunk / 12);    // Get abs. chunk coords.
 	const int   scx = 16 * (schunk % 12);
 	// Go through chunks.
 	for (int cy = 0; cy < 16; cy++) {
 		for (int cx = 0; cx < 16; cx++) {
-			writer.write_object(get_chunk(scx + cx, scy + cy), v2);
+			Map_chunk* chunk = get_chunk(scx + cx, scy + cy);
+			writer.write_object(chunk, v2);
 		}
 	}
 	schunk_modified[schunk] = false;
@@ -563,9 +574,15 @@ void Game_map::write_ifix_objects(int schunk    // Superchunk # (0-143).
 void Game_map::get_ifix_objects(int schunk    // Superchunk # (0-143).
 ) {
 	char fname[128];    // Set up name.
-	if (!is_system_path_defined("<PATCH>") ||
-		// First check for patch.
-		!U7exists(get_schunk_file_name(PATCH_U7IFIX, schunk, fname))) {
+
+	// First check gamedat
+	if (U7exists(get_schunk_file_name(GAMEDAT_U7IFIX, schunk, fname))) {
+		ifix_in_gamedat[schunk] = true;
+	}
+
+	// Then check patch
+	else if (!is_system_path_defined("<PATCH>") || !U7exists(get_schunk_file_name(PATCH_U7IFIX, schunk, fname))) {
+		// Finally default to static
 		get_schunk_file_name(U7IFIX, schunk, fname);
 	}
 	IFileDataSource ifix(fname);
@@ -726,7 +743,7 @@ int Game_map::write_string(
  *  Write modified 'u7ireg' files.
  */
 
-void Game_map::write_ireg() {
+void Game_map::write_gamedat_objs() {
 	// Write each superchunk to Iregxx.
 	for (int schunk = 0; schunk < c_num_schunks * c_num_schunks; schunk++) {
 		// Only write if we have something to write.
@@ -746,6 +763,7 @@ void Game_map::write_ireg() {
 		} else {
 			// It's active
 			write_ireg_objects(schunk, &ireg_ds);
+			write_ifix_objects(schunk, true, true);
 			ireg_ds.flush();
 		}
 	}

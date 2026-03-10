@@ -299,9 +299,13 @@ public:
 
 	bool writeMemorytoDisk();
 
+	ODataSourceFileOrVector Open_ODataSource(
+			const std::string& fname, bool fileonly = false) {
+		return ODataSourceFileOrVector(fileonly ? nullptr : get_memory_file(fname, true), fname.c_str());
+	}
 
-	auto Open_ODataSource(const char* fname) {
-		return ODataSourceFileOrVector(get_memory_file(fname, true), fname);
+	auto Open_ODataSource(const char* fname, bool fileonly = false) {
+		return Open_ODataSource(std::string(fname), fileonly);
 	}
 
 	std::unique_ptr<std::ostream> Open_ostream(const char* fname) {
