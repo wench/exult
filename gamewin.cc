@@ -1374,7 +1374,7 @@ void Game_window::write(bool nopaint) {
 	}
 	for (auto* map : maps) {
 		if (map) {
-			map->write_ireg();    // Write ireg files.
+			map->write_gamedat_objs();    // Write ireg files.
 		}
 	}
 	write_npcs();              // Write out npc.dat.
