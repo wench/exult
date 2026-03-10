@@ -75,6 +75,7 @@ class Game_map {
 	std::array<std::vector<unsigned char>, 144> schunk_cache;
 	int                                         caching_out;    // >0 in 'cache_out_schunk'.
 	std::unique_ptr<Map_patch_collection>       map_patches;
+	bool                                        ifix_in_gamedat[144];
 
 	Map_chunk*            create_chunk(int cx, int cy);
 	static Chunk_terrain* read_terrain(int chunk_num);
@@ -110,6 +111,13 @@ public:
 
 	inline Map_patch_collection& get_map_patches() {
 		return *map_patches;
+	}
+
+	void set_ifix_in_gamedat(int cx, int cy) {
+		if (cx < 0 || cy < 0 || cx >= c_num_schunks || cy >= c_num_schunks) {
+			return;
+		}
+		ifix_in_gamedat[cx + cy * c_num_schunks];
 	}
 
 	void set_map_modified() {
@@ -194,7 +202,7 @@ public:
 	static void write_chunk_terrains();
 	void        write_static();    // Write to 'static' directory.
 	// Write (static) map objects.
-	void write_ifix_objects(int schunk);
+	void write_ifix_objects(int schunk, bool only_modified = false, bool gamedat = false);
 	// Get "ifix" objects for a superchunk.
 	void get_ifix_objects(int schunk);
 	// Get "ifix" objs. for given chunk.
@@ -203,7 +211,7 @@ public:
 	// Write scheduled script for obj.
 	static void write_scheduled(ODataSource* ireg, Game_object* obj, bool write_mark = false);
 	static int  write_string(ODataSource* ireg, const char* str);
-	void        write_ireg();    // Write modified ireg files.
+	void        write_gamedat_objs();    // Write modified ireg files.
 	// Write moveable objects to file.
 	void write_ireg_objects(int schunk);
 	// Write moveable objects to datasource.

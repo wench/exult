@@ -580,12 +580,13 @@ public:
 
 	bool writeMemorytoDisk();
 
-	ODataSourceFileOrVector<std::pmr::polymorphic_allocator> Open_ODataSource(const std::pmr::string& fname) {
-		return ODataSourceFileOrVector<std::pmr::polymorphic_allocator>(get_memory_file(fname, true), fname);
+	ODataSourceFileOrVector<std::pmr::polymorphic_allocator> Open_ODataSource(
+			const std::pmr::string& fname, bool fileonly = false) {
+		return ODataSourceFileOrVector<std::pmr::polymorphic_allocator>(fileonly ? nullptr : get_memory_file(fname, true), fname);
 	}
 
-	auto Open_ODataSource(const char* fname) {
-		return Open_ODataSource(std::pmr::string(fname));
+	auto Open_ODataSource(const char* fname, bool fileonly = false) {
+		return Open_ODataSource(std::pmr::string(fname), fileonly);
 	}
 
 	std::shared_ptr<std::ostream> Open_ostream(const std::pmr::string& fname) {
