@@ -186,6 +186,7 @@ public:
 
 	// Get desired terrain.
 	static Chunk_terrain* get_terrain(int tnum) {
+		assert(tnum >= 0 && static_cast<unsigned>(tnum) < chunk_terrains->size());
 		Chunk_terrain* ter = (*chunk_terrains)[tnum];
 		return ter ? ter : read_terrain(tnum);
 	}
