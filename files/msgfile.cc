@@ -69,7 +69,7 @@ static const std::unordered_map<std::string_view, std::string> utf8_to_font_spec
 		{"\xC3\x82", "\x0a"}, // Â (A circumflex uppercase)
 		{"\xC3\xAB", "\x0b"}, // ë (e umlaut)
 		{"\xC3\xA8", "\x0c"}, // è (e grave)
-		{"\xC3\x88", "\x1d"}, // È (E grave uppercase)
+		{"\xC3\x88", "\x0d"}, // È (E grave uppercase)
 		{"\xC3\xAF", "\x0e"}, // ï (i umlaut)
 		{"\xC3\xAE", "\x0f"}, // î (i circumflex)
 		{"\xC3\xAC", "\x10"}, // ì (i grave)
