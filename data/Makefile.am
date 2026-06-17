@@ -307,7 +307,7 @@ fonts_serif.vga: $(expack) $(EXULT_FONTS_SERIF_VGA_OBJECTS)
 shortcutbar.vga:  $(expack) $(EXULT_SHORTCUTBAR_VGA_OBJECTS)
 	$(expack) -i $(srcdir)/shortcutbar.in
 
-exult.flx: $(expack) $(EXULT_FLX_OBJECTS) fonts_original.vga fonts_serif.vga
+exult.flx: $(expack) $(EXULT_FLX_OBJECTS) fonts_original.vga fonts_serif.vga shortcutbar.vga
 	$(expack) -i $(srcdir)/flx.in
 
 exult_bg.flx: $(expack) $(EXULT_BG_FLX_OBJECTS) bg/bg_paperdol.vga bg/bg_mr_faces.vga bg/introsfx_mt32.flx bg/introsfx_sb.flx
