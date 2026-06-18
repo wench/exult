@@ -129,7 +129,7 @@ long get_file_size(string& fname) {
 		auto pFin = U7open_in(fname.c_str(), is_text_file(fname));
 		if (!pFin) {
 			cerr << "Failed to open " << fname << endl;
-			return 0;
+			exit(1);
 		}
 		auto& fin = *pFin;
 		// Lets avoid undefined behavior. See
@@ -138,7 +138,7 @@ long get_file_size(string& fname) {
 		return fin.gcount();
 	} catch (const std::exception& err) {
 		cerr << err.what() << endl;
-		return 0;
+		exit(1);
 	}
 }
 
