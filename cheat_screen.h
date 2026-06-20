@@ -48,11 +48,11 @@ class Font;
 class Game_clock;
 class Actor;
 
+//#define CHEAT_SCREEN_TEST_MOBILE 1
+
 class CheatScreen {
 	Actor*             grabbed = nullptr;
-	static const char* schedules[33];
-	static const char* flag_names[64];
-	static const char* alignments[4];
+
 
 	std::vector<std::string> global_flag_names;
 	bool                     global_flag_names_loaded = false;
