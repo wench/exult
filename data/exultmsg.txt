@@ -765,3 +765,191 @@
 0x8B6:   ready_type: 0x
 0x8B7:  3d: 
 0x8B8: No Shape
+
+#cheat_screen_strings.h
+0x900: Select->
+0x901:_
+#key names
+0x908:ESC
+0x909:???
+0x90A:Tab
+0x90B:RET
+# Prompt Messages
+0x910:Enter Command.
+0x911:Hit a key.
+0x912:Not yet available.
+0x913:Invalid NPC.
+0x914:Invalid Object.
+0x915:Invalid Command.
+0x916:Cancelled
+0x917:Input Required
+0x918:Invalid Value
+0x919:Which NPC?
+0x91A:Enter NPC number
+0x91B:To Cancel
+0x91C:Clock Set.
+0x91D:Invalid Time.
+0x91E:Invalid Shape.
+0x91F:Item Created.
+0x920:Shape Set.
+0x922:Name Changed.
+0x923:Wrong shape file. Must be SHAPES.VGA.
+0x924:Enter Value.
+0x925:Enter Minute.
+0x926:Enter Hour.
+0x927:Enter Day.
+0x928:Enter Shape
+0x929:Enter Activity
+0x92A:Enter X Coord.
+0x92B:Enter Y Coord.
+0x92C:Enter Z Coord.
+0x92D:Enter Lift.
+0x92E:Enter Global Flag
+0x92F:Enter NPC Flag
+0x930:Enter Temperature
+0x931:Enter Latitude.
+0x932:Enter Longitude.
+0x934:Enter a new Name...
+0x935:Latitude [N]orth or [S]outh?
+0x936:Longitude [W]est or [E]ast?
+0x937:Pick Object from World
+0x938:Pick from World
+# Schedules - 33 INDICES 0x940 - 0x960
+0x940:Combat
+0x941:Hor. Pace
+0x942:Ver. Pace
+0x943:Talk
+0x944:Dance
+0x945:Eat
+0x946:Farm
+0x947:Tend Shop
+0x948:Miner
+0x949:Hound
+0x94A:Stand
+0x94B:Loiter
+0x94C:Wander
+0x94D:Blacksmith
+0x94E:Sleep
+0x94F:Wait
+0x950:Major Sit
+0x951:Graze
+0x952:Bake
+0x953:Sew
+0x954:Shy
+0x955:Lab
+0x956:Thief
+0x957:Waiter
+0x958:Special
+0x959:Kid Games
+0x95A:Eat at Inn
+0x95B:Duel
+0x95C:Preach
+0x95D:Patrol
+0x95E:Desk Work
+0x95F:Follow Avt
+0x960:Move2Sched
+0x961:Street Maintenance
+0x962:Arrest Avatar
+
+
+# NPC flags 64 indces 0x970 - 0x9AF (some empty)
+# This all have
+0x970:: invisible
+0x971:: asleep
+0x972:: charmed
+0x973:: cursed
+0x974:: dead
+0x976:: in_party
+#0X975:
+0x977:: paralyzed
+
+0x978:: poisoned
+0x979:: protection
+0x97A:: on_moving_barge
+0x97B:: okay_to_take
+0x97C:: might
+0x97D:: immunities
+0x97E:: cant_die
+0x97F:: in_action
+
+0x980:: dont_move/bg_dont_render
+0x981:: si_on_moving_barge
+0x982:: is_temporary
+#0x983:
+0x984:: sailor
+0x985:: okay_to_land
+0x986:: dont_render/bg_dont_move
+0x987:: in_dungeon
+
+#0x988:
+0x989:: confused
+0x98A:: in_motion
+#0x98B:
+0x98C:: met
+0x98D:: tournament
+0x98E:: si_zombie
+0x98F:: no_spell_casting
+
+0x990:: polymorph
+0x991:: tattooed
+0x992:: read
+0x993:: petra
+0x994:: si_lizard_king
+0x995:: freeze
+0x996:: naked
+
+
+# Alignments - 4 Indices 0x9B0 - 0x9B3
+0x9B0:Neutral
+0x9B1:Good
+0x9B2:Evil
+0x9B3:Chaotic
+
+#Menu Item Labels
+# Note Most menu items use the first character as the key binding. 
+# Only characters that map to a valid SDK_Keycode will work
+# This Means only keys on a US Keyboard.
+# Accented or shifted characters will not work.
+# For convienience both uppercase and lowercase letters will work
+# Menu items bound to arrow keys 
+# can not have their key bindings changed here
+#Business Menu 
+0x9B8: Set
+0x9B9: location
+0x9BA: Clear
+0x9BB:Set Current Activity
+0x9BC:Revert
+# Root Menu
+0x9E0:Paperdolls..
+0x9E1:God Mode....
+0x9E2:Wizard Mode.
+0x9E3:Infravision.
+0x9E4:Hack Mover..
+0x9E5:Eggs Visible
+0x9E6:Set Time    
+0x9E7:NPC Tool    
+0x9E8:Flag Modifier
+0x9E9:Teleport
+0x9EA:Time Rate: 
+#NPC Menu
+0x9F0:Business Activity
+0x9F1:ChangeShape
+0x9F2:Exprience
+0x9F3:Npc flags
+0x9F4:1 Name
+0x9F5:Stats
+0x9F6:2 Training Points
+0x9F7:Teleport to NPC
+0x9F8:Palette Effect
+0x9F9:Walk to Avatar
+0x9FA: Change NPC
+0x9FB:Scroll NPCs
+#NPCStatsMenu
+0xA00:Dexterity....
+0xA01:Food Level...
+0xA02:Intellicence.
+0xA03:Strength.....
+0xA04:Combat Skill.
+0xA05:Hit Points...
+0xA06:Magic Points.
+0xA07:Vana Level...
