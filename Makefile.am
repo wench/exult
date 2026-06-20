@@ -41,6 +41,7 @@ EXULTSOURCES =	\
 	cheat.cc	\
 	cheat.h		\
 	cheat_screen.cc	\
+	cheat_screen_actors.cc \
 	cheat_screen.h	\
 	cheat_screen_strings.h	\
 	combat.cc	\
