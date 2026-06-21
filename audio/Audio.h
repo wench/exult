@@ -52,7 +52,8 @@ class MyMidiPlayer;
 class SFX_cached;
 class Tile_coord;
 
-#define MAX_SOUND_FALLOFF 24
+#define MAX_SOUND_FALLOFF    24
+#define SOUND_HEIGHT_FALLOFF 8
 
 /*
  *	This is a resource-management class for SFX. Maybe make it a

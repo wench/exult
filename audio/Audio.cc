@@ -773,6 +773,14 @@ void Audio::get_2d_position_for_tile(const Tile_coord& tile, int& distance, int&
 	// distance = slow_sqrt(sqr_dist) * 256 / MAX_SOUND_FALLOFF;
 	distance = sqr_dist * 256 / (MAX_SOUND_FALLOFF * MAX_SOUND_FALLOFF);
 
+	// The z-Level needs to be factored in as well, but with a lesser falloff.
+	if (apos.tz > 0) {
+		distance += apos.tz * SOUND_HEIGHT_FALLOFF;
+		if (distance > 256) {
+			distance = 256;
+		}
+	}
+
 	balance = (Tile_coord::delta(apos.tx, tile.tx) * 2 - tile.tz - apos.tz) * 32 / 5;
 }
 
