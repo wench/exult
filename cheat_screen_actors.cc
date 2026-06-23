@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2025  The Exult Team
+ *  Copyright (C) 2000-2026  The Exult Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,11 +20,6 @@
 #	include <config.h>
 #endif
 
-// Disable the gcc warning because we cannot fix it in SDL's headers
-#if defined(__GNUC__)
-#	pragma GCC diagnostic push
-#	pragma GCC diagnostic ignored "-Wold-style-cast"
-#endif
 #include "actors.h"
 #include "cheat.h"
 #include "cheat_screen.h"
@@ -42,10 +37,27 @@
 #include <algorithm>
 #include <cstring>
 
-// renable the warning that was disabled above
-#if defined(__GNUC__)
-#	pragma GCC diagnostic pop
-#endif
+
+
+CheatScreen::InputHandlers::NPC::NPC(bool empty_allowed, std::string&& promptmsg)
+		: GameObject(empty_allowed, std::move(promptmsg)) {
+	hotspots.clear();
+	const char* label = Strings::Pick_NPC_from_World;
+	hotspots.emplace_back(0, 0, label[0], label + 1);
+}
+
+CheatScreen::InputHandlers::NPC::NPC(bool empty_allowed) : NPC(empty_allowed, Strings::WHICH_NPC) {}
+
+void CheatScreen::InputHandlers::NPC::Parse() {
+	if (!actor) {
+		GameObject::Parse();
+		actor = dynamic_cast<Actor*>(object);
+	}
+
+	if (!actor) {
+		throw MenuCommandException{Strings::INVALID_NPC, false};
+	}
+}
 
 //
 // DISPLAYS

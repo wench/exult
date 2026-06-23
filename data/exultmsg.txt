@@ -769,6 +769,7 @@
 #cheat_screen_strings.h
 0x900: Select->
 0x901:_
+0x902: Exit
 #key names
 0x908:ESC
 0x909:???
