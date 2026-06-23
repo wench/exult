@@ -224,6 +224,28 @@ struct StringsBase {
 		virtual TReturn operator()(unsigned offset = 0) const {
 			return operator[](offset);
 		}
+		static bool isempty(const char*str) {
+			return !str || !*str;
+		}
+		static bool isempty(const std::string &str) {
+			return str.empty();
+		}
+		static bool isempty(const std::string_view &str) {
+			return str.empty();
+		}
+
+
+		TReturn GetNotEmpty(unsigned offset, TReturn def = "") const
+		{
+			TReturn result = operator[](offset);
+
+			return isempty(result) ? def : result;
+		}
+
+		TReturn GetNotEmpty(TReturn def = "",unsigned offset=0) const{
+			return GetNotEmpty(offset, def);
+
+		}
 	};
 
 	// Alias of String that return std::string instead of const char *
