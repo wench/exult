@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2025  The Exult Team
+ *  Copyright (C) 2000-2026  The Exult Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,17 +20,13 @@
 #	include <config.h>
 #endif
 
-// Disable the gcc warning because we cannot fix it in SDL's headers
-#if defined(__GNUC__)
-#	pragma GCC diagnostic push
-#	pragma GCC diagnostic ignored "-Wold-style-cast"
-#endif
 #include "cheat_screen.h"
 
 #include "Configuration.h"
 #include "Gump_manager.h"
 #include "actors.h"
 #include "cheat.h"
+#include "cheat_screen_strings.h"
 #include "chunks.h"
 #include "exult.h"
 #include "files/U7file.h"    // IWYU pragma: keep
@@ -56,12 +52,8 @@
 #include <algorithm>
 #include <cstring>
 
-static const SDL_MouseID EXSDL_TOUCH_MOUSEID = SDL_TOUCH_MOUSEID;
-
-// renable the warning that was disabled above
-#if defined(__GNUC__)
-#	pragma GCC diagnostic pop
-#endif
+static const SDL_MouseID EXSDL_TOUCH_MOUSEID  = SDL_TOUCH_MOUSEID;
+CheatScreen*             CheatScreen::cscreen = nullptr;
 
 int CheatScreen::Get_highest_map() {
 	if (highest_map != INT_MIN) {
@@ -77,7 +69,7 @@ int CheatScreen::Get_highest_map() {
 }
 
 void CheatScreen::show_screen() {
-	gwin                                 = Game_window::get_instance();
+	cscreen                              = this;
 	ibuf                                 = gwin->get_win()->get_ib8();
 	const str_int_pair& pal_tuple_static = game->get_resource("palettes/0");
 	const str_int_pair& pal_tuple_patch  = game->get_resource("palettes/patch/0");
@@ -85,12 +77,14 @@ void CheatScreen::show_screen() {
 
 	// init fontcolor transform table, default does nothing
 	for (size_t i = 0; i < std::size(fontcolor.colors); i++) {
-		fontcolor.colors[i] = i;
+		fontcolor.colors[i]  = i;
+		fontcolor2.colors[i] = i;
 	}
 
 	// Try to use SMALL_BLACK_FONT and Remap black to white in fontcolor
-	font                = fontManager.get_font("SMALL_BLACK_FONT");
-	fontcolor.colors[0] = pal.find_color(256, 256, 256);
+	font                 = fontManager.get_font("SMALL_BLACK_FONT");
+	fontcolor.colors[0]  = pal.find_color(256, 256, 256);
+	fontcolor2.colors[0] = pal.find_color(256, 0, 0);
 
 	if (!font) {
 		// reset fontcolor black so it maps to black
@@ -177,6 +171,359 @@ void CheatScreen::show_screen() {
 		if (SDL_TextInputActive(window)) {
 			SDL_StopTextInput(window);
 		}
+	}
+}
+
+const char* CheatScreen::getKeyName(SDL_Keycode keycode) {
+	switch (keycode) {
+	case SDLK_UNKNOWN:
+		return "";
+
+	case SDLK_ESCAPE:
+		return Strings::ESC;
+
+	case SDLK_TAB:
+		return Strings::TAB;
+
+	case SDLK_RETURN:
+		return Strings::RET;
+
+		// Using Macro for Function Keys becasue the keycodes for them aren't cobsecutive
+#define F_KEY_CASE(n) \
+	case SDLK_F##n:   \
+		return "F" #n
+
+		F_KEY_CASE(1);
+		F_KEY_CASE(2);
+		F_KEY_CASE(3);
+		F_KEY_CASE(4);
+		F_KEY_CASE(5);
+		F_KEY_CASE(6);
+		F_KEY_CASE(7);
+		F_KEY_CASE(8);
+		F_KEY_CASE(9);
+		F_KEY_CASE(10);
+		F_KEY_CASE(11);
+		F_KEY_CASE(12);
+
+		F_KEY_CASE(13);
+		F_KEY_CASE(14);
+		F_KEY_CASE(15);
+		F_KEY_CASE(16);
+		F_KEY_CASE(17);
+		F_KEY_CASE(18);
+		F_KEY_CASE(19);
+		F_KEY_CASE(20);
+		F_KEY_CASE(21);
+		F_KEY_CASE(22);
+		F_KEY_CASE(23);
+		F_KEY_CASE(24);
+
+#undef F_KEY_CASE
+	default:
+		// Get rid of the scancode bit
+		keycode &= ~SDLK_SCANCODE_MASK;
+
+		if (keycode < 0x1000) {
+			// Use a static array for each key name
+			static char names[0x1000][4] = {};
+
+			// only if not already set
+			if (!names[keycode][0]) {
+				// Keycode is an ASCII Character
+				if (keycode < 128 && std::isprint(keycode)) {
+					names[keycode][0] = std::toupper(keycode);
+					names[keycode][1] = 0;
+				}
+				// not ascii so output 3 digit hexcode
+				else {
+					for (size_t i = 0; i < 4; i++) {
+						int  d                = (keycode >> i * 4) & 0xf;
+						char c                = d + (d >= 0xA ? 'A' : '0');
+						names[keycode][3 - i] = c;
+					}
+					names[keycode][3] = 0;
+				}
+			}
+			return names[keycode];
+		}
+	}
+	return Strings::UNKNOWNKEYNAME;
+}
+
+//
+// Input Handlers
+//
+
+// Parse the input , returns false on error
+void CheatScreen::InputHandler::Parse() {
+	if (!input[0]) {
+		if (!empty_allowed) {
+			throw MenuCommandException{Strings::INPUT_REQUIRED};
+		} else {
+			was_empty = true;
+		}
+	}
+}
+
+void CheatScreen::InputHandler::ArrangeHotspots(int x, int y, unsigned lines) {
+	// If only one and it would fit put it on the buttom line
+	if (hotspots.size() == 1 && x <= (320 - hotspots.back().getWidth())) {
+		auto& hs = hotspots.back();
+		hs.x     = x;
+		hs.y     = y + 9 * (lines - 1);
+	}
+	// One per line right align to edge of screen
+	else if (lines >= hotspots.size()) {
+		for (auto& hs : hotspots) {
+			hs.x = 320 - 8 - hs.getWidth();
+			hs.y = y;
+			y += 9;
+		}
+	} else {    // put them all on 1 line
+		for (auto& hs : hotspots) {
+			hs.x = x;
+			hs.y = y;
+			x += hs.getWidth() + 8;
+		}
+	}
+}
+
+int CheatScreen::InputHandler::PaintPrompt(int x, int y, SDL_Keycode lastkey) {
+	auto  font      = cscreen->font;
+	auto  ibuf      = cscreen->ibuf;
+	auto& fontcolor = cscreen->fontcolor;
+	int   offset    = font->paint_text_fixedwidth(ibuf, Strings::SELECT, x, y, 8, fontcolor.colors);
+	if (curlen) {
+		offset += font->paint_text_fixedwidth(ibuf, input, curlen, x + offset, y, 8, fontcolor.colors);
+	} else {
+		offset += cscreen->PaintKeyName(x + offset, y, lastkey);
+	}
+
+	return offset;
+}
+
+//
+//
+//
+
+inline void CheatScreen::InputHandlers::KeyOnly::Parse() {
+	// Parse makes sure the pressed key is in hotspots
+	if (!hotspots.empty()) {
+		auto it = std::find_if(hotspots.begin(), hotspots.end(), [this](const auto& hotspot) {
+			return hotspot.IsKeycode(key_sym);
+		});
+		if (it == hotspots.end()) {
+			throw MenuCommandException{Strings::INVALID_COMMAND, false};
+		}
+	}
+	if (events.Parsed) {
+		events.Parsed(this);
+	}
+}
+
+//
+// String Input Handler
+//
+
+bool CheatScreen::InputHandlers::String::OnInput(SDL_Keycode key_sym) {
+	// Backspace last character
+	if (key_sym == SDLK_BACKSPACE) {
+		if (curlen) {
+			input[--curlen] = 0;
+		}
+	}
+	// Append the character
+	else if (key_sym < 256 && std::isprint(key_sym)) {
+		if (curlen < (std::size(input) - 1)) {
+			input[curlen++] = key_sym;
+			input[curlen]   = 0;
+		}
+	} else if (key_sym == SDLK_RETURN) {
+		return true;
+	}
+
+	return false;
+}
+
+void CheatScreen::InputHandlers::String::Parse() {
+	if (!curlen && !empty_allowed) {
+		throw MenuCommandException{invalidmsg, false};
+	}
+}
+
+// Integer Input Handler
+
+inline void CheatScreen::InputHandlers::Integer::GetPromptMessage(char* buf, size_t buf_size) {
+	bool hasmin = val_min != INT_MIN;
+	bool hasmax = val_max != INT_MAX;
+	// treat as hex if hex only flag is set or the input has a hex prefix
+	bool hex = hexonly || !strncmp(input, "0x", 2) || !strncmp(input, "-0x", 3);
+
+	if (hasmin && hasmax) {
+		snprintf(buf, buf_size, (hex ? "%s  0x%lx-0x%lx " : "%s  %ld-%ld "), promptmsg.c_str(), val_min, val_max);
+	} else if (hasmin || hasmax) {
+		snprintf(
+				buf, buf_size, (hex ? "%s  %s 0x%lx " : "%s  %s %ld "), promptmsg.c_str(),
+				hasmin ? "Min:" : "Max:", hasmin ? val_min : val_max);
+
+	} else {
+		snprintf(buf, buf_size, "%s ", promptmsg.c_str());
+	}
+}
+
+bool CheatScreen::InputHandlers::Integer::OnInput(SDL_Keycode key_sym) {
+	// treat as hex if hex only flag is set or the input has a hex prefix
+	bool hex = hexonly || !strncmp(input, "0x", 2) || !strncmp(input, "-0x", 3);
+
+	// Increment/Decrement with arrow keys
+	if (key_sym == SDLK_LEFT || key_sym == SDLK_RIGHT) {
+		char* end     = nullptr;
+		input[curlen] = 0;
+		long val      = std::strtol(input, &end, hex ? 16 : 10);
+
+		if (end == input + curlen) {
+			// Decrement
+			if (key_sym == SDLK_LEFT && val > val_min) {
+				val--;
+			}
+			// Increment
+			else if (key_sym == SDLK_RIGHT && val < val_max) {
+				val++;
+			} else {
+				val = val_min;
+			}
+			// Format value back to a string
+			// Separate handling for positive and negative so negaive hex numbers have a minus sign
+			int len = 0;
+			if (val < 0) {
+				len = snprintf(input, std::size(input), hex ? "-%lx" : "-%ld", -val);
+			} else {
+				len = snprintf(input, std::size(input), hex ? "%lx" : "%ld", val);
+			}
+			if (len < 0) {
+				curlen   = 0;
+				input[0] = 0;
+				throw MenuCommandException{"Unexepected Error calling snprintf", false};
+			}
+			if (size_t(len) >= std::size(input)) {
+				input[curlen = std::size(input) - 1] = 0;
+			} else {
+				curlen = len;
+			}
+		}
+	}
+	// Add x for hex prefix but only if input is currently "0" or "-0" to form "0x or "-0x
+	else if ((key_sym == SDLK_X) && (!strcmp(input, "0") || !strcmp(input, "-0"))) {
+		input[curlen++] = 'x';
+		input[curlen]   = 0;
+	}
+	// Backspace last character
+	else if (key_sym == SDLK_BACKSPACE) {
+		if (curlen) {
+			input[--curlen] = 0;
+		}
+
+	}
+	// Append pressed digit, or minus sign if start of input
+	else if (key_sym < 256 && (std::isdigit(key_sym) || (hex && std::isxdigit(key_sym)) || (key_sym == SDLK_MINUS && !input[0]))) {
+		if (curlen < (std::size(input) - 1)) {
+			// SDLK_MINUS should be '-' but being  careful I'm not assuming that
+			input[curlen++] = key_sym == SDLK_MINUS ? '-' : char(std::tolower(key_sym));
+			input[curlen]   = 0;
+		}
+	} else if (key_sym == SDLK_RETURN) {
+		return true;
+	}
+
+	return false;
+}
+
+CheatScreen::InputHandlers::Integer::Integer(
+		bool empty_allowed, long min, long max, bool hex, std::string&& promptmsg, std::string&& invalidmsg)
+		: InputHandler(empty_allowed, std::move(promptmsg)), hexonly(hex), val_min(std::min(max, min)), val_max(std::max(max, min)),
+		  invalidmsg(std::move(invalidmsg)) {}
+
+CheatScreen::InputHandlers::Integer::Integer(bool empty_allowed, long min, long max, bool hex, std::string&& promptmsg)
+		: Integer(empty_allowed, min, max, hex, std::move(promptmsg), Strings::INVALID_VALUE) {}
+
+CheatScreen::InputHandlers::Integer::Integer(bool empty_allowed, long min, long max, bool hex)
+		: Integer(empty_allowed, min, max, hex, Strings::ENTER_VALUE) {}
+
+void CheatScreen::InputHandlers::Integer::Parse() {
+	InputHandler::Parse();
+
+	if (empty_allowed && was_empty) {
+		// If empty set to minimum
+		value = val_min;
+		return;
+	}
+
+	// treat as hex if hex only flag is set or the input has a hex prefix
+	bool hex = hexonly || !strncmp(input, "0x", 2) || !strncmp(input, "-0x", 3);
+
+	if (input[0]) {
+		char* input_end = nullptr;
+
+		const long val = std::strtol(input, &input_end, hex ? 16 : 10);
+		if (input_end != input && val >= val_min && val <= val_max) {
+			value = val;
+		} else {
+			throw MenuCommandException{Strings::INVALID_VALUE};
+		}
+	}
+}
+
+// Game Object input Handler
+
+CheatScreen::InputHandlers::GameObject::GameObject(bool empty_allowed, std::string&& promptmsg, std::string&& invalidmsg)
+		: Integer(empty_allowed, 0, gwin->get_num_npcs(), false, std::move(promptmsg), std::move(invalidmsg)) {
+	const char* label = Strings::Pick_Object_from_World;
+	hotspots.emplace_back(0, 0, label[0], label + 1);
+}
+
+CheatScreen::InputHandlers::GameObject::GameObject(bool empty_allowed, std::string&& promptmsg)
+		: GameObject(empty_allowed, std::move(promptmsg), Strings::INVALID_OBJECT) {}
+
+CheatScreen::InputHandlers::GameObject::GameObject(bool empty_allowed) : GameObject(empty_allowed, Strings::ENTERNPCNUMBER) {}
+
+bool CheatScreen::InputHandlers::GameObject::OnInput(SDL_Keycode key_sym) {
+	// Enter Pick Mode
+	if (key_sym == SDLK_P) {
+		cscreen->WaitButtonsUp(true);
+		gwin->set_all_dirty();
+		gwin->paint();
+		gwin->show(true);
+
+		int x, y;
+
+		if (Get_click(x, y, Mouse::greenselect, nullptr, true, nullptr, true)) {
+			object = gwin->find_object(x, y);
+		} else {
+			throw MenuCommandException{Strings::CANCELLED, false};
+		}
+		if (!object) {
+			throw MenuCommandException{invalidmsg, false};
+		}
+		return true;
+	}
+	return Integer::OnInput(key_sym);
+}
+
+void CheatScreen::InputHandlers::GameObject::Parse() {
+	if (!object) {
+		Integer::Parse();
+
+		// Empty input means use grabbed NPC
+		if (empty_allowed && was_empty) {
+			object = cscreen->grabbed;
+		} else {
+			object = gwin->get_npc(value);
+		}
+	}
+
+	if (!object) {
+		throw MenuCommandException{invalidmsg};
 	}
 }
 
@@ -399,7 +746,7 @@ static void resizeline(float& axis1, float delta1, float& axis2) {
 	}
 }
 
-bool CheatScreen::SharedInput() {
+SDL_Keycode CheatScreen::GetKey(const std::vector<Hotspot*>& hotspots, SDL_Keycode& unicode) {
 	SDL_Event     event;
 	SDL_Renderer* renderer = SDL_GetRenderer(gwin->get_win()->get_screen_window());
 	SDL_Window*   window   = gwin->get_win()->get_screen_window();
@@ -541,7 +888,8 @@ bool CheatScreen::SharedInput() {
 					CERR("SDL_EVENT_MOUSE_BUTTON_DOWN( " << gx << " , " << gy << " )");
 					buttons_down.insert(event.button.button);
 					if (event.button.button == 1) {
-						simulate_key = CheckHotspots(gx, gy);
+						simulate_key = Hotspot::HitCheck(hotspots, gx, gy);
+						// simulate_key = CheckHotspots(gx, gy);
 
 						if (!simulate_key) {
 							// Double click detection
@@ -593,179 +941,17 @@ bool CheatScreen::SharedInput() {
 			}
 			SDL_Keycode key_sym = event.key.key;
 			SDL_Keymod  key_mod = event.key.mod;
-			SDL_Keycode unicode = 0;
+			unicode             = 0;
 			if (!Translate_keyboard(event, key_sym, unicode, true)) {
 				continue;
 			}
 
-			if (key_sym == SDLK_ESCAPE) {
-				std::memset(state.input, 0, sizeof(state.input));
-				// If current mode is needing to press a key return to command
-				if (state.GetMode() >= CP_HitKey && state.GetMode() <= CP_WrongShapeFile) {
-					state.command = 0;
-					state.SetMode(CP_Command, true);
-					return false;
-				}
-				// Escape will cancel current mode
-				else if (state.GetMode() != CP_Command) {
-					state.command = key_sym;
-					state.SetMode(CP_Canceled, true);
-					return false;
-				}
-			}
-
 			if ((key_sym == SDLK_S) && (key_mod & SDL_KMOD_ALT) && (key_mod & SDL_KMOD_CTRL)) {
 				make_screenshot(true);
-				return false;
+				return SDLK_UNKNOWN;
 			}
 
-			if (state.GetMode() == CP_NorthSouth) {
-				if (!state.input[0] && (key_sym == SDLK_N || key_sym == SDLK_S)) {
-					state.input[0] = char(key_sym);
-					state.activate = true;
-				}
-			} else if (state.GetMode() == CP_WestEast) {
-				if (!state.input[0] && (key_sym == SDLK_W || key_sym == SDLK_E)) {
-					state.input[0] = char(key_sym);
-					state.activate = true;
-				}
-			} else if (state.GetMode() >= CP_HexXCoord && state.GetMode() <= CP_HexYCoord) {    // Want hex input
-				// Activate (if possible)
-				if (key_sym == SDLK_RETURN) {
-					state.activate = true;
-					// Begin New
-					// increment/decrement
-				} else if (key_sym == SDLK_LEFT || key_sym == SDLK_RIGHT) {
-					char* end   = nullptr;
-					long  value = std::strtol(state.input, &end, 16);
-					if (state.val_max < state.val_min) {
-						std::swap(state.val_max, state.val_min);
-					}
-					if (end == state.input + strlen(state.input)) {
-						if (key_sym == SDLK_LEFT && value != state.val_min) {
-							value = std::max(value - 1, state.val_min);
-						} else if (key_sym == SDLK_RIGHT && value != state.val_max) {
-							value = std::min(value + 1, state.val_max);
-						}
-						if (value < 0) {
-							snprintf(state.input, std::size(state.input), "-%lx", -value);
-						} else {
-							snprintf(state.input, std::size(state.input), "%lx", value);
-						}
-					}
-					// End New
-				} else if ((key_sym == SDLK_MINUS) && !state.input[0]) {
-					state.input[0] = '-';
-				} else if (key_sym < 256 && std::isxdigit(key_sym)) {
-					const size_t curlen = std::strlen(state.input);
-					if (curlen < (std::size(state.input) - 1)) {
-						state.input[curlen]     = char(std::tolower(key_sym));
-						state.input[curlen + 1] = 0;
-					}
-				} else if (key_sym == SDLK_BACKSPACE) {
-					const size_t curlen = std::strlen(state.input);
-					if (curlen) {
-						state.input[curlen - 1] = 0;
-					}
-				}
-			} else if (state.GetMode() == CP_Name) {    // Want Text input
-				if (key_sym == SDLK_RETURN) {
-					state.activate = true;
-				} else if ((unicode < 256 && std::isalnum(unicode)) || unicode == ' ') {
-					const size_t curlen = std::strlen(state.input);
-					if (curlen < (std::size(state.input) - 1)) {
-						state.input[curlen]     = unicode;
-						state.input[curlen + 1] = 0;
-					}
-				} else if (key_sym == SDLK_BACKSPACE) {
-					const size_t curlen = std::strlen(state.input);
-					if (curlen) {
-						state.input[curlen - 1] = 0;
-					}
-				}
-			} else if (state.GetMode() >= CP_ChooseNPC) {    // Need to grab
-															 // numerical input
-				// Browse shape
-				if (state.GetMode() == CP_Shape && !state.input[0] && key_sym == SDLK_B) {
-					cheat.shape_browser();
-					state.input[0] = 'b';
-					state.activate = true;
-				}
-
-				if (key_sym == SDLK_LEFT || key_sym == SDLK_RIGHT) {
-					char* end   = nullptr;
-					long  value = std::strtol(state.input, &end, 10);
-
-					if (state.val_max < state.val_min) {
-						std::swap(state.val_max, state.val_min);
-					}
-					if (end == state.input + strlen(state.input)) {
-						if (key_sym == SDLK_LEFT && value != state.val_min) {
-							value = std::max(value - 1, state.val_min);
-						} else if (key_sym == SDLK_RIGHT && value != state.val_max) {
-							value = std::min(value + 1, state.val_max);
-						}
-						snprintf(state.input, std::size(state.input) - 1, "%ld", value);
-					}
-				}
-				// Activate (if possible)
-				else if (key_sym == SDLK_RETURN) {
-					state.activate = true;
-				} else if ((key_sym == SDLK_MINUS) && !state.input[0]) {
-					state.input[0] = '-';
-				} else if (key_sym < 256 && std::isdigit(key_sym)) {
-					const size_t curlen = std::strlen(state.input);
-					if (curlen < (std::size(state.input) - 1)) {
-						state.input[curlen]     = key_sym;
-						state.input[curlen + 1] = 0;
-					}
-				} else if (key_sym == SDLK_BACKSPACE) {
-					const auto curlen = std::strlen(state.input);
-					if (curlen) {
-						state.input[curlen - 1] = 0;
-					}
-				}
-			} else {
-				char c = key_sym;
-
-				// Translate arrow key into the characters we use for arrows
-				switch (key_sym) {
-				case SDLK_UP: {
-					c = '^';
-				} break;
-
-				case SDLK_DOWN: {
-					c = 'V';
-				} break;
-
-				case SDLK_RIGHT: {
-					c = '>';
-				} break;
-
-				case SDLK_LEFT: {
-					c = '<';
-				} break;
-
-				default: {
-				} break;
-				}
-				// Set input to the typed character so it is shown with the
-				// prompt
-				std::memset(state.input, 0, sizeof(state.input));
-				state.input[0] = c;
-				state.input[1] = 0;
-
-				if (state.GetMode()) {    // Just want a key pressed
-					state.SetMode(CP_Command, true);
-					state.command = 0;
-				} else {    // Need the key pressed
-					state.command       = key_sym;
-					state.highlighttime = SDL_GetTicks() + 1000;
-					state.highlight     = state.command;
-					return true;
-				}
-			}
-			return false;
+			return key_sym;
 		}
 		gwin->rotatecolours();
 		Mouse::mouse()->show();    // Re-display mouse.
@@ -775,7 +961,333 @@ bool CheatScreen::SharedInput() {
 		Mouse::mouse()->hide();    // Need to immediately turn off here to prevent
 								   // flickering after repaint of whole screen
 	}
+	// Didn't get a key press before the timeout
+	return SDLK_UNKNOWN;
+}
+
+bool CheatScreen::SharedInput() {
+	SDL_Keycode           key_sym, unicode;
+	std::vector<Hotspot*> hotspotsp;
+	hotspotsp.reserve(hotspots.size());
+
+	for (auto& hs : hotspots) {
+		hotspotsp.push_back(&hs);
+	}
+
+	// didn't get a key press, just return
+	if (!(key_sym = GetKey(hotspotsp, unicode))) {
+		return false;
+	}
+
+	if (key_sym == SDLK_ESCAPE) {
+		std::memset(state.input, 0, sizeof(state.input));
+		// If current mode is needing to press a key return to command
+		if (state.GetMode() >= CP_HitKey && state.GetMode() <= CP_WrongShapeFile) {
+			state.command = 0;
+			state.SetMode(CP_Command, true);
+			return false;
+		}
+		// Escape will cancel current mode
+		else if (state.GetMode() != CP_Command) {
+			state.command = key_sym;
+			state.SetMode(CP_Canceled, true);
+			return false;
+		}
+	}
+
+	if (state.GetMode() == CP_NorthSouth) {
+		if (!state.input[0] && (key_sym == SDLK_N || key_sym == SDLK_S)) {
+			state.input[0] = char(key_sym);
+			state.activate = true;
+		}
+	} else if (state.GetMode() == CP_WestEast) {
+		if (!state.input[0] && (key_sym == SDLK_W || key_sym == SDLK_E)) {
+			state.input[0] = char(key_sym);
+			state.activate = true;
+		}
+	} else if (state.GetMode() >= CP_HexXCoord && state.GetMode() <= CP_HexYCoord) {    // Want hex input
+		// Activate (if possible)
+		if (key_sym == SDLK_RETURN) {
+			state.activate = true;
+			// Begin New
+			// increment/decrement
+		} else if (key_sym == SDLK_LEFT || key_sym == SDLK_RIGHT) {
+			char* end   = nullptr;
+			long  value = std::strtol(state.input, &end, 16);
+			if (state.val_max < state.val_min) {
+				std::swap(state.val_max, state.val_min);
+			}
+			if (end == state.input + strlen(state.input)) {
+				if (key_sym == SDLK_LEFT && value != state.val_min) {
+					value = std::max(value - 1, state.val_min);
+				} else if (key_sym == SDLK_RIGHT && value != state.val_max) {
+					value = std::min(value + 1, state.val_max);
+				}
+				if (value < 0) {
+					snprintf(state.input, std::size(state.input), "-%lx", -value);
+				} else {
+					snprintf(state.input, std::size(state.input), "%lx", value);
+				}
+			}
+			// End New
+		} else if ((key_sym == SDLK_MINUS) && !state.input[0]) {
+			state.input[0] = '-';
+		} else if (key_sym < 256 && std::isxdigit(key_sym)) {
+			const size_t curlen = std::strlen(state.input);
+			if (curlen < (std::size(state.input) - 1)) {
+				state.input[curlen]     = char(std::tolower(key_sym));
+				state.input[curlen + 1] = 0;
+			}
+		} else if (key_sym == SDLK_BACKSPACE) {
+			const size_t curlen = std::strlen(state.input);
+			if (curlen) {
+				state.input[curlen - 1] = 0;
+			}
+		}
+	} else if (state.GetMode() == CP_Name) {    // Want Text input
+		if (key_sym == SDLK_RETURN) {
+			state.activate = true;
+		} else if ((unicode < 256 && std::isalnum(unicode)) || unicode == ' ') {
+			const size_t curlen = std::strlen(state.input);
+			if (curlen < (std::size(state.input) - 1)) {
+				state.input[curlen]     = unicode;
+				state.input[curlen + 1] = 0;
+			}
+		} else if (key_sym == SDLK_BACKSPACE) {
+			const size_t curlen = std::strlen(state.input);
+			if (curlen) {
+				state.input[curlen - 1] = 0;
+			}
+		}
+	} else if (state.GetMode() >= CP_ChooseNPC) {    // Need to grab
+													 // numerical input
+		// Browse shape
+		if (state.GetMode() == CP_Shape && !state.input[0] && key_sym == SDLK_B) {
+			cheat.shape_browser();
+			state.input[0] = 'b';
+			state.activate = true;
+		}
+
+		if (key_sym == SDLK_LEFT || key_sym == SDLK_RIGHT) {
+			char* end   = nullptr;
+			long  value = std::strtol(state.input, &end, 10);
+
+			if (state.val_max < state.val_min) {
+				std::swap(state.val_max, state.val_min);
+			}
+			if (end == state.input + strlen(state.input)) {
+				if (key_sym == SDLK_LEFT && value != state.val_min) {
+					value = std::max(value - 1, state.val_min);
+				} else if (key_sym == SDLK_RIGHT && value != state.val_max) {
+					value = std::min(value + 1, state.val_max);
+				}
+				snprintf(state.input, std::size(state.input) - 1, "%ld", value);
+			}
+		}
+		// Activate (if possible)
+		else if (key_sym == SDLK_RETURN) {
+			state.activate = true;
+		} else if ((key_sym == SDLK_MINUS) && !state.input[0]) {
+			state.input[0] = '-';
+		} else if (key_sym < 256 && std::isdigit(key_sym)) {
+			const size_t curlen = std::strlen(state.input);
+			if (curlen < (std::size(state.input) - 1)) {
+				state.input[curlen]     = key_sym;
+				state.input[curlen + 1] = 0;
+			}
+		} else if (key_sym == SDLK_BACKSPACE) {
+			const auto curlen = std::strlen(state.input);
+			if (curlen) {
+				state.input[curlen - 1] = 0;
+			}
+		}
+	} else {
+		char c = key_sym;
+
+		// Translate arrow key into the characters we use for arrows
+		switch (key_sym) {
+		case SDLK_UP: {
+			c = '^';
+		} break;
+
+		case SDLK_DOWN: {
+			c = 'V';
+		} break;
+
+		case SDLK_RIGHT: {
+			c = '>';
+		} break;
+
+		case SDLK_LEFT: {
+			c = '<';
+		} break;
+
+		default: {
+		} break;
+		}
+		// Set input to the typed character so it is shown with the
+		// prompt
+		std::memset(state.input, 0, sizeof(state.input));
+		state.input[0] = c;
+		state.input[1] = 0;
+
+		if (state.GetMode()) {    // Just want a key pressed
+			state.SetMode(CP_Command, true);
+			state.command = 0;
+		} else {    // Need the key pressed
+			state.command       = key_sym;
+			state.highlighttime = SDL_GetTicks() + 1000;
+			state.highlight     = state.command;
+			return true;
+		}
+	}
 	return false;
+}
+
+void CheatScreen::RunMenu(std::shared_ptr<Menu> menu) {
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+	const int prompty = 81;
+	const int promptx = 15;
+#else
+	const int prompty = maxy - 18;
+	const int promptx = 0;
+#endif
+
+	std::shared_ptr<MenuCommand> message_command = std::make_shared<MenuCommand>();
+	Uint32                       messagetime     = 0;
+	const Uint32                 messagetimeout  = 1000;
+
+	message_command->inputs.push_back(std::make_shared<InputHandlers::PressAKey>());
+	std::stack<std::shared_ptr<MenuCommand>> input_stack;
+	MenuCommand*                             last = nullptr;
+	std::vector<Hotspot*>                    hotspots;
+	input_stack.push(menu);
+
+	Uint32       highlighted      = SDLK_UNKNOWN;
+	Uint32       highlighttime    = 0;
+	const Uint32 highlighttimeout = 500;
+	SDL_Keycode  key_sym          = SDLK_UNKNOWN;
+	SDL_Keycode  unicode          = SDLK_UNKNOWN;
+
+	// While the input stack is ont enpty run it
+	while (!input_stack.empty()) {
+		auto current = input_stack.top();
+		if (current.get() != last) {
+			current->ResetPhase();
+			last = current.get();
+		}
+
+		try {
+			while (current && current->BeginPhase()) {
+				auto ih = current->GetInputHandler();
+
+				for (;;) {
+					current->run();
+					hotspots.clear();
+					gwin->clear_screen();
+					current->paint_display();
+					current->GatherHotspots(hotspots);
+					// 64 is big enough as the screen res is only big enough for 40x25 text
+					char buf[64];
+
+					ih->GetPromptMessage(buf, std::size(buf));
+					int promptmsgwidth = font->paint_text_fixedwidth(ibuf, buf, promptx, prompty + 9, 8, fontcolor.colors);
+
+					int cursor_offset = ih->PaintPrompt(promptx, prompty, key_sym);
+					// Flash cursor with half second duty cycle
+					if (SDL_GetTicks() % 1000 > 500) {
+						font->paint_text_fixedwidth(
+								ibuf, Strings::CURSOR, promptx + cursor_offset, prompty, 8,
+								ih->input_full() ? fontcolor2.colors : fontcolor.colors);
+					}
+					ih->ArrangeHotspots(promptx + promptmsgwidth + 8, prompty, 2);
+					ih->GatherHotspots(hotspots);
+
+					if (highlighttime && highlighttime < SDL_GetTicks()) {
+						highlighted   = SDLK_UNKNOWN;
+						highlighttime = 0;
+					}
+					if (messagetime && messagetime < SDL_GetTicks()) {
+						highlighted = SDLK_UNKNOWN;
+						messagetime = 0;
+						if (current == message_command) {
+							current = nullptr;
+							break;
+						}
+					}
+					for (const auto hs : hotspots) {
+						hs->Paint(highlighted, Mouse::mouse()->get_mousex(), Mouse::mouse()->get_mousey());
+					}
+					Mouse::mouse()->show();
+					gwin->get_win()->show();
+					Mouse::mouse()->hide();    // Must immediately hide to prevent flickering
+					key_sym = GetKey(hotspots, unicode);
+
+					if (key_sym != SDLK_UNKNOWN) {
+						// Highlight the key
+						highlighttime = SDL_GetTicks() + highlighttimeout;
+						highlighted   = key_sym;
+
+						// Escape always leaves current and doesn't get passed to input handler
+						if (key_sym == SDLK_ESCAPE) {
+							// If not Showing the Message Command throw the exception to return to the previousmenu
+							if (current != message_command) {
+								// Show Cancelled Message if not leaving a menu
+								throw MenuCommandException{
+										!dynamic_cast<Menu*>(current.get()) ? Strings::CANCELLED : std::string(), true};
+							}
+							current->cancelled();
+							current = nullptr;
+							break;
+						} else if (ih->OnInput(key_sym)) {
+							ih->Parse();
+							break;
+						}
+					}
+				}
+
+				// Current could be gone here
+				if (current) {
+					current->EndPhase();
+				}
+			}
+			auto command = current;
+
+			// Activate the command now that all it's needed inputphases are done Replace the command with the result of Activate
+			if (command) {
+				command = command->Activate(key_sym);
+			}
+
+			// New Command so put it at the top of the stack
+			if (command) {
+				command->ResetPhase();
+
+				command->below = input_stack.top();
+				input_stack.push(command);
+			}
+			// If we aren't switching to a new MenuCommand, pop top of stack
+			else {
+				input_stack.pop();
+			}
+		} catch (MenuCommandException& ex) {
+			if (ex.return_to_menu) {
+				// pop till we reach a menu or nothing
+				do {
+					input_stack.top()->cancelled();
+					input_stack.pop();
+				} while (!input_stack.empty() && dynamic_cast<Menu*>(input_stack.top().get()) == nullptr);
+			}
+			// If the message is empty don't try to show it
+			if (!ex.msg.empty()) {
+				message_command->below = input_stack.top();
+				message_command->inputs[0]->SetPromptMessage(std::move(ex.msg));
+				input_stack.push(message_command);
+				messagetime = SDL_GetTicks() + messagetimeout;
+			}
+		}
+	}
+
+	WaitButtonsUp();
 }
 
 void CheatScreen::SharedMenu() {
@@ -794,24 +1306,29 @@ void CheatScreen::SharedMenu() {
 	// const int offsety4 = maxy - 45;
 	const int offsety5 = maxy - 36;
 #endif    // eXit
-	AddMenuItem(offsetx + 160, offsety5 + 9, SDLK_ESCAPE, " Exit");
+	AddMenuItem(offsetx + 160, offsety5 + 9, SDLK_ESCAPE, Strings::Exit());
 }
 
-SDL_Keycode CheatScreen::CheckHotspots(int mx, int my, int radius) {
+SDL_Keycode CheatScreen::Hotspot::HitCheck(const std::vector<Hotspot*>& hotspots, int mx, int my, int radius) {
 	// Find the nearest hotspot
 	SDL_Keycode nearest     = SDLK_UNKNOWN;
 	int         nearestdist = INT_MAX;
 
-	for (auto& hs : hotspots) {
-		int dist = hs.distance(mx, my);
-		if (dist < nearestdist) {
-			nearest     = hs.keycode;
-			nearestdist = dist;
+	for (auto hs : hotspots) {
+		if (hs) {
+			for (size_t k = 0; k < std::size(hs->keycode); k++) {
+				TileRect rect = hs->GetRect(k,false);
+				int      dist = rect.distance(mx, my);
+				if (rect && dist < nearestdist) {
+					nearest     = hs->keycode[k];
+					nearestdist = dist;
+				}
+			}
 		}
 	}
 	// Only return it if it is within the radius
 	if (nearestdist <= radius) {
-		return nearest;
+		return FixUppercaseKeycode(nearest);
 	}
 	return SDLK_UNKNOWN;
 }
@@ -820,10 +1337,11 @@ void CheatScreen::PaintHotspots() {
 	int mx = Mouse::mouse()->get_mousex();
 	int my = Mouse::mouse()->get_mousey();
 	for (const auto& hs : hotspots) {
-		if (hs) {
-			if (hs.has_point(mx, my)) {
+		auto r = hs.ToTR();
+		if (r) {
+			if (r.has_point(mx, my)) {
 				// Draw mouse hover
-				ibuf->fill_translucent8(0, hs.w, hs.h, hs.x, hs.y, hovertable);
+				ibuf->fill_translucent8(0, r.w, r.h, r.x, r.y, hovertable);
 			}
 			// Draw the box in bright yellow
 			// ibuf->draw_box(
@@ -1172,7 +1690,7 @@ bool CheatScreen::NormalCheck() {
 	return true;
 }
 
-void CheatScreen::PaintArrow(int offsetx, int offsety, int type) {
+int CheatScreen::PaintArrow(int offsetx, int offsety, int type) {
 	// Need to draw arrows with overlapping characters
 	// up arrow
 	if (type == '^') {
@@ -1219,7 +1737,11 @@ void CheatScreen::PaintArrow(int offsetx, int offsety, int type) {
 		font->paint_text_fixedwidth(ibuf, ">", offsetx + 2, offsety, 8, fontcolor.colors);
 		// Paint black line to make it pointier
 		ibuf->draw_line8(0, offsetx + 7, offsety + 4, offsetx + 3, offsety + 7);
+	} else {
+		return 0;
 	}
+
+	return 8;
 }
 
 //
@@ -1833,33 +2355,23 @@ bool CheatScreen::TeleportCheck() {
 	return true;
 }
 
-int CheatScreen::AddMenuItem(int offsetx, int offsety, SDL_Keycode keycode, const char* label) {
-	int keywidth = 8;
+int CheatScreen::PaintKeyName(int offsetx, int offsety, SDL_Keycode keycode) {
 	switch (keycode) {
 	case SDLK_UP:
-		PaintArrow(offsetx + 8, offsety, '^');
-		break;
+		return PaintArrow(offsetx, offsety, '^');
 	case SDLK_DOWN:
-		PaintArrow(offsetx + 8, offsety, 'V');
-		break;
+		return PaintArrow(offsetx, offsety, 'V');
 	case SDLK_LEFT:
-		PaintArrow(offsetx + 8, offsety, '<');
-		break;
+		return PaintArrow(offsetx, offsety, '<');
 	case SDLK_RIGHT:
-		PaintArrow(offsetx + 8, offsety, '>');
-		break;
-	case SDLK_ESCAPE:
-		keywidth = 24;
-		font->paint_text_fixedwidth(ibuf, "ESC", offsetx + 8, offsety, 8, fontcolor.colors);
-		break;
+		return PaintArrow(offsetx, offsety, '>');
 	default:
-		if (std::isalnum(keycode)) {
-			char buf[] = {char(std::toupper(keycode)), 0};
-
-			font->paint_text_fixedwidth(ibuf, buf, offsetx + 8, offsety, 8, fontcolor.colors);
-		}
-		break;
+		return font->paint_text_fixedwidth(ibuf, getKeyName(keycode), offsetx, offsety, 8, fontcolor.colors);
 	}
+}
+
+int CheatScreen::AddMenuItem(int offsetx, int offsety, SDL_Keycode keycode, const char* label) {
+	int keywidth = PaintKeyName(offsetx + 8, offsety, keycode);
 	font->paint_text_fixedwidth(ibuf, "[", offsetx, offsety, 8, fontcolor.colors);
 	font->paint_text_fixedwidth(ibuf, "]", offsetx + keywidth + 8, offsety, 8, fontcolor.colors);
 	int labelstart = 16 + keywidth;
@@ -1870,6 +2382,57 @@ int CheatScreen::AddMenuItem(int offsetx, int offsety, SDL_Keycode keycode, cons
 	}
 	return labelstart + labelwidth;
 }
+
+CheatScreen::Hotspot::Hotspot(int x, int y, SDL_Keycode keycode1, std::string&& label, SDL_Keycode keycode2)
+		: keycode{keycode1, keycode2}, namew{GetKeyNameWidth(keycode1), GetKeyNameWidth(keycode2)}, label(std::move(label)),
+		  label_only(keycode1 == 0 && keycode2 == 0), x(x), y(y) {}
+
+void CheatScreen::Hotspot::Paint(SDL_Keycode highlighted, int hoverx, int hovery) const {
+	auto  font       = cscreen->font;
+	auto& fontcolor  = cscreen->fontcolor;
+	auto  ibuf       = cscreen->ibuf;
+	int   nameswidth = 0;
+
+	// Don't paint keys if in label only mode
+	if (!label_only) {
+		// No keycodes, paint nothing
+		if (GetNumkeycodes() == 0) {
+			return;
+		}
+
+		for (size_t k = 0; k < std::size(keycode); ++k) {
+			if (keycode[k] && !hide[k]) {
+				cscreen->PaintKeyName(x + 8 + nameswidth, y, keycode[k]);
+			}
+			nameswidth += namew[k] * 8;
+		}
+
+		font->paint_text_fixedwidth(ibuf, "[", x, y, 8, fontcolor.colors);
+		font->paint_text_fixedwidth(ibuf, "]", x + nameswidth + 8, y, 8, fontcolor.colors);
+	}
+
+	int labelstart = (nameswidth ? 16 : 0) + nameswidth;
+	int labelwidth = font->paint_text_fixedwidth(ibuf, get_label().c_str(), x + labelstart, y, 8, fontcolor.colors);
+	for (size_t k = 0; k < std::size(keycode); ++k) {
+		TileRect r = GetRect(k,false);
+
+		if (keycode[k] && !hide[k]) {
+			if (FixUppercaseKeycode(keycode[k]) == FixUppercaseKeycode(highlighted)) {
+				ibuf->fill_translucent8(0, r.w, r.h, r.x, r.y, cscreen->highlighttable);
+				// if (GetNumkeycodes() == 2) {
+				ibuf->fill_translucent8(0, labelwidth, 8, x + labelstart, y, cscreen->highlighttable);
+				//}
+			}
+			if (r.has_point(hoverx, hovery)) {
+				ibuf->fill_translucent8(0, r.w, r.h, r.x, r.y, cscreen->hovertable);
+				// if (GetNumkeycodes() == 2) {
+				//ibuf->fill_translucent8(0, labelwidth, 8, x + labelstart, y, cscreen->hovertable);
+				//}
+			}
+		}
+	}
+}
+
 
 int CheatScreen::AddLeftRightMenuItem(
 		int offsetx, int offsety, const char* label, bool left, bool right, bool leaveempty, bool fixedlabel) {
@@ -1912,9 +2475,7 @@ void CheatScreen::EndFrame() {
 	Mouse::mouse()->hide();    // Must immediately hide to prevent flickering
 }
 
-const int CheatScreen::button_down_finger;
-
-void CheatScreen::WaitButtonsUp() {
+void CheatScreen::WaitButtonsUp(bool silent) {
 	Uint32     show_message = SDL_GetTicks() + 1000;
 	ClearState clear(state);
 	hotspots.clear();
@@ -1930,7 +2491,7 @@ void CheatScreen::WaitButtonsUp() {
 			break;
 		}
 
-		if (show_message < SDL_GetTicks()) {
+		if (!silent && show_message < SDL_GetTicks()) {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 			const int offsetx_start = 15;
 
@@ -2040,4 +2601,48 @@ void CheatScreen::WaitButtonsUp() {
 
 		EndFrame();
 	}
+}
+
+CheatScreen::Menu::Menu(std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>>&& items) : items(std::move(items)) {
+	// Set the hotspot for all our menu items
+	for (auto& pair : this->items) {
+		if (pair.second) {
+			pair.second->hotspot = &pair.first;
+			pair.second->owner   = this;
+		}
+	}
+
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+	const int offsetx = 15;
+	// const int offsety1 = 73;
+	// const int offsety2 = 55;
+	// const int offsetx1 = 160;
+	// const int offsety4 = 36;
+	const int offsety5 = 72;
+#else
+	const int offsetx = 0;
+	// const int offsety1 = 0;
+	// const int offsety2 = 0;
+	// const int offsetx1 = 160;
+	// const int offsety4 = maxy - 45;
+	const int offsety5 = cscreen->maxy - 36;
+#endif    // eXit
+		  // Add Escape hotspot
+	this->items.emplace_front(Hotspot(offsetx + 160, offsety5 + 9, SDLK_ESCAPE, Strings::Exit()), nullptr);
+	// Input handler to select Menu items
+	inputs.emplace_back(std::make_unique<InputHandlers::KeyOnly>(Strings::ENTER_COMMAND));
+}
+
+std::shared_ptr<CheatScreen::MenuCommand> CheatScreen::Menu::Activate(SDL_Keycode keycode) {
+	std::shared_ptr<MenuCommand> mc = nullptr;
+	auto                         it = std::find_if(items.begin(), items.end(), [keycode](const auto& pair) {
+        return pair.first.IsKeycode(keycode);
+    });
+	if (it != items.end()) {
+		mc = it->second;
+	} else {
+		throw MenuCommandException{Strings::INVALID_COMMAND, false};
+	}
+
+	return mc;
 }

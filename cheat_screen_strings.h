@@ -25,6 +25,8 @@ struct Strings : public StringsBase {
 	static inline const String<0x900> SELECT = {};
 
 	static inline const String<0x901> CURSOR = {};
+	
+	static inline const String<0x902> Exit= {};
 
 	static inline const String<0X908> ESC = {};
 
