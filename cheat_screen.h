@@ -795,7 +795,6 @@ private:
 
 	Cheat_Prompt GlobalFlagLoop(int num);
 
-
 	Cheat_Prompt NPCLoop(int num);
 	void         NPCDisplay(Actor* actor, int& num);
 	void         NPCMenu(Actor* actor, int& num);
@@ -822,11 +821,8 @@ private:
 	void PalEffectMenu(Actor* actor);
 	void PalEffectActivate(Actor* actor);
 	bool PalEffectCheck(Actor* actor);
-	void TeleportLoop();
-	void TeleportDisplay();
-	void TeleportMenu();
-	void TeleportActivate(int& prev);
-	bool TeleportCheck();
+
+	std::shared_ptr<Menu> TeleportMenu();
 
 	//! @brief Add a menu item with a hotspot for the Specified key
 	//! @param offsetx X coord for the menu item

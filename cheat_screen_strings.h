@@ -25,25 +25,25 @@ struct Strings : public StringsBase {
 	static inline const String<0x8F0> SELECT = {};
 
 	static inline const String<0x8F1> CURSOR = {};
-	
-	static inline const String<0x8F2> Exit= {};
-	
-	static inline const String<0x8F3> AdvancedOptionCheatScreen= {};
-	static inline const String<0x8F4> Running= {};
-	static inline const String<0x8F5> CurrentTime= {};
-	static inline const String<0x8F6> Day= {};
-	static inline const String<0x8F7> Coordinates= {};
-	static inline const String<0x8F8> North= {};
-	static inline const String<0x8F8> South= {};
-	static inline const String<0x8FA> Map= {};
-	static inline const String<0x8FB> West= {};
-	static inline const String<0x8FC> East= {};
-	static inline const String<0x8FD> Coords_hex= {};
-	static inline const String<0x8FE> Coords_dec= {};
-	static inline const String<0x8FF> Yes= {};
-	static inline const String<0x900> No= {};
-	static inline const String<0x901> On= {};
-	static inline const String<0x902> Off= {};
+
+	static inline const String<0x8F2> Exit = {};
+
+	static inline const String<0x8F3> AdvancedOptionCheatScreen = {};
+	static inline const String<0x8F4> Running                   = {};
+	static inline const String<0x8F5> CurrentTime               = {};
+	static inline const String<0x8F6> Day                       = {};
+	static inline const String<0x8F7> Coordinates               = {};
+	static inline const String<0x8F8> North                     = {};
+	static inline const String<0x8F8> South                     = {};
+	static inline const String<0x8FA> Map                       = {};
+	static inline const String<0x8FB> West                      = {};
+	static inline const String<0x8FC> East                      = {};
+	static inline const String<0x8FD> Coords_hex                = {};
+	static inline const String<0x8FE> Coords_dec                = {};
+	static inline const String<0x8FF> Yes                       = {};
+	static inline const String<0x900> No                        = {};
+	static inline const String<0x901> On                        = {};
+	static inline const String<0x902> Off                       = {};
 
 	static inline const String<0X90C> ESC = {};
 
@@ -202,6 +202,38 @@ struct Strings : public StringsBase {
 		static inline const String<0xA05> HitPoints    = {};
 		static inline const String<0xA06> MagicPoints  = {};
 		static inline const String<0xA07> ManaLevel    = {};
+	};
+
+	static inline const String<0xA08, 30> NPCFlagMenuItems;
+
+	struct AdvancedFlags {
+		static inline const String<0xA26>       FlagIsSET   = {};
+		static inline const String<0xA27>       FlagIsUNSET = {};
+		static inline const String<0xA28>       ToggleFlag  = {};
+		static inline const stringString<0xA29> NPCFlag     = {};
+		static inline const stringString<0xA29> GlobalFlag  = {};
+		static inline const String<0xA2B>       unnamed     = {};
+	};
+
+	struct TeleportMenu {
+		static inline const String<0xA2C> GeographicCoordinates;
+		static inline const String<0xA2D> TileCoordinates;
+
+		static inline const String<0xA2E> NPCNumber;
+		static inline const String<0xA2F> MapNumber;
+
+		static inline const stringString<0xA30> Latitude;
+		static inline const String<0xA31>       NorthOr;
+		static inline const String<0xA32>       South;
+		static inline const stringString<0xA33> Longitude;
+		static inline const String<0xA34>       WestOr;
+		static inline const String<0xA35>       East;
+		static inline const String<0xA36>       Teleport_Menu;
+		static inline const String<0xA37>       Dangerous   = {};
+		static inline const String<0xA38>       UseWithCare = {};
+		static inline const String<0xA39>       Of          = {};
+		static inline const String<0xA3A>       OnMap       = {};
+		static inline const String<0xA3B>       Coords      = {};
 	};
 };
 
