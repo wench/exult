@@ -22,19 +22,36 @@
 #include "schedule.h"
 
 struct Strings : public StringsBase {
-	static inline const String<0x900> SELECT = {};
+	static inline const String<0x8F0> SELECT = {};
 
-	static inline const String<0x901> CURSOR = {};
+	static inline const String<0x8F1> CURSOR = {};
 	
-	static inline const String<0x902> Exit= {};
+	static inline const String<0x8F2> Exit= {};
+	
+	static inline const String<0x8F3> AdvancedOptionCheatScreen= {};
+	static inline const String<0x8F4> Running= {};
+	static inline const String<0x8F5> CurrentTime= {};
+	static inline const String<0x8F6> Day= {};
+	static inline const String<0x8F7> Coordinates= {};
+	static inline const String<0x8F8> North= {};
+	static inline const String<0x8F8> South= {};
+	static inline const String<0x8FA> Map= {};
+	static inline const String<0x8FB> West= {};
+	static inline const String<0x8FC> East= {};
+	static inline const String<0x8FD> Coords_hex= {};
+	static inline const String<0x8FE> Coords_dec= {};
+	static inline const String<0x8FF> Yes= {};
+	static inline const String<0x900> No= {};
+	static inline const String<0x901> On= {};
+	static inline const String<0x902> Off= {};
 
-	static inline const String<0X908> ESC = {};
+	static inline const String<0X90C> ESC = {};
 
-	static inline const String<0X909> UNKNOWNKEYNAME = {};
+	static inline const String<0X90D> UNKNOWNKEYNAME = {};
 
-	static inline const String<0X90A> TAB = {};
+	static inline const String<0X90E> TAB = {};
 
-	static inline const String<0X90B> RET = {};
+	static inline const String<0X90F> RET = {};
 
 	static inline const stringString<0X910> ENTER_COMMAND = {};
 
