@@ -406,11 +406,11 @@ private:
 		class Integer : public InputHandler {
 		protected:
 			bool        hexonly;
-			long        val_min, val_max;
+			int        val_min, val_max;
 			std::string invalidmsg;
 
 		public:
-			long value = 0;
+			int value = 0;
 
 			void GetPromptMessage(char* buf, size_t buf_size) override;
 
@@ -426,9 +426,9 @@ private:
 				val_max = new_max;
 			}
 
-			Integer(bool empty_allowed, long min, long max, bool hex);
-			Integer(bool empty_allowed, long min, long max, bool hex, std::string&& promptmsg);
-			Integer(bool empty_allowed, long min, long max, bool hex, std::string&& promptmsg, std::string&& invalidmsg);
+			Integer(bool empty_allowed, int min, int max, bool hex);
+			Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg);
+			Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg, std::string&& invalidmsg);
 		};
 
 		// GameObject inherits from Integer so npc number can be entered for an object

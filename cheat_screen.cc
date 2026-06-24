@@ -365,7 +365,7 @@ inline void CheatScreen::InputHandlers::Integer::GetPromptMessage(char* buf, siz
 		snprintf(buf, buf_size, (hex ? "%s  0x%lx-0x%lx " : "%s  %ld-%ld "), promptmsg.c_str(), val_min, val_max);
 	} else if (hasmin || hasmax) {
 		snprintf(
-				buf, buf_size, (hex ? "%s  %s 0x%lx " : "%s  %s %ld "), promptmsg.c_str(),
+				buf, buf_size, (hex ? "%s  %s 0x%x " : "%s  %s %d "), promptmsg.c_str(),
 				hasmin ? "Min:" : "Max:", hasmin ? val_min : val_max);
 
 	} else {
@@ -441,14 +441,14 @@ bool CheatScreen::InputHandlers::Integer::OnInput(SDL_Keycode key_sym) {
 }
 
 CheatScreen::InputHandlers::Integer::Integer(
-		bool empty_allowed, long min, long max, bool hex, std::string&& promptmsg, std::string&& invalidmsg)
+		bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg, std::string&& invalidmsg)
 		: InputHandler(empty_allowed, std::move(promptmsg)), hexonly(hex), val_min(std::min(max, min)), val_max(std::max(max, min)),
 		  invalidmsg(std::move(invalidmsg)) {}
 
-CheatScreen::InputHandlers::Integer::Integer(bool empty_allowed, long min, long max, bool hex, std::string&& promptmsg)
+CheatScreen::InputHandlers::Integer::Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg)
 		: Integer(empty_allowed, min, max, hex, std::move(promptmsg), Strings::INVALID_VALUE) {}
 
-CheatScreen::InputHandlers::Integer::Integer(bool empty_allowed, long min, long max, bool hex)
+CheatScreen::InputHandlers::Integer::Integer(bool empty_allowed, int min, int max, bool hex)
 		: Integer(empty_allowed, min, max, hex, Strings::ENTER_VALUE) {}
 
 void CheatScreen::InputHandlers::Integer::Parse() {
@@ -468,7 +468,7 @@ void CheatScreen::InputHandlers::Integer::Parse() {
 
 		const long val = std::strtol(input, &input_end, hex ? 16 : 10);
 		if (input_end != input && val >= val_min && val <= val_max) {
-			value = val;
+			value = int(val);
 		} else {
 			throw MenuCommandException{Strings::INVALID_VALUE};
 		}
