@@ -1443,6 +1443,8 @@ static void Handle_events() {
 			Actor*        act   = gwin->get_camera_actor();
 			Barge_object* barge = gwin->get_moving_barge();
 
+			const bool slow_walk = !barge && act && act->get_frame_time() * 2 >= 3 * gwin->get_std_delay();
+
 			// Force a reset if position changed
 			if (last_x != gwin->get_scrolltx() || last_y != gwin->get_scrollty()) {
 				// printf ("%i: %i -> %i, %i -> %i\n", ticks, last_x,
@@ -1488,7 +1490,9 @@ static void Handle_events() {
 
 			// Is lerping (smooth scrolling) enabled
 			if (mswait && ticks < (last_repaint + mswait * 2)) {
-				gwin->paint_lerped(((ticks - last_repaint) * 0x10000) / mswait);
+				// Slow walk doesn't use smooth scrolling.
+				const int factor = slow_walk ? 0x10000 : ((ticks - last_repaint) * 0x10000) / mswait;
+				gwin->paint_lerped(factor);
 				didlerp = true;
 			}
 		}
