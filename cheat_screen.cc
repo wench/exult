@@ -150,8 +150,9 @@ void CheatScreen::show_screen() {
 	Mouse::mouse()->set_shape(Mouse::hand);
 
 	buttons_down.clear();
-	// Start the loop
-	NormalLoop();
+
+	// Run the Menu
+	RunMenu(RootMenu());
 
 	Mouse::mouse()->set_shape(saveshape);
 	Mouse::mouse()->hide();
@@ -188,7 +189,7 @@ const char* CheatScreen::getKeyName(SDL_Keycode keycode) {
 	case SDLK_RETURN:
 		return Strings::RET;
 
-		// Using Macro for Function Keys becasue the keycodes for them aren't cobsecutive
+		// Using a Macro for Function Keys because the keycodes for them aren't cobsecutive
 #define F_KEY_CASE(n) \
 	case SDLK_F##n:   \
 		return "F" #n
@@ -1351,102 +1352,14 @@ void CheatScreen::PaintHotspots() {
 }
 
 //
-// Normal
+// Root Menu
 //
 
-void CheatScreen::NormalLoop() {
-	bool looping = true;
+std::shared_ptr<CheatScreen::Menu> CheatScreen::RootMenu() {
+	std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> items;
+	std::shared_ptr<MenuCommand>                                        command;
+	const char*                                                         label;
 
-	ClearState clear(state);
-	while (looping) {
-		hotspots.clear();
-		gwin->clear_screen();
-
-		// First the display
-		NormalDisplay();
-
-		// Now the Menu Column
-		NormalMenu();
-
-		// Finally the Prompt...
-		SharedPrompt();
-
-		// Draw it!
-		EndFrame();
-
-		// Check to see if we need to change menus
-		if (state.activate) {
-			NormalActivate();
-			state.activate = false;
-			continue;
-		}
-
-		if (SharedInput()) {
-			looping = NormalCheck();
-		}
-	}
-	WaitButtonsUp();
-}
-
-void CheatScreen::NormalDisplay() {
-	char buf[512];
-#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	const int offsetx  = 15;
-	const int offsety1 = 108;
-	const int offsety2 = 54;
-	const int offsety3 = 0;
-#else
-	const int offsetx  = 0;
-	const int offsety1 = 0;
-	const int offsety2 = 0;
-	const int offsety3 = 45;
-#endif
-	const int        curmap = gwin->get_map()->get_num();
-	const Tile_coord t      = gwin->get_main_actor()->get_tile();
-
-	font->paint_text_fixedwidth(ibuf, "Advanced Option Cheat Screen", offsetx, offsety1, 8, fontcolor.colors);
-
-	if (Game::get_game_type() == BLACK_GATE) {
-		snprintf(buf, sizeof(buf), "Running \"Ultima VII: The Black Gate\"");
-	} else if (Game::get_game_type() == SERPENT_ISLE) {
-		snprintf(buf, sizeof(buf), "Running \"Ultima VII Part 2: Serpent Isle\"");
-	} else {
-		snprintf(buf, sizeof(buf), "Running Unknown Game Type %i", Game::get_game_type());
-	}
-
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 18, 8, fontcolor.colors);
-
-	strcpy(buf, "Exult Version " VERSION " Rev: ");
-	auto rev    = VersionGetGitRevision(true);
-	int  curlen = strlen(buf);
-	rev.copy(buf + strlen(buf), rev.size());
-	// Need to null terminate after copy
-	buf[curlen + rev.size()] = 0;
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 27, 8, fontcolor.colors);
-
-	font->paint_text_fixedwidth(ibuf, "Compiled " __DATE__ " " __TIME__, offsetx, offsety1 + 36, 8, fontcolor.colors);
-
-	snprintf(
-			buf, sizeof(buf), "Current time: %i:%02i %s  Day: %i", ((clock->get_hour() + 11) % 12) + 1, clock->get_minute(),
-			clock->get_hour() < 12 ? "AM" : "PM", clock->get_day());
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety3, 8, fontcolor.colors);
-
-	const int longi = ((t.tx - 0x3A5) / 10);
-	const int lati  = ((t.ty - 0x46E) / 10);
-	snprintf(
-			buf, sizeof(buf), "Coordinates %d %s %d %s, Map #%d", abs(lati), (lati < 0 ? "North" : "South"), abs(longi),
-			(longi < 0 ? "West" : "East"), curmap);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 63 - offsety2, 8, fontcolor.colors);
-
-	snprintf(buf, sizeof(buf), "Coords in hex (%04x, %04x, %02x)", t.tx, t.ty, t.tz);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 72 - offsety2, 8, fontcolor.colors);
-
-	snprintf(buf, sizeof(buf), "Coords in dec (%04i, %04i, %02i)", t.tx, t.ty, t.tz);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 81 - offsety2, 8, fontcolor.colors);
-}
-
-void CheatScreen::NormalMenu() {
-	char buf[512];
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 	const int offsetx  = 15;
 	const int offsety1 = 73;
@@ -1469,225 +1382,196 @@ void CheatScreen::NormalMenu() {
 #if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
 	// Paperdolls can be toggled in the gumps, no need here for small screens
 	Shape_manager* sman = Shape_manager::get_instance();
-	if (sman->can_use_paperdolls() && sman->are_paperdolls_enabled()) {
-		snprintf(buf, sizeof(buf), "aperdolls..: Yes");
-	} else {
-		snprintf(buf, sizeof(buf), "aperdolls..:  No");
-	}
-	AddMenuItem(offsetx, maxy - 99, SDLK_P, buf);
 
-#endif
+	command = std::make_shared<ToggleCommand>(
+			sman->can_use_paperdolls() && sman->are_paperdolls_enabled(), std::array{Strings::No(), Strings::Yes()});
+	command->events.Activate = [](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		Shape_manager* sman = Shape_manager::get_instance();
 
-	// GodMode
-	snprintf(buf, sizeof(buf), "od Mode....: %3s", cheat.in_god_mode() ? "On" : "Off");
-	AddMenuItem(offsetx, maxy - offsety1 - 90, SDLK_G, buf);
-
-	// Archwizzard Mode
-	snprintf(buf, sizeof(buf), "izard Mode.: %3s", cheat.in_wizard_mode() ? "On" : "Off");
-	AddMenuItem(offsetx, maxy - offsety1 - 81, SDLK_W, buf);
-
-	// Infravision
-	snprintf(buf, sizeof(buf), "nfravision.: %3s", cheat.in_infravision() ? "On" : "Off");
-	AddMenuItem(offsetx, maxy - offsety1 - 72, SDLK_I, buf);
-
-	// Hackmover
-	snprintf(buf, sizeof(buf), "ack Mover..: %3s", cheat.in_hack_mover() ? "Yes" : "No");
-	AddMenuItem(offsetx, maxy - offsety1 - 63, SDLK_H, buf);
-
-	// Eggs
-	snprintf(buf, sizeof(buf), "ggs Visible: %3s", gwin->paint_eggs ? "Yes" : "No");
-	AddMenuItem(offsetx, maxy - offsety1 - 54, SDLK_E, buf);
-
-	// Set Time
-	AddMenuItem(offsetx + offsetx1, offsety4, SDLK_S, "et Time");
-
-	// Right Column
-
-	// NPC Tool
-	AddMenuItem(offsetx + 160, maxy - offsety2 - 99, SDLK_N, "PC Tool");
-
-	// Global Flag Modify
-	AddMenuItem(offsetx + 160, maxy - offsety2 - 90, SDLK_F, "lag Modifier");
-
-	// Teleport
-	AddMenuItem(offsetx + 160, maxy - offsety2 - 81, SDLK_T, "eleport");
-
-#if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
-	// for small screens taking the liberty of leaving that out
-	// Time Rate
-	snprintf(buf, sizeof(buf), " Time Rate:%4i", clock->get_time_rate());
-	AddLeftRightMenuItem(offsetx + 160, offsety4, buf, clock->get_time_rate() > 1, clock->get_time_rate() < 20, true, false);
-#endif
-
-	SharedMenu();
-}
-
-void CheatScreen::NormalActivate() {
-	const int      npc  = std::atoi(state.input);
-	Shape_manager* sman = Shape_manager::get_instance();
-
-	state.SetMode(CP_Command, false);
-
-	switch (state.command) {
-		// God Mode
-	case SDLK_G:
-		cheat.toggle_god();
-		break;
-
-		// Wizard Mode
-	case SDLK_W:
-		cheat.toggle_wizard();
-		break;
-
-		// Infravision
-	case SDLK_I:
-		cheat.toggle_infravision();
-		pal.apply();
-		break;
-
-		// Eggs
-	case SDLK_E:
-		cheat.toggle_eggs();
-		break;
-
-		// Hack mover
-	case SDLK_H:
-		cheat.toggle_hack_mover();
-		break;
-
-		// Set Time
-	case SDLK_S:
-		state.SetMode(TimeSetLoop());
-		break;
-
-		// - Time Rate
-	case '<':
-		if (clock->get_time_rate() > 0) {
-			clock->set_time_rate(clock->get_time_rate() - 1);
-		}
-		break;
-
-		// + Time Rate
-	case '>':
-		if (clock->get_time_rate() < 20) {
-			clock->set_time_rate(clock->get_time_rate() + 1);
-		}
-		break;
-
-		// Teleport
-	case SDLK_T:
-		TeleportLoop();
-		break;
-
-		// NPC Tool
-	case SDLK_N:
-		if (npc < 0 || (npc >= 356 && npc <= 359)) {
-			state.SetMode(CP_InvalidNPC, false);
-		} else if (!state.input[0]) {
-			NPCLoop(-1);
-		} else {
-			state.SetMode(NPCLoop(npc));
-		}
-		break;
-
-		// Global Flag Editor
-	case SDLK_F:
-		if (npc < 0) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (static_cast<size_t>(npc) > Usecode_machine::last_gflag) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			state.SetMode(CP_Canceled, false);
-		} else {
-			state.SetMode(GlobalFlagLoop(npc));
-		}
-		break;
-
-		// Paperdolls
-	case SDLK_P:
 		if ((Game::get_game_type() == BLACK_GATE || Game::get_game_type() == EXULT_DEVEL_GAME) && sman->can_use_paperdolls()) {
 			sman->set_paperdoll_status(!sman->are_paperdolls_enabled());
 			config->set("config/gameplay/bg_paperdolls", sman->are_paperdolls_enabled() ? "yes" : "no", true);
 		}
-		break;
+		return {};
+	};
+	label = Strings::RootMenu::Paperdolls;
+	items.emplace_front(Hotspot(offsetx, maxy - 99, label[0], label + 1), command);
+#endif
 
-	default:
-		break;
+	// GodMode
+	command                  = std::make_shared<ToggleCommand>(cheat.in_god_mode(), std::array{Strings::Off(), Strings::On()});
+	command->events.Activate = [](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		cheat.toggle_god();
+		return {};
+	};
+	label = Strings::RootMenu::GodMode;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 90, label[0], label + 1), command);
+
+	// Archwizzard Mode
+	command                  = std::make_shared<ToggleCommand>(cheat.in_wizard_mode(), std::array{Strings::Off(), Strings::On()});
+	command->events.Activate = [](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		cheat.toggle_wizard();
+		return {};
+	};
+	label = Strings::RootMenu::WizardMode;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 81, label[0], label + 1), command);
+
+	// Infravision
+	command                  = std::make_shared<ToggleCommand>(cheat.in_infravision(), std::array{Strings::Off(), Strings::On()});
+	command->events.Activate = [](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		cheat.toggle_infravision();
+		return {};
+	};
+	label = Strings::RootMenu::Infravision;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 72, label[0], label + 1), command);
+
+	// Hackmover
+	command                  = std::make_shared<ToggleCommand>(cheat.in_hack_mover(), std::array{Strings::Off(), Strings::On()});
+	command->events.Activate = [](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		cheat.toggle_hack_mover();
+		return {};
+	};
+	label = Strings::RootMenu::HackMover;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 63, label[0], label + 1), command);
+
+	// Eggs
+	command                  = std::make_shared<ToggleCommand>(gwin->paint_eggs, std::array{Strings::No(), Strings::Yes()});
+	command->events.Activate = [](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		cheat.toggle_eggs();
+		return {};
+	};
+	label = Strings::RootMenu::EggsVisible;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 54, label[0], label + 1), command);
+
+	// Set Time
+	command                  = std::make_shared<MenuCommand>();
+	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		clock->reset();
+		clock->set_day(static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
+		clock->set_hour(static_cast<InputHandlers::Integer*>(self->inputs[1].get())->value);
+		clock->set_minute(static_cast<InputHandlers::Integer*>(self->inputs[2].get())->value);
+		throw MenuCommandException{Strings::CLOCK_SET, true};
+	};
+	command->inputs.push_back(
+			std::make_shared<InputHandlers::Integer>(false, 0, INT_MAX, false, Strings::ENTER_DAY, Strings::INVALID_TIME));
+	command->inputs.push_back(
+			std::make_shared<InputHandlers::Integer>(false, 0, 23, false, Strings::ENTER_HOUR, Strings::INVALID_TIME));
+	command->inputs.push_back(
+			std::make_shared<InputHandlers::Integer>(false, 0, 59, false, Strings::ENTER_MINUTE, Strings::INVALID_TIME));
+	label = Strings::RootMenu::SetTime;
+	items.emplace_front(Hotspot(offsetx + offsetx1, offsety4, label[0], label + 1), command);
+
+	// Right Column
+
+	// NPC Tool
+	command                  = std::make_shared<MenuCommand>();
+	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		NPCLoop(static_cast<InputHandlers::NPC*>(self->inputs[0].get())->actor->get_npc_num());
+		return {};
+	};
+	command->inputs.push_back(std::make_shared<InputHandlers::NPC>(true));
+	label = Strings::RootMenu::NPCTool;
+	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety2 - 99, label[0], label + 1), command);
+
+	// Global Flag Editor
+	// This is its own menu createdin the kambda for the Activate even just below
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+			false, 0, Usecode_machine::last_gflag, false, Strings::ENTER_GLOBAL_FLAG, Strings::INVALID_VALUE));
+	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		// Load global flag names if not yet loaded
+		if (!global_flag_names_loaded) {
+			load_global_flag_names();
+		}
+		GlobalFlagLoop(static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
+		return {};
+	};
+	label = Strings::RootMenu::FlagModifier;
+	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety2 - 90, label[0], label + 1), command);
+
+	// Teleport
+	command = std::make_shared<MenuCommand>();
+	command->events.Activate = [this](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		// Load global flag names if not yet loaded
+		if (!global_flag_names_loaded) {
+			load_global_flag_names();
+		}
+		TeleportLoop();
+		return {};
+	};
+	label   = Strings::RootMenu::Teleport;
+	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety2 - 81, label[0], label + 1), command);
+
+#if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
+	// for small screens taking the liberty of leaving that out
+	// Time Rate
+	command                  = std::make_shared<LeftRightIntegerCommand>(1, 20, clock->get_time_rate());
+	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		clock->set_time_rate(static_cast<LeftRightIntegerCommand*>(self)->currentval);
+		return {};
+	};
+	items.emplace_front(Hotspot(offsetx + 160, offsety4, SDLK_LEFT, Strings::RootMenu::TimeRate(), SDLK_RIGHT), command);
+#endif
+
+	std::shared_ptr<Menu> menu = std::make_shared<Menu>(std::move(items));
+	menu->events.paint_display = [this](MenuCommand*) {
+	char buf[512];
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+	const int offsetx  = 15;
+	const int offsety1 = 108;
+	const int offsety2 = 54;
+	const int offsety3 = 0;
+#else
+	const int offsetx  = 0;
+	const int offsety1 = 0;
+	const int offsety2 = 0;
+	const int offsety3 = 45;
+#endif
+	const int        curmap = gwin->get_map()->get_num();
+	const Tile_coord t      = gwin->get_main_actor()->get_tile();
+
+	font->paint_text_fixedwidth(ibuf, Strings::AdvancedOptionCheatScreen, offsetx, offsety1, 8, fontcolor.colors);
+
+	std::string           gametitle = Game::get_menustring();
+	size_t pos;
+	// Replace all newlines in title with ": "
+	while((pos = gametitle.find('\n')) != std::string::npos) {
+		gametitle.replace(pos, 1, ": ");
 	}
+	snprintf(buf, sizeof(buf), "%s\"%s\"", Strings::Running(), gametitle.c_str());
 
-	std::memset(state.input, 0, sizeof(state.input));
+	font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 18, 8, fontcolor.colors);
 
-	state.command = 0;
-}
+	strcpy(buf, "Exult Version " VERSION " Rev: ");
+	auto rev    = VersionGetGitRevision(true);
+	int  curlen = strlen(buf);
+	rev.copy(buf + strlen(buf), rev.size());
+	// Need to null terminate after copy
+	buf[curlen + rev.size()] = 0;
+	font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 27, 8, fontcolor.colors);
 
-// Checks the state.input
-bool CheatScreen::NormalCheck() {
-	switch (state.command) {
-		// Simple commands
-	case SDLK_T:    // Teleport
-	case SDLK_G:    // God Mode
-	case SDLK_W:    // Wizard
-	case SDLK_I:    // iNfravision
-	case SDLK_S:    // Set Time
-	case SDLK_E:    // Eggs
-	case SDLK_H:    // Hack Mover
-	case SDLK_C:    // Create Item
-	case SDLK_P:    // Paperdolls
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		state.activate = true;
-		break;
+	font->paint_text_fixedwidth(ibuf, "Compiled " __DATE__ " " __TIME__, offsetx, offsety1 + 36, 8, fontcolor.colors);
 
-		// - Time
-	case SDLK_LEFT:
-		state.command = '<';
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		state.activate = true;
-		break;
+	snprintf(
+			buf, sizeof(buf), "%s%i:%02i %s  %s%i", Strings::CurrentTime(), ((clock->get_hour() + 11) % 12) + 1, clock->get_minute(),
+				clock->get_hour() < 12 ? Strings::am() : Strings::pm(), Strings::Day(), clock->get_day());
+	font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety3, 8, fontcolor.colors);
 
-		// + Time
-	case SDLK_RIGHT:
-		state.command = '>';
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		state.activate = true;
-		break;
+	const int longi = ((t.tx - 0x3A5) / 10);
+	const int lati  = ((t.ty - 0x46E) / 10);
+	snprintf(
+			buf, sizeof(buf), "%s%d %s %d %s, %s%d", Strings::Coordinates(), abs(lati), (lati < 0 ? Strings::North() : Strings::South()),
+			abs(longi), (longi < 0 ? Strings::West() : Strings::East()), Strings::Map(),curmap);
+	font->paint_text_fixedwidth(ibuf, buf, offsetx, 63 - offsety2, 8, fontcolor.colors);
 
-		// NPC Tool
-	case SDLK_N:
-		state.SetMode(CP_ChooseNPC);
-		state.val_min = 0;
-		state.val_max = gwin->get_num_npcs() - 1;
-		break;
+	snprintf(buf, sizeof(buf), "%s(%04x, %04x, %02x)", Strings::Coords_hex(), t.tx, t.ty, t.tz);
+	font->paint_text_fixedwidth(ibuf, buf, offsetx, 72 - offsety2, 8, fontcolor.colors);
 
-		// Global Flag Editor
-	case SDLK_F:
-		state.SetMode(CP_GFlagNum);
-		state.val_min = 0;
-		state.val_max = Usecode_machine::last_gflag;
-		break;
-
-		// X and Escape leave
-	case SDLK_ESCAPE:
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		return false;
-
-	default:
-		state.SetMode(CP_InvalidCom, false);
-		if (!state.input[0]) {
-			state.input[0] = (state.command < 128 ? state.command : 0);
-		}
-		state.command = 0;
-		break;
-	}
-
-	return true;
+	snprintf(buf, sizeof(buf), "%s(%04i, %04i, %02i)", Strings::Coords_dec(), t.tx, t.ty, t.tz);
+	font->paint_text_fixedwidth(ibuf, buf, offsetx, 81 - offsety2, 8, fontcolor.colors);
+		return true;
+	};
+	return menu;
 }
 
 int CheatScreen::PaintArrow(int offsetx, int offsety, int type) {
@@ -1744,78 +1628,6 @@ int CheatScreen::PaintArrow(int offsetx, int offsety, int type) {
 	return 8;
 }
 
-//
-// TimeSet
-//
-
-CheatScreen::Cheat_Prompt CheatScreen::TimeSetLoop() {
-	int        day  = 0;
-	int        hour = 0;
-	ClearState clear(state);
-	state.SetMode(CP_Day);
-	state.val_min = 0;
-	state.val_max = INT_MAX;    // This seems unbounded
-	while (true) {
-		hotspots.clear();
-		gwin->clear_screen();
-
-		// First the display
-		NormalDisplay();
-
-		// Now the Menu Column
-		NormalMenu();
-
-		// Finally the Prompt...
-		SharedPrompt();
-
-		// Draw it!
-		EndFrame();
-
-		// Check to see if we need to change menus
-		if (state.activate) {
-			const int val = std::atoi(state.input);
-
-			if (val < 0) {
-				return CP_InvalidTime;
-			} else if (state.GetMode() == CP_Day) {
-				day = val;
-				state.SetMode(CP_Hour);
-				state.val_min = 0;
-				state.val_max = 23;
-			} else if (val > 59) {
-				return CP_InvalidTime;
-			} else if (state.GetMode() == CP_Minute) {
-				clock->reset();
-				clock->set_day(day);
-				clock->set_hour(hour);
-				clock->set_minute(val);
-				break;
-			} else if (val > 23) {
-				return CP_InvalidTime;
-			} else if (state.GetMode() == CP_Hour) {
-				hour = val;
-				state.SetMode(CP_Minute);
-				state.val_min = 0;
-				state.val_max = 59;
-			}
-
-			state.activate = false;
-			state.input[0] = 0;
-			state.input[1] = 0;
-			state.input[2] = 0;
-			state.input[3] = 0;
-			state.command  = 0;
-			continue;
-		}
-
-		SharedInput();
-		if (state.GetMode() == CP_Canceled) {
-			return CP_Canceled;
-		}
-	}
-
-	return CP_ClockSet;
-}
 
 //
 // Global Flags
@@ -1865,7 +1677,7 @@ CheatScreen::Cheat_Prompt CheatScreen::GlobalFlagLoop(int num) {
 		// on small screens we want lean and mean, so begone NormalDisplay
 		font->paint_text_fixedwidth(ibuf, "Global Flags", 15, 0, 8, fontcolor.colors);
 #else
-		NormalDisplay();
+		//NormalDisplay();
 #endif
 
 		// First the info

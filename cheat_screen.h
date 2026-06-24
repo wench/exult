@@ -464,7 +464,7 @@ private:
 	struct Menu;
 
 	class MenuCommand : public std::enable_shared_from_this<MenuCommand> {
-bool input_active = false;
+		bool input_active = false;
 
 	public:
 		size_t                                     phase = 0;
@@ -474,7 +474,7 @@ bool input_active = false;
 		std::any                     data;
 		Menu*                        owner = nullptr;
 
-				Hotspot* hotspot = nullptr;
+		Hotspot* hotspot = nullptr;
 
 		MenuCommand() {}
 
@@ -535,24 +535,24 @@ bool input_active = false;
 		// Returns false if no more phases
 		virtual bool BeginPhase() {
 			if (phase >= inputs.size()) {
-input_active = false;
+				input_active = false;
 				return false;
 			}
 			inputs[phase]->clear();
-input_active = true;
+			input_active = true;
 			return true;
 		}
 
 		virtual void EndPhase() {
 			++phase;
-if (phase >= inputs.size()) {
+			if (phase >= inputs.size()) {
 				input_active = false;
 			}
 		}
 
 		void ResetPhase() {
 			phase = 0;
-// This is set false until BeginPhase is called
+			// This is set false until BeginPhase is called
 			input_active = false;
 		}
 
@@ -683,12 +683,12 @@ if (phase >= inputs.size()) {
 		}
 
 		void run() override {
-if (isInputActive()) {
+			if (isInputActive()) {
 				// Forward to our children if we are recieving input
-			for (const auto& it : items) {
-				if (it.second) {
-					it.second->run();
-}
+				for (const auto& it : items) {
+					if (it.second) {
+						it.second->run();
+					}
 				}
 			}
 		}
@@ -780,16 +780,11 @@ if (isInputActive()) {
 
 	// clang-format on
 
-	void        SharedPrompt();
-	bool        SharedInput();
-	void        SharedMenu();
-	SDL_Keycode CheckHotspots(int mx, int my, int radius = 4);
-	void        PaintHotspots();
-	void        NormalLoop();
-	void        NormalDisplay();
-	void        NormalMenu();
-	void        NormalActivate();
-	bool        NormalCheck();
+	void                  SharedPrompt();
+	bool                  SharedInput();
+	void                  SharedMenu();
+	void                  PaintHotspots();
+	std::shared_ptr<Menu> RootMenu();
 
 	void ActivityDisplay();
 
@@ -800,7 +795,6 @@ if (isInputActive()) {
 
 	Cheat_Prompt GlobalFlagLoop(int num);
 
-	Cheat_Prompt TimeSetLoop();
 
 	Cheat_Prompt NPCLoop(int num);
 	void         NPCDisplay(Actor* actor, int& num);

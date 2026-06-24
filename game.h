@@ -61,6 +61,7 @@ private:
 	std::vector<char*>  xmlstrings;
 	static std::string  gametitle;
 	static std::string  modtitle;
+	static std::string  menustring;
 	static unsigned int ticks;
 
 protected:
@@ -134,6 +135,10 @@ public:
 
 	static std::string get_modtitle() {
 		return modtitle;
+	}
+
+	static std::string get_menustring() {
+		return menustring;
 	}
 
 	virtual void                      play_intro()                             = 0;
