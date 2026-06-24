@@ -1318,7 +1318,7 @@ SDL_Keycode CheatScreen::Hotspot::HitCheck(const std::vector<Hotspot*>& hotspots
 	for (auto hs : hotspots) {
 		if (hs) {
 			for (size_t k = 0; k < std::size(hs->keycode); k++) {
-				TileRect rect = hs->GetRect(k,false);
+				TileRect rect = hs->GetRect(k, false);
 				int      dist = rect.distance(mx, my);
 				if (rect && dist < nearestdist) {
 					nearest     = hs->keycode[k];
@@ -1490,17 +1490,8 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::RootMenu() {
 	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety2 - 90, label[0], label + 1), command);
 
 	// Teleport
-	command = std::make_shared<MenuCommand>();
-	command->events.Activate = [this](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
-		// Load global flag names if not yet loaded
-		if (!global_flag_names_loaded) {
-			load_global_flag_names();
-		}
-		TeleportLoop();
-		return {};
-	};
-	label   = Strings::RootMenu::Teleport;
-	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety2 - 81, label[0], label + 1), command);
+	label = Strings::RootMenu::Teleport;
+	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety2 - 81, label[0], label + 1), TeleportMenu());
 
 #if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
 	// for small screens taking the liberty of leaving that out
@@ -1515,60 +1506,61 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::RootMenu() {
 
 	std::shared_ptr<Menu> menu = std::make_shared<Menu>(std::move(items));
 	menu->events.paint_display = [this](MenuCommand*) {
-	char buf[512];
+		char buf[512];
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	const int offsetx  = 15;
-	const int offsety1 = 108;
-	const int offsety2 = 54;
-	const int offsety3 = 0;
+		const int offsetx  = 15;
+		const int offsety1 = 108;
+		const int offsety2 = 54;
+		const int offsety3 = 0;
 #else
-	const int offsetx  = 0;
-	const int offsety1 = 0;
-	const int offsety2 = 0;
-	const int offsety3 = 45;
+		const int offsetx  = 0;
+		const int offsety1 = 0;
+		const int offsety2 = 0;
+		const int offsety3 = 45;
 #endif
-	const int        curmap = gwin->get_map()->get_num();
-	const Tile_coord t      = gwin->get_main_actor()->get_tile();
+		const int        curmap = gwin->get_map()->get_num();
+		const Tile_coord t      = gwin->get_main_actor()->get_tile();
 
-	font->paint_text_fixedwidth(ibuf, Strings::AdvancedOptionCheatScreen, offsetx, offsety1, 8, fontcolor.colors);
+		font->paint_text_fixedwidth(ibuf, Strings::AdvancedOptionCheatScreen, offsetx, offsety1, 8, fontcolor.colors);
 
-	std::string           gametitle = Game::get_menustring();
-	size_t pos;
-	// Replace all newlines in title with ": "
-	while((pos = gametitle.find('\n')) != std::string::npos) {
-		gametitle.replace(pos, 1, ": ");
-	}
-	snprintf(buf, sizeof(buf), "%s\"%s\"", Strings::Running(), gametitle.c_str());
+		std::string gametitle = Game::get_menustring();
+		size_t      pos;
+		// Replace all newlines in title with ": "
+		while ((pos = gametitle.find('\n')) != std::string::npos) {
+			gametitle.replace(pos, 1, ": ");
+		}
+		snprintf(buf, sizeof(buf), "%s\"%s\"", Strings::Running(), gametitle.c_str());
 
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 18, 8, fontcolor.colors);
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 18, 8, fontcolor.colors);
 
-	strcpy(buf, "Exult Version " VERSION " Rev: ");
-	auto rev    = VersionGetGitRevision(true);
-	int  curlen = strlen(buf);
-	rev.copy(buf + strlen(buf), rev.size());
-	// Need to null terminate after copy
-	buf[curlen + rev.size()] = 0;
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 27, 8, fontcolor.colors);
+		strcpy(buf, "Exult Version " VERSION " Rev: ");
+		auto rev    = VersionGetGitRevision(true);
+		int  curlen = strlen(buf);
+		rev.copy(buf + strlen(buf), rev.size());
+		// Need to null terminate after copy
+		buf[curlen + rev.size()] = 0;
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 27, 8, fontcolor.colors);
 
-	font->paint_text_fixedwidth(ibuf, "Compiled " __DATE__ " " __TIME__, offsetx, offsety1 + 36, 8, fontcolor.colors);
+		font->paint_text_fixedwidth(ibuf, "Compiled " __DATE__ " " __TIME__, offsetx, offsety1 + 36, 8, fontcolor.colors);
 
-	snprintf(
-			buf, sizeof(buf), "%s%i:%02i %s  %s%i", Strings::CurrentTime(), ((clock->get_hour() + 11) % 12) + 1, clock->get_minute(),
-				clock->get_hour() < 12 ? Strings::am() : Strings::pm(), Strings::Day(), clock->get_day());
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety3, 8, fontcolor.colors);
+		snprintf(
+				buf, sizeof(buf), "%s%i:%02i %s  %s%i", Strings::CurrentTime(), ((clock->get_hour() + 11) % 12) + 1,
+				clock->get_minute(), clock->get_hour() < 12 ? Strings::am() : Strings::pm(), Strings::Day(), clock->get_day());
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety3, 8, fontcolor.colors);
 
-	const int longi = ((t.tx - 0x3A5) / 10);
-	const int lati  = ((t.ty - 0x46E) / 10);
-	snprintf(
-			buf, sizeof(buf), "%s%d %s %d %s, %s%d", Strings::Coordinates(), abs(lati), (lati < 0 ? Strings::North() : Strings::South()),
-			abs(longi), (longi < 0 ? Strings::West() : Strings::East()), Strings::Map(),curmap);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 63 - offsety2, 8, fontcolor.colors);
+		const int longi = ((t.tx - 0x3A5) / 10);
+		const int lati  = ((t.ty - 0x46E) / 10);
+		snprintf(
+				buf, sizeof(buf), "%s%d %s %d %s, %s%d", Strings::Coordinates(), abs(lati),
+				(lati < 0 ? Strings::North() : Strings::South()), abs(longi), (longi < 0 ? Strings::West() : Strings::East()),
+				Strings::Map(), curmap);
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 63 - offsety2, 8, fontcolor.colors);
 
-	snprintf(buf, sizeof(buf), "%s(%04x, %04x, %02x)", Strings::Coords_hex(), t.tx, t.ty, t.tz);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 72 - offsety2, 8, fontcolor.colors);
+		snprintf(buf, sizeof(buf), "%s(%04x, %04x, %02x)", Strings::Coords_hex(), t.tx, t.ty, t.tz);
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 72 - offsety2, 8, fontcolor.colors);
 
-	snprintf(buf, sizeof(buf), "%s(%04i, %04i, %02i)", Strings::Coords_dec(), t.tx, t.ty, t.tz);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 81 - offsety2, 8, fontcolor.colors);
+		snprintf(buf, sizeof(buf), "%s(%04i, %04i, %02i)", Strings::Coords_dec(), t.tx, t.ty, t.tz);
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 81 - offsety2, 8, fontcolor.colors);
 		return true;
 	};
 	return menu;
@@ -1628,7 +1620,6 @@ int CheatScreen::PaintArrow(int offsetx, int offsety, int type) {
 	return 8;
 }
 
-
 //
 // Global Flags
 //
@@ -1677,7 +1668,7 @@ CheatScreen::Cheat_Prompt CheatScreen::GlobalFlagLoop(int num) {
 		// on small screens we want lean and mean, so begone NormalDisplay
 		font->paint_text_fixedwidth(ibuf, "Global Flags", 15, 0, 8, fontcolor.colors);
 #else
-		//NormalDisplay();
+		// NormalDisplay();
 #endif
 
 		// First the info
@@ -1810,88 +1801,7 @@ CheatScreen::Cheat_Prompt CheatScreen::GlobalFlagLoop(int num) {
 // Teleport screen
 //
 
-void CheatScreen::TeleportLoop() {
-	bool looping = true;
-
-	int prev = 0;
-
-	ClearState clear(state);
-	while (looping) {
-		hotspots.clear();
-		gwin->clear_screen();
-
-		// First the display
-		TeleportDisplay();
-
-		// Now the Menu Column
-		TeleportMenu();
-
-		// Finally the Prompt...
-		SharedPrompt();
-
-		// Draw it!
-		EndFrame();
-
-		// Check to see if we need to change menus
-		if (state.activate) {
-			TeleportActivate(prev);
-			state.activate = false;
-			continue;
-		}
-
-		if (SharedInput()) {
-			looping = TeleportCheck();
-		}
-	}
-}
-
-void CheatScreen::TeleportDisplay() {
-	char             buf[512];
-	const Tile_coord t       = gwin->get_main_actor()->get_tile();
-	const int        curmap  = gwin->get_map()->get_num();
-	const int        highest = Get_highest_map();
-#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	const int offsetx  = 15;
-	const int offsety1 = 54;
-#else
-	const int offsetx  = 0;
-	const int offsety1 = 0;
-#endif
-
-#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	font->paint_text_fixedwidth(ibuf, "Teleport Menu - Dangerous!", offsetx, 0, 8, fontcolor.colors);
-#else
-	font->paint_text_fixedwidth(ibuf, "Teleport Menu", offsetx, 0, 8, fontcolor.colors);
-	font->paint_text_fixedwidth(ibuf, "Dangerous - use with care!", offsetx, 18, 8, fontcolor.colors);
-#endif
-
-	const int longi = ((t.tx - 0x3A5) / 10);
-	const int lati  = ((t.ty - 0x46E) / 10);
-#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	snprintf(
-			buf, sizeof(buf), "Coords %d %s %d %s, Map #%d of %d", abs(lati), (lati < 0 ? "North" : "South"), abs(longi),
-			(longi < 0 ? "West" : "East"), curmap, highest);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 9, 8, fontcolor.colors);
-#else
-	snprintf(
-			buf, sizeof(buf), "Coordinates   %d %s %d %s", abs(lati), (lati < 0 ? "North" : "South"), abs(longi),
-			(longi < 0 ? "West" : "East"));
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 63, 8, fontcolor.colors);
-#endif
-
-	snprintf(buf, sizeof(buf), "Coords in hex (%04x, %04x, %02x)", t.tx, t.ty, t.tz);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 72 - offsety1, 8, fontcolor.colors);
-
-	snprintf(buf, sizeof(buf), "Coords in dec (%04i, %04i, %02i)", t.tx, t.ty, t.tz);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 81 - offsety1, 8, fontcolor.colors);
-
-#if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
-	snprintf(buf, sizeof(buf), "On Map #%d of %d", curmap, highest);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 90, 8, fontcolor.colors);
-#endif
-}
-
-void CheatScreen::TeleportMenu() {
+std::shared_ptr<CheatScreen::Menu> CheatScreen::TeleportMenu() {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 	const int offsetx  = 15;
 	const int offsety1 = 64;
@@ -1899,272 +1809,185 @@ void CheatScreen::TeleportMenu() {
 	const int offsety2 = 63;
 	// const int offsety3 = 72;
 #else
-	const int offsetx  = 0;
+	const int offsetx  = 8;
 	const int offsety1 = 0;
 	const int offsetx2 = offsetx;
 	const int offsety2 = maxy - 63;
 	// const int offsety3 = maxy - 36;
 #endif
-
+	std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> items;
+	const char*                                                         label;
+	std::shared_ptr<MenuCommand>                                        command;
 	// Left Column
 	// Geo
-	AddMenuItem(offsetx, maxy - offsety1 - 99, SDLK_G, "eographic Coordinates");
-	// Hex
-	AddMenuItem(offsetx, maxy - offsety1 - 90, SDLK_H, "exadecimal Coordinates");
+	command                         = std::make_shared<MenuCommand>();
+	const char*          labelNorth = Strings::TeleportMenu::NorthOr.GetNotEmpty("North or");
+	const char*          labelSouth = Strings::TeleportMenu::South.GetNotEmpty("South?");
+	const char*          labelWest  = Strings::TeleportMenu::WestOr.GetNotEmpty("West or");
+	const char*          labelEast  = Strings::TeleportMenu::East.GetNotEmpty("East?");
+	std::vector<Hotspot> hotspots;
+	hotspots.reserve(2);
+	hotspots.emplace_back(0, 0, labelNorth[0], labelNorth + 1);
+	hotspots.emplace_back(0, 0, labelSouth[0], labelSouth + 1);
 
-	// Dec
-	AddMenuItem(offsetx, maxy - offsety1 - 81, SDLK_D, "ecimal Coordinates");
+	command->inputs.push_back(std::make_shared<InputHandlers::KeyOnly>(Strings::TeleportMenu::Latitude, std::move(hotspots)));
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, 193, false, Strings::ENTER_LATITUDE));
+
+	// reinitialized moved hotspots vector just to be safe
+	hotspots = std::vector<Hotspot>();
+	hotspots.reserve(2);
+	hotspots.emplace_back(0, 0, labelWest[0], labelWest + 1);
+	hotspots.emplace_back(0, 0, labelEast[0], labelEast + 1);
+
+	command->inputs.push_back(std::make_shared<InputHandlers::KeyOnly>(Strings::TeleportMenu::Longitude, std::move(hotspots)));
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, 193, false, Strings::ENTER_LONGITUDE));
+
+	command->events.run = [=](MenuCommand* self) {
+		// Check phase 0 input and update maximum accepted for input[1]
+		if (self->phase == 1) {
+			auto latkeypress = static_cast<InputHandlers::KeyOnly*>(self->inputs[0].get());
+			auto latinteger  = static_cast<InputHandlers::Integer*>(self->inputs[1].get());
+
+			latinteger->setMax(latkeypress->check_key(*labelNorth) ? 113 : 193);
+		}
+		// Check phase 2 input and update maximum accepted for input[3]
+		else if (self->phase == 3) {
+			auto longkeypress = static_cast<InputHandlers::KeyOnly*>(self->inputs[2].get());
+			auto longinteger  = static_cast<InputHandlers::Integer*>(self->inputs[3].get());
+
+			longinteger->setMax(longkeypress->check_key(*labelWest) ? 93 : 213);
+		}
+	};
+	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		Tile_coord t;
+		auto       latkeypress  = static_cast<InputHandlers::KeyOnly*>(self->inputs[0].get());
+		auto       latinteger   = static_cast<InputHandlers::Integer*>(self->inputs[1].get());
+		auto       longkeypress = static_cast<InputHandlers::KeyOnly*>(self->inputs[2].get());
+		auto       longinteger  = static_cast<InputHandlers::Integer*>(self->inputs[3].get());
+		if (latkeypress->check_key(*labelNorth)) {
+			t.ty = ((latinteger->value * -10) + 0x46E);
+		} else {
+			t.ty = ((latinteger->value * 10) + 0x46E);
+		}
+		if (longkeypress->check_key(*labelWest)) {
+			t.tx = ((longinteger->value * -10) + 0x3A5);
+		} else {
+			t.tx = ((longinteger->value * 10) + 0x3A5);
+		}
+		t.tz = 0;
+		gwin->teleport_party(t);
+
+		return {};
+	};
+
+	label = Strings::TeleportMenu::GeographicCoordinates;
+	if (*label) {
+		items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 90, *label, label + 1), command);
+	}
+
+	// Tile Coords
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, c_num_tiles, false, Strings::ENTER_X_COORD));
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, c_num_tiles, false, Strings::ENTER_Y_COORD));
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, 255, false, Strings::ENTER_Z_COORD));
+	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		Tile_coord t
+				= {static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value,
+				   static_cast<InputHandlers::Integer*>(self->inputs[1].get())->value,
+				   static_cast<InputHandlers::Integer*>(self->inputs[2].get())->value};
+		gwin->teleport_party(t);
+
+		return {};
+	};
+	label = Strings::TeleportMenu::TileCoordinates;
+	if (*label) {
+		items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 81, *label, label + 1), command);
+	}
 
 	// NPC
-	AddMenuItem(offsetx, maxy - offsety1 - 72, SDLK_N, "PC Number");
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::NPC>(false));
+	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		if (Actor* actor = static_cast<InputHandlers::NPC*>(self->inputs[0].get())->actor) {
+			gwin->teleport_party(actor->get_tile(), false, actor->get_map_num());
+		}
 
-	AddMenuItem(offsetx2, offsety2, SDLK_M, "ap Number");
+		return {};
+	};
+	label = Strings::TeleportMenu::NPCNumber;
+	if (*label) {
+		items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 72, *label, label + 1), command);
+	}
+
 	// Map
+	const int highest = Get_highest_map();
 
-	SharedMenu();
-}
+	if (highest != 0) {
+		command = std::make_shared<MenuCommand>();
+		command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, highest, false, Strings::ENTER_VALUE));
+		command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+			gwin->teleport_party(
+					gwin->get_main_actor()->get_tile(), true, static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
 
-void CheatScreen::TeleportActivate(int& prev) {
-	int        i = std::atoi(state.input);
-	static int lat;
-	Tile_coord t       = gwin->get_main_actor()->get_tile();
-	const int  highest = Get_highest_map();
-
-	state.SetMode(CP_Command, false);
-	switch (state.command) {
-	case SDLK_G:    // North or South
-		if (!state.input[0]) {
-			state.SetMode(CP_NorthSouth);
-			state.command = 'g';
-		} else if (state.input[0] == 'n' || state.input[0] == 's') {
-			prev = state.input[0];
-			if (prev == 'n') {
-				state.SetMode(CP_NLatitude);
-				state.val_max = 0;
-				state.val_min = 113;
-			} else {
-				state.SetMode(CP_SLatitude);
-				state.val_max = 0;
-				state.val_min = 193;
-			}
-			state.command = 'a';
-		} else {
-			state.SetMode(CP_InvalidValue, false);
-		}
-		break;
-
-	case SDLK_A:    // latitude
-		if (i < 0 || (prev == 'n' && i > 113) || (prev == 's' && i > 193)) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			if (prev == 'n') {
-				state.SetMode(CP_NLatitude);
-				state.val_max = 0;
-				state.val_min = 113;
-			} else {
-				state.SetMode(CP_SLatitude);
-				state.val_max = 0;
-				state.val_min = 193;
-			}
-			state.command = 'a';
-		} else {
-			if (prev == 'n') {
-				lat = ((i * -10) + 0x46E);
-			} else {
-				lat = ((i * 10) + 0x46E);
-			}
-			state.SetMode(CP_WestEast);
-			state.command = 'b';
-		}
-		break;
-
-	case SDLK_B:    // West or East
-		if (!state.input[0]) {
-			state.SetMode(CP_WestEast);
-			state.command = 'b';
-		} else if (state.input[0] == 'w' || state.input[0] == 'e') {
-			prev = state.input[0];
-			if (prev == 'w') {
-				state.SetMode(CP_WLongitude);
-				state.val_max = 0;
-				state.val_min = 93;
-			} else {
-				state.SetMode(CP_ELongitude);
-				state.val_max = 0;
-				state.val_min = 213;
-			}
-			state.command = 'c';
-		} else {
-			state.SetMode(CP_InvalidValue, false);
-		}
-		break;
-
-	case SDLK_C:    // longitude
-		if (i < 0 || (prev == 'w' && i > 93) || (prev == 'e' && i > 213)) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			if (prev == 'w') {
-				state.SetMode(CP_WLongitude);
-				state.val_max = 0;
-				state.val_min = 93;
-			} else {
-				state.SetMode(CP_ELongitude);
-				state.val_max = 0;
-				state.val_min = 213;
-			}
-			state.command = 'c';
-		} else {
-			if (prev == 'w') {
-				t.tx = ((i * -10) + 0x3A5);
-			} else {
-				t.tx = ((i * 10) + 0x3A5);
-			}
-			t.ty = lat;
-			t.tz = 0;
-			gwin->teleport_party(t);
-		}
-		break;
-
-	case SDLK_H:    // hex X coord
-		i = strtol(state.input, nullptr, 16);
-		if (i < 0 || i > c_num_tiles) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			state.SetMode(CP_HexXCoord);
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-			state.command = 'h';
-		} else {
-			prev = i;
-			state.SetMode(CP_HexYCoord);
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-			state.command = 'i';
-		}
-		state.val_max = 0;
-		state.val_min = c_num_tiles;
-		break;
-
-	case SDLK_I:    // hex Y coord
-		i = strtol(state.input, nullptr, 16);
-		if (i < 0 || i > c_num_tiles) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			state.SetMode(CP_HexYCoord);
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-			state.command = 'i';
-		} else {
-			t.tx = prev;
-			t.ty = i;
-			t.tz = 0;
-			gwin->teleport_party(t);
-		}
-		break;
-
-	case SDLK_D:    // dec X coord
-		if (i < 0 || i > c_num_tiles) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			state.SetMode(CP_XCoord);
-			state.command = 'd';
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-		} else {
-			prev = i;
-			state.SetMode(CP_YCoord);
-			state.command = 'e';
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-		}
-		break;
-
-	case SDLK_E:    // dec Y coord
-		if (i < 0 || i > c_num_tiles) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			state.SetMode(CP_YCoord);
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-			state.command = 'e';
-		} else {
-			t.tx = prev;
-			t.ty = i;
-			t.tz = 0;
-			gwin->teleport_party(t);
-		}
-		break;
-
-	case SDLK_N:    // NPC
-		if (i < 0 || (i >= 356 && i <= 359)) {
-			state.SetMode(CP_InvalidNPC);
-		} else {
-			Actor* actor = gwin->get_npc(i);
-			Game_window::get_instance()->teleport_party(actor->get_tile(), false, actor->get_map_num());
-		}
-		break;
-
-	case SDLK_M:    // map
-		if ((i < 0 || i > 255) || i > highest) {
-			state.SetMode(CP_InvalidValue, false);
-		} else {
-			gwin->teleport_party(gwin->get_main_actor()->get_tile(), true, i);
-		}
-		break;
-
-	default:
-		break;
-	}
-	std::memset(state.input, 0, sizeof(state.input));
-}
-
-// Checks the state.input
-bool CheatScreen::TeleportCheck() {
-	ignore_unused_variable_warning(state.activate);
-	switch (state.command) {
-		// Simple commands
-	case SDLK_G:    // geographic
-		state.SetMode(CP_NorthSouth);
-		return true;
-
-	case SDLK_H:    // hex
-		state.SetMode(CP_HexXCoord);
-		state.val_min = 0;
-		state.val_max = c_num_tiles;
-		return true;
-
-	case SDLK_D:    // dec teleport
-		state.SetMode(CP_XCoord);
-		state.val_min = 0;
-		state.val_max = c_num_tiles;
-		return true;
-
-	case SDLK_N:    // NPC teleport
-		state.SetMode(CP_ChooseNPC);
-		break;
-
-	case SDLK_M:    // NPC teleport
-		state.SetMode(CP_EnterValue);
-		state.val_min = 0;
-		state.val_max = gwin->get_num_npcs() - 1;
-		break;
-
-		// X and Escape leave
-	case SDLK_ESCAPE:
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		return false;
-
-	default:
-		state.command = 0;
-		state.SetMode(CP_InvalidCom, false);
-		break;
+			return {};
+		};
+		label = Strings::TeleportMenu::MapNumber;
+		items.emplace_front(Hotspot(offsetx2, offsety2, *label, label + 1), command);
 	}
 
-	return true;
+	auto menu                  = std::make_shared<Menu>(std::move(items));
+	menu->events.paint_display = [this](MenuCommand*) -> bool {
+		char             buf[512];
+		const Tile_coord t       = gwin->get_main_actor()->get_tile();
+		const int        curmap  = gwin->get_map()->get_num();
+		const int        highest = Get_highest_map();
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+		const int offsetx  = 15;
+		const int offsety1 = 54;
+#else
+		const int offsetx  = 0;
+		const int offsety1 = 0;
+#endif
+
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+		snprintf(buf, sizeof(buf), "%s - %s!", Strings::TeleportMenu::Teleport_Menu(), Strings::TeleportMenu::Dangerous());
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 0, 8, fontcolor.colors);
+#else
+		font->paint_text_fixedwidth(ibuf, Strings::TeleportMenu::Teleport_Menu, offsetx, 0, 8, fontcolor.colors);
+		snprintf(buf, sizeof(buf), "%s - %s!", Strings::TeleportMenu::Dangerous(), Strings::TeleportMenu::UseWithCare());
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 18, 8, fontcolor.colors);
+#endif
+
+		const int longi = ((t.tx - 0x3A5) / 10);
+		const int lati  = ((t.ty - 0x46E) / 10);
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+		snprintf(
+				buf, sizeof(buf), "%s%d %s %d %s, %s%d %s %d", Strings::TeleportMenu::Coords(), abs(lati),
+				(lati < 0 ? Strings::North() : Strings::South()), abs(longi), (longi < 0 ? Strings::West() : Strings::East()),
+				Strings::Map(), curmap, Strings::TeleportMenu::Of(), highest + 1);
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 9, 8, fontcolor.colors);
+#else
+		snprintf(
+				buf, sizeof(buf), "%s%d %s %d %s", Strings::Coordinates(), abs(lati),
+				(lati < 0 ? Strings::North() : Strings::South()), abs(longi), (longi < 0 ? Strings::West() : Strings::East()));
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 63, 8, fontcolor.colors);
+#endif
+
+		snprintf(buf, sizeof(buf), "%s(%04x, %04x, %02x)", Strings::Coords_hex(), t.tx, t.ty, t.tz);
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 72 - offsety1, 8, fontcolor.colors);
+
+		snprintf(buf, sizeof(buf), "%s(%04i, %04i, %02i)", Strings::Coords_dec(), t.tx, t.ty, t.tz);
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 81 - offsety1, 8, fontcolor.colors);
+
+#if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
+		snprintf(buf, sizeof(buf), "%s%d %s %d", Strings::TeleportMenu::OnMap(), curmap, Strings::TeleportMenu::Of(), highest + 1);
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 90, 8, fontcolor.colors);
+#endif
+
+		return true;
+	};
+
+	return menu;
 }
 
 int CheatScreen::PaintKeyName(int offsetx, int offsety, SDL_Keycode keycode) {
@@ -2226,7 +2049,7 @@ void CheatScreen::Hotspot::Paint(SDL_Keycode highlighted, int hoverx, int hovery
 	int labelstart = (nameswidth ? 16 : 0) + nameswidth;
 	int labelwidth = font->paint_text_fixedwidth(ibuf, get_label().c_str(), x + labelstart, y, 8, fontcolor.colors);
 	for (size_t k = 0; k < std::size(keycode); ++k) {
-		TileRect r = GetRect(k,false);
+		TileRect r = GetRect(k, false);
 
 		if (keycode[k] && !hide[k]) {
 			if (FixUppercaseKeycode(keycode[k]) == FixUppercaseKeycode(highlighted)) {
@@ -2238,13 +2061,12 @@ void CheatScreen::Hotspot::Paint(SDL_Keycode highlighted, int hoverx, int hovery
 			if (r.has_point(hoverx, hovery)) {
 				ibuf->fill_translucent8(0, r.w, r.h, r.x, r.y, cscreen->hovertable);
 				// if (GetNumkeycodes() == 2) {
-				//ibuf->fill_translucent8(0, labelwidth, 8, x + labelstart, y, cscreen->hovertable);
+				// ibuf->fill_translucent8(0, labelwidth, 8, x + labelstart, y, cscreen->hovertable);
 				//}
 			}
 		}
 	}
 }
-
 
 int CheatScreen::AddLeftRightMenuItem(
 		int offsetx, int offsety, const char* label, bool left, bool right, bool leaveempty, bool fixedlabel) {
