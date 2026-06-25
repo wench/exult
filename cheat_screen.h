@@ -147,15 +147,16 @@ private:
 
 	// Hotspot for Mouse/Touch input
 	// Base TileRect can be changed after construction but keycode and label cannot be changed
-	struct Hotspot {
+	class Hotspot {
 		SDL_Keycode keycode[2] = {0};
 		int         namew[2]   = {0};    // Name Width of each keycode
 		bool        hide[2]    = {false, false};
 
+	public:
 		const std::string label      = {};       // This is drawn to the right of above
 		bool              label_only = false;    // Don't hit check keycodes. Only draw the label
 		std::string       label_rw   = {};       // if this is set it is used instead of label
-		int               x, y, w, h = 0;
+		int               x, y, w = 0, h = 0;
 
 		const std::string& get_label() const {
 			return label_rw.empty() ? label : label_rw;
@@ -181,6 +182,13 @@ private:
 			}
 			keycode[index] = code;
 			namew[index]   = GetKeyNameWidth(code);
+		}
+
+		void setHidden(unsigned index, bool hidden) {
+			if (index >= std::size(keycode)) {
+				return;
+			}
+			hide[index] = hidden;
 		}
 
 		static int GetKeyNameWidth(SDL_Keycode keycode) {
@@ -265,8 +273,16 @@ private:
 
 		static SDL_Keycode HitCheck(const std::vector<Hotspot*>& hotspots, int mx, int my, int radius = 4);
 
-		bool IsKeycode(SDL_Keycode code) const {
-			return !label_only && (FixUppercaseKeycode(keycode[0]) == code || FixUppercaseKeycode(keycode[1]) == code);
+		bool IsKeycode(SDL_Keycode code, unsigned mask = 0xFFFFFFFF) const {
+			if (!label_only) {
+				code = FixUppercaseKeycode(code);
+				for (unsigned i = 0; i < std::size(keycode); i++) {
+					if (!hide[i] && (mask & 1 << i) && FixUppercaseKeycode(keycode[i]) == code) {
+						return true;
+					}
+				}
+			}
+			return false;
 		}
 
 		// if the code is an uppercase letter make it lowercase
@@ -331,6 +347,7 @@ private:
 		virtual void clear() {
 			curlen = 0;
 			memset(input, 0, sizeof(input));
+			was_empty = false;
 		}
 
 		InputHandler(bool empty_allowed, std::string&& promptmsg) : empty_allowed(empty_allowed), promptmsg(std::move(promptmsg)) {}
@@ -612,15 +629,15 @@ private:
 		}
 
 		std::shared_ptr<MenuCommand> Activate(SDL_Keycode keycode) override {
-			// left hotspot is decrement
-			if (keycode == hotspot->keycode[0] && currentval > min) {
+			// first hotspot key is decrement
+			if (hotspot->IsKeycode(keycode, 1 << 0) && currentval > min) {
 				currentval--;
 				if (currentval > max) {
 					currentval = max;
 				}
 			}
-			// right is increment
-			if (keycode == hotspot->keycode[1] && currentval < max) {
+			// second key is increment
+			if (hotspot->IsKeycode(keycode, 1 << 1) && currentval < max) {
 				currentval++;
 				if (currentval < min) {
 					currentval = min;
@@ -632,9 +649,9 @@ private:
 
 		void run() override {
 			MenuCommand::run();
-			// Set hides based on the currentvalue bein min or max
-			hotspot->hide[0] = currentval <= min;
-			hotspot->hide[1] = currentval >= max;
+			// Set each key hidden based on comparing the currentvalue to min and max
+			hotspot->setHidden(0, currentval <= min);
+			hotspot->setHidden(1, currentval >= max);
 			if (update_label) {
 				char valstring[16];
 				snprintf(valstring, std::size(valstring), "%4i", currentval);
@@ -793,7 +810,7 @@ private:
 
 	int PaintKeyName(int offsetx, int offsety, SDL_Keycode key_sym);
 
-	Cheat_Prompt GlobalFlagLoop(int num);
+	std::shared_ptr<Menu> GlobalFlagMenu(unsigned num);
 
 	Cheat_Prompt NPCLoop(int num);
 	void         NPCDisplay(Actor* actor, int& num);

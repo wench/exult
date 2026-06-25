@@ -803,7 +803,7 @@
 0x917:Input Required
 0x918:Invalid Value
 0x919:Which NPC?
-0x91A:Enter NPC number
+0x91A:Enter NPC number or
 0x91B:To Cancel
 0x91C:Clock Set.
 0x91D:Invalid Time.
@@ -831,7 +831,9 @@
 0x935:Latitude [N]orth or [S]outh?
 0x936:Longitude [W]est or [E]ast?
 0x937:Pick Object from World
-0x938:Pick from World
+0x938:Pick NPC from World
+0x939:Browse
+0x93A:Enter Frame
 # Schedules - 33 INDICES 0x940 - 0x960
 0x940:Combat
 0x941:Hor. Pace
@@ -938,12 +940,12 @@
 0x9BB:Set Current Activity
 0x9BC:Revert
 # Root Menu
-0x9E0:Paperdolls..
-0x9E1:God Mode....
-0x9E2:Wizard Mode.
-0x9E3:Infravision.
-0x9E4:Hack Mover..
-0x9E5:Eggs Visible
+0x9E0:Paperdolls..: 
+0x9E1:God Mode....: 
+0x9E2:Wizard Mode.: 
+0x9E3:Infravision.: 
+0x9E4:Hack Mover..: 
+0x9E5:Eggs Visible: 
 0x9E6:Set Time    
 0x9E7:NPC Tool    
 0x9E8:Flag Modifier
@@ -1010,21 +1012,24 @@
 0xA29:NPC Flag 
 0xA2A:Global Flag 
 0xA2B:(unnamed)
+0xA2C: Change Flag
+0xA2D:Scroll Flags
+0xA2E:Global Flags
 
 #teleport Menu
-0xA2C:Geographic Coordinates
-0xA2D:Tile Coordinates
-0xA2E:NPC Number
-0xA2F:Map Number
-0xA30:Latitude
-0xA31:North or
-0xA32:South?
-0xA33:Longitude
-0xA34:West or
-0xA35:East?
-0xA36:Teleport Menu
-0xA37:Dangerous
-0xA38:use with care!
-0xA39:of
-0xA3A:OnMap #
-0xA3B:Coords 
+0xA30:Geographic Coordinates
+0xA31:Tile Coordinates
+0xA32:NPC Number
+0xA33:Map Number
+0xA34:Latitude
+0xA35:North or
+0xA36:South?
+0xA37:Longitude
+0xA38:West or
+0xA39:East?
+0xA3A:Teleport Menu
+0xA3B:Dangerous
+0xA3C:use with care!
+0xA3D:of
+0xA3E:OnMap #
+0xA3F:Coords 

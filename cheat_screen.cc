@@ -478,8 +478,8 @@ void CheatScreen::InputHandlers::Integer::Parse() {
 // Game Object input Handler
 
 CheatScreen::InputHandlers::GameObject::GameObject(bool empty_allowed, std::string&& promptmsg, std::string&& invalidmsg)
-		: Integer(empty_allowed, 0, gwin->get_num_npcs(), false, std::move(promptmsg), std::move(invalidmsg)) {
-	const char* label = Strings::Pick_Object_from_World;
+		: Integer(empty_allowed, 0, gwin->get_num_npcs() - 1, false, std::move(promptmsg), std::move(invalidmsg)) {
+	const char* label = Strings::Pick_Object_from_World.GetNotEmpty("Pick Object from World");
 	hotspots.emplace_back(0, 0, label[0], label + 1);
 }
 
@@ -490,7 +490,7 @@ CheatScreen::InputHandlers::GameObject::GameObject(bool empty_allowed) : GameObj
 
 bool CheatScreen::InputHandlers::GameObject::OnInput(SDL_Keycode key_sym) {
 	// Enter Pick Mode
-	if (key_sym == SDLK_P) {
+	if (hotspots[0].IsKeycode(key_sym)) {
 		cscreen->WaitButtonsUp(true);
 		gwin->set_all_dirty();
 		gwin->paint();
@@ -1483,8 +1483,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::RootMenu() {
 		if (!global_flag_names_loaded) {
 			load_global_flag_names();
 		}
-		GlobalFlagLoop(static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
-		return {};
+		return GlobalFlagMenu(static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
 	};
 	label = Strings::RootMenu::FlagModifier;
 	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety2 - 90, label[0], label + 1), command);
@@ -1642,8 +1641,7 @@ void CheatScreen::load_global_flag_names() {
 	}
 }
 
-CheatScreen::Cheat_Prompt CheatScreen::GlobalFlagLoop(int num) {
-	bool looping = true;
+std::shared_ptr<CheatScreen::Menu> CheatScreen::GlobalFlagMenu(unsigned num) {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 	const int offsetx  = 15;
 	const int offsety1 = 83;
@@ -1653,148 +1651,93 @@ CheatScreen::Cheat_Prompt CheatScreen::GlobalFlagLoop(int num) {
 	const int offsety1 = 0;
 	// const int offsety2 = maxy - 36;
 #endif
+	std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> items;
 
-	int  i;
-	char buf[64];
+	//
+	// Start of Global Flag Menu Commands
+	//
+	// Global Flag Message
+	auto command        = std::make_shared<MenuCommand>();
+	command->events.run = [this](MenuCommand* self) {
+		char buf[16];
+		auto num = MenuCommand::getDataOrDefault<unsigned>(self->GetMyMenu());
+		snprintf(buf, sizeof(buf), "%d ", num);
+		std::string_view flag_name;
 
-	Usecode_machine* usecode = Game_window::get_instance()->get_usecode();
-
-	ClearState clear(state);
-	while (looping) {
-		hotspots.clear();
-		gwin->clear_screen();
-
-#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-		// on small screens we want lean and mean, so begone NormalDisplay
-		font->paint_text_fixedwidth(ibuf, "Global Flags", 15, 0, 8, fontcolor.colors);
-#else
-		// NormalDisplay();
-#endif
-
-		// First the info
-		snprintf(buf, sizeof(buf), "Global Flag %i", num);
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, maxy - offsety1 - 99, 8, fontcolor.colors);
-
-		// Load global flag names if not yet loaded
-		if (!global_flag_names_loaded) {
-			load_global_flag_names();
-		}
-		// Display the flag name if available
-		if (num >= 0 && num < static_cast<int>(global_flag_names.size()) && !global_flag_names[num].empty()) {
-			snprintf(buf, sizeof(buf), "%s", global_flag_names[num].c_str());
+		if (num >= 0 && num < static_cast<unsigned>(global_flag_names.size()) && !global_flag_names[num].empty()) {
+			flag_name = global_flag_names[num];
 		} else {
-			snprintf(buf, sizeof(buf), "(unnamed)");
+			flag_name = Strings::AdvancedFlags::unnamed();
 		}
-		font->paint_text_fixedwidth(ibuf, buf, offsetx + 130, maxy - offsety1 - 99, 8, fontcolor.colors);
+		self->hotspot->label_rw.reserve(self->hotspot->label.size() + 16 + flag_name.size());
 
-		bool flagset = usecode->get_global_flag(num).value_or(false);
-		snprintf(buf, sizeof(buf), "Flag is %s", flagset ? "SET" : "UNSET");
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, maxy - offsety1 - 90, 8, fontcolor.colors);
+		self->hotspot->label_rw = self->hotspot->label;
+		self->hotspot->label_rw += buf;
+		self->hotspot->label_rw += flag_name;
+		self->hotspot->label_only = true;
+	};
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 99, 0, Strings::AdvancedFlags::GlobalFlag), command);
 
-		// Now the Menu Column
-		if (!flagset) {
-			AddMenuItem(offsetx + 130, maxy - offsety1 - 90, SDLK_S, "et Flag");
-		} else {
-			AddMenuItem(offsetx + 130, maxy - offsety1 - 90, SDLK_U, "nset Flag");
-		}
+	// Flag is message
+	command             = std::make_shared<MenuCommand>();
+	command->events.run = [](MenuCommand* self) {
+		auto num = MenuCommand::getDataOrDefault<unsigned>(self->GetMyMenu());
 
-		// Change Flag
-		AddMenuItem(offsetx, maxy - offsety1 - 72, SDLK_UP, " Change Flag");
-		AddLeftRightMenuItem(
-				offsetx, maxy - offsety1 - 63, "Scroll Flags", num > 0, num < static_cast<int>(Usecode_machine::last_gflag), false,
-				true);
+		self->hotspot->label_rw = gwin->get_usecode()->get_global_flag_bool(num) ? Strings::AdvancedFlags::FlagIsSET()
+																				 : Strings::AdvancedFlags::FlagIsUNSET();
+		;
+		self->hotspot->label_only = true;
+	};
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 90, 0, ""), command);
 
-		SharedMenu();
-
-		// Finally the Prompt...
-		SharedPrompt();
-
-		// Draw it!
-		EndFrame();
-
-		// Check to see if we need to change menus
-		if (state.activate) {
-			state.SetMode(CP_Command, false);
-			if (state.command == '<') {    // Decrement
-				num = std::max(num - 1, 0);
-			} else if (state.command == '>') {    // Increment
-				num = std::min<size_t>(num + 1, Usecode_machine::last_gflag);
-			} else if (state.command == '^') {    // Change Flag
-				i = std::atoi(state.input);
-				if (i < 0 || static_cast<size_t>(i) > Usecode_machine::last_gflag) {
-					state.SetMode(CP_InvalidValue, false);
-				} else if (state.input[0]) {
-					num = i;
-				}
-			} else if (state.command == 's') {    // Set
-				usecode->set_global_flag(num, true);
-			} else if (state.command == 'u') {    // Unset
-				usecode->set_global_flag(num, false);
-			}
-			std::memset(state.input, 0, sizeof(state.input));
-
-			state.command  = 0;
-			state.activate = false;
-			continue;
-		}
-
-		if (SharedInput()) {
-			switch (state.command) {
-				// Simple commands
-			case SDLK_S:    // Set Flag
-			case SDLK_U:    // Unset flag
-				if (!state.input[0]) {
-					state.input[0] = state.command;
-				}
-				state.activate = true;
-				break;
-
-				// Decrement
-			case SDLK_LEFT:
-				state.command = '<';
-				if (!state.input[0]) {
-					state.input[0] = state.command;
-				}
-				state.activate = true;
-				break;
-
-				// Increment
-			case SDLK_RIGHT:
-				state.command = '>';
-				if (!state.input[0]) {
-					state.input[0] = state.command;
-				}
-				state.activate = true;
-				break;
-
-				// * Change Flag
-			case SDLK_UP:
-				state.command  = '^';
-				state.input[0] = 0;
-				state.SetMode(CP_GFlagNum);
-				state.val_min = 0;
-				state.val_max = Usecode_machine::last_gflag;
-				break;
-
-				// X and Escape leave
-			case SDLK_ESCAPE:
-				if (!state.input[0]) {
-					state.input[0] = state.command;
-				}
-				looping = false;
-				break;
-
-			default:
-				state.SetMode(CP_InvalidCom, false);
-				if (!state.input[0]) {
-					state.input[0] = (state.command < 128 ? state.command : 0);
-				}
-				state.command = 0;
-				break;
-			}
-		}
+	// Toggle command
+	command                  = std::make_shared<MenuCommand>();
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto num = MenuCommand::getDataOrDefault<unsigned>(self->GetMyMenu());
+		gwin->get_usecode()->set_global_flag(num, !gwin->get_usecode()->get_global_flag_bool(num));
+		return {};
+	};
+	const char* label = Strings::AdvancedFlags::ToggleFlag;
+	if (label && *label) {
+		items.emplace_front(Hotspot(offsetx + 160, maxy - offsety1 - 90, *label, label + 1), command);
 	}
-	return CP_Command;
+
+	// Change Flag
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+			false, 0, Usecode_machine::last_gflag, false, Strings::ENTER_GLOBAL_FLAG, Strings::INVALID_VALUE));
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		self->GetMyMenu()->setData<unsigned>(static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
+
+		return {};
+	};
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 72, SDLK_UP, Strings::AdvancedFlags::ChangeFlag), command);
+
+	// Scroll Flags
+	command                  = std::make_shared<LeftRightIntegerCommand>(0, Usecode_machine::last_gflag, 0, false);
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		self->GetMyMenu()->setData<unsigned>(static_cast<LeftRightIntegerCommand*>(self)->currentval);
+		return {};
+	};
+	command->events.run = [](MenuCommand* self) {
+		// Make sure currentval is synced with the flag number
+		static_cast<LeftRightIntegerCommand*>(self)->currentval = MenuCommand::getDataOrDefault<unsigned>(self->GetMyMenu());
+	};
+	items.emplace_front(
+			Hotspot(offsetx, maxy - offsety1 - 63, SDLK_LEFT, Strings::AdvancedFlags::ScrollFlags, SDLK_RIGHT), command);
+
+	auto menu = std::make_shared<Menu>(std::move(items));
+	menu->setData<unsigned>(num);
+
+	menu->events.paint_display = [=](MenuCommand*) -> bool {
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+		font->paint_text_fixedwidth(ibuf, Strings::AdvancedFlags::GlobalFlags, 15, 0, 8, fontcolor.colors);
+		return true;
+#else
+		return false;
+#endif
+	};
+	return menu;
 }
 
 //
