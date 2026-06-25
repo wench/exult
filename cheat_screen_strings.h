@@ -130,6 +130,9 @@ struct Strings : public StringsBase {
 	static inline const String<0x937> Pick_Object_from_World = {};
 
 	static inline const String<0x938> Pick_NPC_from_World = {};
+	
+	static inline const String<0x939> Browse = {};
+	static inline const String<0x93A> ENTER_FRAME = {};
 
 	static inline const struct : public String<0x940, 35> {
 		const char* operator[](unsigned offset) const override {
@@ -213,27 +216,30 @@ struct Strings : public StringsBase {
 		static inline const stringString<0xA29> NPCFlag     = {};
 		static inline const stringString<0xA29> GlobalFlag  = {};
 		static inline const String<0xA2B>       unnamed     = {};
+		static inline const stringString<0xA2C>       ChangeFlag  = {};
+		static inline const stringString<0xA2D>       ScrollFlags = {};
+		static inline const String<0xA2E>       GlobalFlags = {};
 	};
 
 	struct TeleportMenu {
-		static inline const String<0xA2C> GeographicCoordinates;
-		static inline const String<0xA2D> TileCoordinates;
+		static inline const String<0xA30> GeographicCoordinates;
+		static inline const String<0xA31> TileCoordinates;
 
-		static inline const String<0xA2E> NPCNumber;
-		static inline const String<0xA2F> MapNumber;
+		static inline const String<0xA32> NPCNumber;
+		static inline const String<0xA33> MapNumber;
 
-		static inline const stringString<0xA30> Latitude;
-		static inline const String<0xA31>       NorthOr;
-		static inline const String<0xA32>       South;
-		static inline const stringString<0xA33> Longitude;
-		static inline const String<0xA34>       WestOr;
-		static inline const String<0xA35>       East;
-		static inline const String<0xA36>       Teleport_Menu;
-		static inline const String<0xA37>       Dangerous   = {};
-		static inline const String<0xA38>       UseWithCare = {};
-		static inline const String<0xA39>       Of          = {};
-		static inline const String<0xA3A>       OnMap       = {};
-		static inline const String<0xA3B>       Coords      = {};
+		static inline const stringString<0xA34> Latitude;
+		static inline const String<0xA35>       NorthOr;
+		static inline const String<0xA36>       South;
+		static inline const stringString<0xA37> Longitude;
+		static inline const String<0xA38>       WestOr;
+		static inline const String<0xA39>       East;
+		static inline const String<0xA3A>       Teleport_Menu;
+		static inline const String<0xA3B>       Dangerous   = {};
+		static inline const String<0xA3C>       UseWithCare = {};
+		static inline const String<0xA3D>       Of          = {};
+		static inline const String<0xA3E>       OnMap       = {};
+		static inline const String<0xA3F>       Coords      = {};
 	};
 };
 
