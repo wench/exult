@@ -1077,7 +1077,7 @@ USECODE_INTRINSIC(display_runes) {
 				translate_usecode_text(translated);
 				sign.add_text(i, translated.c_str());
 			} else {
-				sign.add_text(i, str);
+				sign.add_text(i, std::string());
 			}
 		}
 		int x;
