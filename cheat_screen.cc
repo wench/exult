@@ -441,9 +441,10 @@ bool CheatScreen::InputHandlers::Integer::OnInput(SDL_Keycode key_sym) {
 }
 
 CheatScreen::InputHandlers::Integer::Integer(
-		bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg, std::string&& invalidmsg)
+		bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg, std::string&& invalidmsg,
+		std::optional<int> special)
 		: InputHandler(empty_allowed, std::move(promptmsg)), hexonly(hex), val_min(std::min(max, min)), val_max(std::max(max, min)),
-		  invalidmsg(std::move(invalidmsg)) {}
+		  invalidmsg(std::move(invalidmsg)), special(special) {}
 
 CheatScreen::InputHandlers::Integer::Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg)
 		: Integer(empty_allowed, min, max, hex, std::move(promptmsg), Strings::INVALID_VALUE) {}
@@ -467,7 +468,7 @@ void CheatScreen::InputHandlers::Integer::Parse() {
 		char* input_end = nullptr;
 
 		const long val = std::strtol(input, &input_end, hex ? 16 : 10);
-		if (input_end != input && val >= val_min && val <= val_max) {
+		if (input_end != input && ((val >= val_min && val <= val_max) || special.value_or(val_min) == val)) {
 			value = int(val);
 		} else {
 			throw MenuCommandException{Strings::INVALID_VALUE};

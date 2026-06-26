@@ -422,9 +422,10 @@ private:
 
 		class Integer : public InputHandler {
 		protected:
-			bool        hexonly;
-			int         val_min, val_max;
-			std::string invalidmsg;
+			bool               hexonly;
+			int                val_min, val_max;
+			std::string        invalidmsg;
+			std::optional<int> special;
 
 		public:
 			int value = 0;
@@ -445,7 +446,8 @@ private:
 
 			Integer(bool empty_allowed, int min, int max, bool hex);
 			Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg);
-			Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg, std::string&& invalidmsg);
+			Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg, std::string&& invalidmsg,
+					std::optional<int> special = {});
 		};
 
 		class Shape : public Integer {
@@ -834,14 +836,14 @@ private:
 
 	std::shared_ptr<Menu> BusinessMenu(Actor* actor);
 
-	void StatLoop(Actor* actor);
-	void StatMenu(Actor* actor);
-	void StatActivate(Actor* actor);
-	bool StatCheck(Actor* actor);
-	void PalEffectLoop(Actor*);
-	void PalEffectMenu(Actor* actor);
-	void PalEffectActivate(Actor* actor);
-	bool PalEffectCheck(Actor* actor);
+	void                  StatLoop(Actor* actor);
+	void                  StatMenu(Actor* actor);
+	void                  StatActivate(Actor* actor);
+	bool                  StatCheck(Actor* actor);
+	void                  PalEffectLoop(Actor*);
+	std::shared_ptr<Menu> PalEffectMenu(Actor* actor);
+	void                  PalEffectActivate(Actor* actor);
+	bool                  PalEffectCheck(Actor* actor);
 
 	std::shared_ptr<Menu> TeleportMenu();
 

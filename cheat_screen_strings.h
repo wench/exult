@@ -259,6 +259,36 @@ struct Strings : public StringsBase {
 		static inline const String<0xA4E>       OnMap       = {};
 		static inline const String<0xA4F>       Coords      = {};
 	};
+
+	struct PaletteEffect {
+		struct MenuItems {
+			;
+			static inline const String<0xA50> RampRemap;
+			static inline const String<0xA51> Xform;
+			static inline const String<0xA52> Shift;
+			static inline const String<0xA53> Clear;
+		};
+
+		struct Display {
+			static inline const String<0xA54> PaletteEffect;
+			static inline const String<0xA55> None;
+			static inline const String<0xA56> RampRemapAllTo;
+			static inline const String<0xA57> RampRemap;
+			static inline const String<0xA58> To;
+			static inline const String<0xA59> Xform;
+			static inline const String<0xA5A> ShiftBy;
+			static inline const String<0xA5B> FromRampall;
+			static inline const String<0xA5C> FromRamp;
+		};
+
+		struct Prompts {
+			static inline const stringString<0xA5D> enterFromRamp;
+			static inline const stringString<0xA5E> or255forall;
+			static inline const stringString<0xA5F> enterXFORMIndex;
+			static inline const stringString<0xA60> entershiftamount;
+			static inline const stringString<0xA61> enterToRampnumberIndex;
+		};
+	};
 };
 
 #endif    // CHEAT_STRINGS_INCLUDED

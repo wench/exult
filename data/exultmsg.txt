@@ -1054,3 +1054,27 @@
 0xA4D:of
 0xA4E:OnMap #
 0xA4F:Coords 
+
+#palette effect Menu
+#menu items
+0xA50:Ramp Remap
+0xA51:Xform
+0xA52:shift
+0xA53:Clear
+#display Strings
+0xA54:Palette effect: 
+0xA55:None
+0xA56:Ramp Remap All To 
+0xA57:Ramp Remap 
+0xA58: To 
+0xA59:Xform 
+0xA5A:Shift by 
+0xA5B:From Ramp: All
+0xA5C:From Ramp: 
+
+#prompts
+0xA5D: enter From Ramp 
+0xA5E: or 255 for all
+0xA5F: enter XFORM Index
+0xA60: enter shift amount
+0xA61: enter To Ramp
