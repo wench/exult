@@ -826,11 +826,11 @@ private:
 
 	std::shared_ptr<Menu> NPCMenu(Actor* actor);
 
-	void         FlagLoop(Actor* actor);
-	void         FlagMenu(Actor* actor);
-	void         FlagActivate(Actor* actor);
-	bool         FlagCheck(Actor* actor);
-	Cheat_Prompt AdvancedFlagLoop(int flagnum, Actor* actor);
+	void                  FlagLoop(Actor* actor);
+	std::shared_ptr<Menu> NPCFlagMenu(Actor* actor);
+	void                  FlagActivate(Actor* actor);
+	bool                  FlagCheck(Actor* actor);
+	std::shared_ptr<Menu> AdvancedFlagMenu(unsigned flagnum, Actor* actor);
 
 	std::shared_ptr<Menu> BusinessMenu(Actor* actor);
 

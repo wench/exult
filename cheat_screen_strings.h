@@ -146,7 +146,7 @@ struct Strings : public StringsBase {
 		}
 	} ScheduleActivity = {};
 
-	static inline const String<0x970, 64> NPCFlag = {};
+	static inline const stringviewString<0x970, 64> NPCFlag = {};
 
 	static inline const String<0x9B0, 4> Alignment = {};
 
