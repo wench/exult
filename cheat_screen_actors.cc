@@ -268,7 +268,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
 	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
 		auto menu = self->GetMyMenu();
 		if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(menu)) {
-			PalEffectLoop(actor);
+			return PalEffectMenu(actor);
 		}
 		return {};
 	};
@@ -1071,8 +1071,7 @@ void CheatScreen::PalEffectLoop(Actor* actor) {
 	}
 }
 
-void CheatScreen::PalEffectMenu(Actor* actor) {
-	char buf[512];
+std::shared_ptr<CheatScreen::Menu> CheatScreen::PalEffectMenu(Actor* actor) {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 	const int offsetx  = 15;
 	const int offsety1 = 81;
@@ -1083,45 +1082,127 @@ void CheatScreen::PalEffectMenu(Actor* actor) {
 	// const int offsety2 = maxy - 36;
 
 #endif
-	int pt = actor->get_palette_transform();
-	if (pt == 0) {
-		snprintf(buf, sizeof(buf), "Palette effect: None");
-	} else if ((pt & ShapeID::PT_RampRemapAllFrom) == ShapeID::PT_RampRemapAllFrom) {
-		snprintf(buf, sizeof(buf), "Palette effect: Ramp Remap All To %i", pt & 31);
-	} else if ((pt & ShapeID::PT_RampRemap) == ShapeID::PT_RampRemap) {
-		snprintf(buf, sizeof(buf), "Palette effect: Ramp Remap %i To %i", (pt >> 5) & 31, pt & 31);
-	} else if ((pt & ShapeID::PT_xForm) == ShapeID::PT_xForm) {
-		snprintf(buf, sizeof(buf), "Palette effect: XForm %i", pt & 31);
-	} else if (pt < 256) {
-		snprintf(buf, sizeof(buf), "Palette effect: Shift by %i", pt & 0xff);
-	}
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, maxy - offsety1 - 119, 8, fontcolor.colors);
 
-	if (state.command == 't') {
-		if (state.saved_value == 255) {
-			snprintf(buf, sizeof(buf), "From Ramp: All");
-		} else {
-			snprintf(buf, sizeof(buf), "From Ramp: %i", state.saved_value & 31);
-		}
-
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, maxy - offsety1 - 110, 8, fontcolor.colors);
-	}
+	std::shared_ptr<MenuCommand>                                        command;
+	std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> items;
+	const char*                                                         label;
 
 	// Left Column
 
 	// ramp remap
-	AddMenuItem(offsetx, maxy - offsety1 - 99, SDLK_R, "amp Remap");
+	command               = std::make_shared<MenuCommand>();
+	unsigned int numramps = 0;
+	if (numramps) {
+		numramps--;
+	}
+	gwin->get_pal()->get_ramps(numramps);
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+			false, 0, numramps, false, Strings::PaletteEffect::Prompts::enterFromRamp, Strings::INVALID_VALUE, 255));
+	command->inputs[0]->hotspots.emplace_back(0, 0, 0, Strings::PaletteEffect::Prompts::or255forall);
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+			false, 0, numramps, false, Strings::PaletteEffect::Prompts::enterToRampnumberIndex, Strings::INVALID_VALUE));
+	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto from = static_cast<InputHandlers::Integer*>(self->inputs[0].get());
+		auto to   = static_cast<InputHandlers::Integer*>(self->inputs[1].get());
+		if (from->value == 255) {
+			actor->set_palette_transform(ShapeID::PT_RampRemapAllFrom | (to->value & 31));
+		} else {
+			actor->set_palette_transform(ShapeID::PT_RampRemap | (to->value & 31) | ((from->value & 0xff) << 5));
+		}
+		return {};
+	};
+	command->events.paint_display = [=](MenuCommand* self) -> bool {
+		char buf[41];
+		if (self->phase > 0) {
+			auto from = static_cast<InputHandlers::Integer*>(self->inputs[0].get());
+
+			if (from->value == 255) {
+				snprintf(buf, sizeof(buf), "%s", Strings::PaletteEffect::Display::FromRampall());
+			} else {
+				snprintf(buf, sizeof(buf), "%s%i", Strings::PaletteEffect::Display::FromRamp(), from->value & 31);
+			}
+
+			font->paint_text_fixedwidth(ibuf, buf, offsetx, maxy - offsety1 - 110, 8, fontcolor.colors);
+		}
+		return false;
+	};
+	label = Strings::PaletteEffect::MenuItems::RampRemap;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 99, label[0], label + 1), command);
 
 	// xform
-	AddMenuItem(offsetx, maxy - offsety1 - 90, SDLK_X, "form");
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+			false, 0, Shape_manager::get_instance()->get_xforms_cnt(), false, Strings::PaletteEffect::Prompts::enterXFORMIndex));
+	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto x = static_cast<InputHandlers::Integer*>(self->inputs[0].get());
+		actor->set_palette_transform(ShapeID::PT_xForm | x->value % int(Shape_manager::get_instance()->get_xforms_cnt()));
+		return {};
+	};
+	label = Strings::PaletteEffect::MenuItems::Xform;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 90, label[0], label + 1), command);
 
 	// Shift
-	AddMenuItem(offsetx, maxy - offsety1 - 81, SDLK_S, "hift");
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(
+			std::make_shared<InputHandlers::Integer>(false, 0, 255, false, Strings::PaletteEffect::Prompts::entershiftamount));
+	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto s = static_cast<InputHandlers::Integer*>(self->inputs[0].get());
+		actor->set_palette_transform(ShapeID::PT_Shift | (s->value & 0xff));
+		return {};
+	};
+	label = Strings::PaletteEffect::MenuItems::Shift;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 81, label[0], label + 1), command);
 
 	// clear
-	AddMenuItem(offsetx, maxy - offsety1 - 72, SDLK_C, "lear");
+	command                  = std::make_shared<MenuCommand>();
+	command->events.Activate = [=](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		actor->set_palette_transform(0);
+		return {};
+	};
+	label = Strings::PaletteEffect::MenuItems::Clear;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 72, label[0], label + 1), command);
 
-	SharedMenu();
+	auto menu                  = std::make_shared<Menu>(std::move(items));
+	menu->events.paint_display = [=](MenuCommand*) -> bool {
+		char buf[41];
+		int  pt = actor->get_palette_transform();
+		if (pt == 0) {
+			snprintf(
+					buf, sizeof(buf), "%s%s", Strings::PaletteEffect::Display::PaletteEffect(),
+					Strings::PaletteEffect::Display::None());
+		} else if ((pt & ShapeID::PT_RampRemapAllFrom) == ShapeID::PT_RampRemapAllFrom) {
+			snprintf(
+					buf, sizeof(buf), "%s%s%i", Strings::PaletteEffect::Display::PaletteEffect(),
+					Strings::PaletteEffect::Display::RampRemapAllTo(), pt & 31);
+		} else if ((pt & ShapeID::PT_RampRemap) == ShapeID::PT_RampRemap) {
+			snprintf(
+					buf, sizeof(buf), "%s%s%i%s%i", Strings::PaletteEffect::Display::PaletteEffect(),
+					Strings::PaletteEffect::Display::RampRemap(), (pt >> 5) & 31, Strings::PaletteEffect::Display::To(), pt & 31);
+		} else if ((pt & ShapeID::PT_xForm) == ShapeID::PT_xForm) {
+			snprintf(
+					buf, sizeof(buf), "%s%s%i", Strings::PaletteEffect::Display::PaletteEffect(),
+					Strings::PaletteEffect::Display::Xform(), pt & 31);
+		} else if (pt < 256) {
+			snprintf(
+					buf, sizeof(buf), "%s%s%i", Strings::PaletteEffect::Display::PaletteEffect(),
+					Strings::PaletteEffect::Display::ShiftBy(), pt & 0xff);
+		}
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, maxy - offsety1 - 119, 8, fontcolor.colors);
+
+#if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
+		// Return false so our parent Menu's (NPC Menu) display is shown
+		return false;
+#else
+		// But not on mobile because the changed layout doesn't fit
+
+		// Paint the actors shape here because the NPC menu display wont be painting it
+		if (Shape_frame* shape = actor->get_shape()) {
+			actor->paint_shape(shape->get_xright() + 240, shape->get_yabove() + 8, true);
+		}
+		return true;
+#endif
+	};
+	return menu;
 }
 
 void CheatScreen::PalEffectActivate(Actor* actor) {
