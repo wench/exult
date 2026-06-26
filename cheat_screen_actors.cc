@@ -126,9 +126,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
 	command                  = std::make_shared<MenuCommand>();
 	command->events.run      = hideifnoactor;
 	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
-		// return BusinessMenu(MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu()));
-		BusinessLoop(MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu()));
-		return {};
+		return BusinessMenu(MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu()));
 	};
 	label = Strings::NPCMenu::BusinessActivity;
 	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 99, label[0], label + 1), command);
@@ -1055,310 +1053,194 @@ bool CheatScreen::FlagCheck(Actor* actor) {
 // Business Schedules
 //
 
-void CheatScreen::BusinessLoop(Actor* actor) {
-	bool looping = true;
+std::shared_ptr<CheatScreen::Menu> CheatScreen::BusinessMenu(Actor* actor) {
+	std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> items;
+	std::shared_ptr<MenuCommand>                                        command;
 
-	int time = 0;
-	int prev = 0;
-
-	ClearState clear(state);
-	while (looping) {
-		hotspots.clear();
-		gwin->clear_screen();
-
-		// First the display
-		if (state.GetMode() == CP_Activity) {
-			ActivityDisplay();
-		} else {
-			BusinessDisplay(actor);
-		}
-
-		// Now the Menu Column
-		BusinessMenu(actor);
-
-		// Finally the Prompt...
-		SharedPrompt();
-
-		// Draw it!
-		EndFrame();
-
-		// Check to see if we need to change menus
-		if (state.activate) {
-			BusinessActivate(actor, time, prev);
-			state.activate = false;
-			continue;
-		}
-
-		if (SharedInput()) {
-			looping = BusinessCheck(actor, time);
-		}
-	}
-}
-
-void CheatScreen::BusinessDisplay(Actor* actor) {
-	char             buf[512];
-	const Tile_coord t = actor->get_tile();
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 	const int offsetx  = 10;
+	const int offsety  = 0;
 	const int offsety1 = 20;
 	const int offsetx2 = 171;
 	const int offsety2 = 8;
 	const int offsety3 = 0;
 #else
 	const int offsetx  = 0;
+	const int offsety  = 4;
 	const int offsety1 = 0;
 	const int offsetx2 = offsetx;
 	const int offsety2 = 28;
 	const int offsety3 = 16;
 #endif
+	const char* label;
 
-	// Now the info
-	const std::string namestr = actor->get_npc_name();
-	snprintf(buf, sizeof(buf), "NPC %i - %s", actor->get_npc_num(), namestr.c_str());
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 0, 8, fontcolor.colors);
-
-	snprintf(buf, sizeof(buf), "Loc (%04i, %04i, %02i)", t.tx, t.ty, t.tz);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx, 8, 8, fontcolor.colors);
-
-#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	const char activity_msg[] = "%2i %s";
-#else
-	const char activity_msg[] = "Current Activity:  %2i - %s";
-#endif
-	snprintf(buf, sizeof(buf), activity_msg, actor->get_schedule_type(), Strings::ScheduleActivity[actor->get_schedule_type()]);
-	font->paint_text_fixedwidth(ibuf, buf, offsetx2, offsety3, 8, fontcolor.colors);
-
-	const Actor::Schedule_list* scheds = actor->get_schedules();
-
-	if (scheds != nullptr) {
-		font->paint_text_fixedwidth(ibuf, "Schedules:", offsetx2, offsety2, 8, fontcolor.colors);
-
-		int types[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
-		int x[8]     = {0};
-		int y[8]     = {0};
-
-		for (const auto& sched : *scheds) {
-			const int time        = sched.get_time();
-			types[time]           = sched.get_type();
-			const Tile_coord tile = sched.get_pos();
-			x[time]               = tile.tx;
-			y[time]               = tile.ty;
-		}
-
-		font->paint_text_fixedwidth(ibuf, "12 AM:", offsetx, 36 - offsety1, 8, fontcolor.colors);
-		font->paint_text_fixedwidth(ibuf, " 3 AM:", offsetx, 44 - offsety1, 8, fontcolor.colors);
-		font->paint_text_fixedwidth(ibuf, " 6 AM:", offsetx, 52 - offsety1, 8, fontcolor.colors);
-		font->paint_text_fixedwidth(ibuf, " 9 AM:", offsetx, 60 - offsety1, 8, fontcolor.colors);
-		font->paint_text_fixedwidth(ibuf, "12 PM:", offsetx, 68 - offsety1, 8, fontcolor.colors);
-		font->paint_text_fixedwidth(ibuf, " 3 PM:", offsetx, 76 - offsety1, 8, fontcolor.colors);
-		font->paint_text_fixedwidth(ibuf, " 6 PM:", offsetx, 84 - offsety1, 8, fontcolor.colors);
-		font->paint_text_fixedwidth(ibuf, " 9 PM:", offsetx, 92 - offsety1, 8, fontcolor.colors);
-
-		for (int i = 0; i < 8; i++) {
-			if (types[i] != -1) {
-				snprintf(buf, sizeof(buf), "%2i (%4i,%4i) - %s", types[i], x[i], y[i], Strings::ScheduleActivity[types[i]]);
-				font->paint_text_fixedwidth(ibuf, buf, offsetx + 56, (36 - offsety1) + i * 8, 8, fontcolor.colors);
-			}
-		}
+	if (!actor) {
+		return {};
 	}
-}
-
-void CheatScreen::BusinessMenu(Actor* actor) {
-	char buf[64];
-	// Left Column
+	std::function<bool(MenuCommand*)> ActivityListDisplay = [this](MenuCommand*) -> bool {
+		char buf[64];
+		// 31 activities
+		const int num_acts = 31;
+		// This defaults to 3 columns of 11. On mobile the vertical space is limited so row spacing is squeezed to 7 pixels
+		// If there is enough space on mobile for 4 columns we do 4 columns of 9 with row spacing of 8
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	const int offsetx = 10;
-	const int offsety = 0;
+		const int rowheight = maxx >= 420 ? 8 : 7;
+		const int colsize   = maxx >= 420 ? 9 : 11;
 #else
-	const int offsetx = 0;
-	const int offsety = 4;
+		const int rowheight = 8;
+		const int colsize   = 11;
 #endif
-	int nextx;
+		const int numcols = (num_acts + colsize - 1) / colsize;
+
+		for (int a = 0; a <= num_acts; a++) {
+			int row = a % colsize;
+			int col = a / colsize;
+			snprintf(buf, sizeof(buf), "%2i:%s", a, Strings::ScheduleActivity[a]);
+			buf[std::size(buf) - 1] = 0;
+			font->paint_text_fixedwidth(
+					ibuf, buf, (maxx * col) / numcols - (colsize <= 10 ? 8 : 0), rowheight * row, 8, fontcolor.colors);
+		}
+
+		return true;
+	};
+
+	int y_current;    // y pos for set current activity menu item
 	// Might break on monster npcs?
 	if (actor->get_npc_num() > 0 && !actor->is_monster()) {
-		for (int h = 0; h < 24; h += 3) {
-			int row = h / 3;
-			int h12 = h % 12;
+		char buf[64];
+		int  nextx;
+		for (int time = 0; time < 8; time++) {
+			int h12 = (time & 3) * 3;
 			h12     = h12 ? h12 : 12;
-			int y   = 96 - row * 8;
-			snprintf(buf, sizeof(buf), "%2i %cM:", h12, h / 12 ? 'P' : 'A');
-			nextx = offsetx;
-			nextx += 8 + font->paint_text_fixedwidth(ibuf, buf, nextx, maxy - offsety - y, 8, fontcolor.colors);
-			nextx += 8 + AddMenuItem(nextx, maxy - offsety - y, SDLK_A + row, " Set");
-			nextx += 8 + AddMenuItem(nextx, maxy - offsety - y, SDLK_I + row, " Location");
-			AddMenuItem(nextx, maxy - offsety - y, SDLK_1 + row, " Clear");
-		}
-		nextx = offsetx;
-		nextx += 8 + AddMenuItem(nextx, maxy - offsety - 32, SDLK_S, "et Current Activity");
+			int y   = 96 - time * 8;
+			nextx   = offsetx;
+			snprintf(buf, sizeof(buf), "%2i %2s:", h12, time < 4 ? Strings::am() : Strings::pm());
+			buf[std::size(buf) - 1] = 0;
+			label                   = buf;
+			items.emplace_front(Hotspot(nextx, maxy - offsety - y, 0, label), nullptr);
+			nextx += 8 + 8 * strlen(label);
+			command = std::make_shared<MenuCommand>();
+			command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, 31, false, Strings::ENTER_ACTIVITY));
+			command->events.Activate = [actor, time](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+				if (auto input = dynamic_cast<InputHandlers::Integer*>(self->inputs.front().get())) {
+					actor->set_schedule_time_type(time, input->value);
+				}
+				return {};
+			};
+			command->events.paint_display = ActivityListDisplay;
+			label                         = Strings::BusinessMenu::Set;
 
-		AddMenuItem(nextx, maxy - offsety - 32, SDLK_R, "evert");
+			items.emplace_front(Hotspot(nextx, maxy - offsety - y, 'A' + time, label), command);
+			nextx += 32 + 8 * strlen(label);
+			command = std::make_shared<MenuCommand>();
+			command->inputs.reserve(3);
+			command->inputs.push_back(
+					std::make_shared<InputHandlers::Integer>(false, 0, c_num_tiles, false, Strings::ENTER_X_COORD));
+			command->inputs.push_back(
+					std::make_shared<InputHandlers::Integer>(false, 0, c_num_tiles, false, Strings::ENTER_Y_COORD));
+			command->inputs.push_back(std::make_shared<InputHandlers::Integer>(true, 0, 255, false, Strings::ENTER_Z_COORD));
+			command->events.Activate = [actor, time](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+				auto xinput = dynamic_cast<InputHandlers::Integer*>(self->inputs[0].get());
+				auto yinput = dynamic_cast<InputHandlers::Integer*>(self->inputs[1].get());
+				auto zinput = dynamic_cast<InputHandlers::Integer*>(self->inputs[2].get());
+				if (xinput && yinput && zinput) {
+					actor->set_schedule_time_location(time, xinput->value, yinput->value, zinput->value);
+				}
+				return {};
+			};
+			label = Strings::BusinessMenu::Location;
+			items.emplace_front(Hotspot(nextx, maxy - offsety - y, 'I' + time, label), command);
+			nextx += 32 + 8 * strlen(label);
+			command                  = std::make_shared<MenuCommand>();
+			command->events.Activate = [actor, time](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+				actor->remove_schedule(time);
+				return {};
+			};
+			items.emplace_front(Hotspot(nextx, maxy - offsety - y, SDLK_1 + time, Strings::BusinessMenu::Clear), command);
+		}
+		nextx = offsetx + 32 + 8 * strlen(Strings::BusinessMenu::SetCurrentActivity + 1);
+
+		command                  = std::make_shared<MenuCommand>();
+		command->events.Activate = [actor](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+			Game_window::get_instance()->revert_schedules(actor);
+			return {};
+		};
+		label = Strings::BusinessMenu::Revert;
+		items.emplace_front(Hotspot(nextx, maxy - offsety - 32, label[0], label + 1), command);
+		y_current = 32;
 
 	} else {
-		AddMenuItem(offsetx, maxy - offsety - 96, SDLK_S, "et Current Activity");
+		y_current = 96;
 	}
-	SharedMenu();
-}
-
-void CheatScreen::BusinessActivate(Actor* actor, int& time, int& prev) {
-	int i = std::atoi(state.input);
-
-	state.SetMode(CP_Command, false);
-	const int old = state.command;
-	state.command = 0;
-	switch (old) {
-	case SDLK_A:    // Set Activity
-		if (i < 0 || i > 31) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			state.SetMode(CP_Activity);
-			state.val_min = 0;
-			state.val_max = 31;
-			state.command = 'a';
-		} else {
-			actor->set_schedule_time_type(time, i);
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, 31, false, Strings::ENTER_ACTIVITY));
+	command->events.Activate = [actor](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		if (auto input = dynamic_cast<InputHandlers::Integer*>(self->inputs.front().get())) {
+			actor->set_schedule_type(input->value);
 		}
-		break;
+		return {};
+	};
+	command->events.paint_display = ActivityListDisplay;
+	label                         = Strings::BusinessMenu::SetCurrentActivity;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety - y_current, label[0], label + 1), command);
 
-	case SDLK_I:    // X Coord
-		if (i < 0 || i > c_num_tiles) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			state.SetMode(CP_XCoord);
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-			state.command = 'i';
-		} else {
-			prev = i;
-			state.SetMode(CP_YCoord);
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-			state.command = 'j';
+	auto menu                  = std::make_shared<Menu>(std::move(items));
+	menu->events.paint_display = [=](MenuCommand*) -> bool {
+		char             buf[512];
+		const Tile_coord t = actor->get_tile();
+
+		// Now the info
+		const std::string namestr = actor->get_npc_name();
+		snprintf(buf, sizeof(buf), "%s%i - %s", Strings::NPCMenu::NPC_(), actor->get_npc_num(), namestr.c_str());
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 0, 8, fontcolor.colors);
+
+		snprintf(buf, sizeof(buf), "%s(%04i, %04i, %02i)", Strings::NPCMenu::Loc_(), t.tx, t.ty, t.tz);
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 8, 8, fontcolor.colors);
+
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+		const char  activity_msg[]     = "%s%2i %s";
+		const char* activity_msg_label = "";
+#else
+		const char  activity_msg[]     = "%s%2i - %s";
+		const char* activity_msg_label = Strings::NPCMenu::CurrentActivity_;
+#endif
+		snprintf(
+				buf, sizeof(buf), activity_msg, activity_msg_label, actor->get_schedule_type(),
+				Strings::ScheduleActivity[actor->get_schedule_type()]);
+		font->paint_text_fixedwidth(ibuf, buf, offsetx2, offsety3, 8, fontcolor.colors);
+
+		const Actor::Schedule_list* scheds = actor->get_schedules();
+
+		// Monsters return an empty list so don't show anything
+		if (scheds != nullptr && !actor->is_monster()) {
+			font->paint_text_fixedwidth(ibuf, "Schedules:", offsetx2, offsety2, 8, fontcolor.colors);
+
+			int        types[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+			Tile_coord tile[8];
+
+			for (const auto& sched : *scheds) {
+				const int time = sched.get_time();
+				types[time]    = sched.get_type();
+				tile[time]     = sched.get_pos();
+			}
+
+			for (int i = 0; i < 8; i++) {
+				int h12 = (i % 4) * 3;
+				h12     = h12 ? h12 : 12;
+
+				snprintf(buf, sizeof(buf), "%2i %2s:", h12, i < 4 ? Strings::am() : Strings::pm());
+				font->paint_text_fixedwidth(ibuf, buf, offsetx, (36 - offsety1) + i * 8, 8, fontcolor.colors);
+				if (types[i] != -1) {
+					snprintf(
+							buf, sizeof(buf), "%2i (%4i,%4i,%2i) - %s", types[i], tile[i].tx, tile[i].ty, tile[i].tz,
+							Strings::ScheduleActivity[types[i]]);
+					font->paint_text_fixedwidth(ibuf, buf, offsetx + 56, (36 - offsety1) + i * 8, 8, fontcolor.colors);
+				}
+			}
 		}
-		break;
-
-	case SDLK_J:    // Y Coord
-		if (i < 0 || i > c_num_tiles) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			state.SetMode(CP_YCoord);
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-			state.command = 'j';
-		} else {
-			actor->set_schedule_time_location(time, prev, i);
-		}
-		break;
-
-	case SDLK_1:    // Clear
-		actor->remove_schedule(time);
-		break;
-
-	case SDLK_S:    // Set Current
-		if (i < 0 || i > 31) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			state.SetMode(CP_Activity);
-			state.val_min = 0;
-			state.val_max = 31;
-			state.command = 's';
-		} else {
-			actor->set_schedule_type(i);
-		}
-		break;
-
-	case SDLK_R:    // Revert
-		Game_window::get_instance()->revert_schedules(actor);
-		break;
-
-	default:
-		break;
-	}
-	std::memset(state.input, 0, sizeof(state.input));
-}
-
-// Checks the state.input
-bool CheatScreen::BusinessCheck(Actor* actor, int& time) {
-	// Might break on monster npcs?
-	if (actor->get_npc_num() > 0) {
-		switch (state.command) {
-		case SDLK_A:
-		case SDLK_B:
-		case SDLK_C:
-		case SDLK_D:
-		case SDLK_E:
-		case SDLK_F:
-		case SDLK_G:
-		case SDLK_H:
-			time          = state.command - 'a';
-			state.command = 'a';
-			state.SetMode(CP_Activity);
-			state.val_min = 0;
-			state.val_max = 31;
-			return true;
-
-		case SDLK_I:
-		case SDLK_J:
-		case SDLK_K:
-		case SDLK_L:
-		case SDLK_M:
-		case SDLK_N:
-		case SDLK_O:
-		case SDLK_P:
-			time          = state.command - 'i';
-			state.command = 'i';
-			state.SetMode(CP_XCoord);
-			state.val_min = 0;
-			state.val_max = c_num_tiles;
-			return true;
-
-		case SDLK_1:
-		case SDLK_2:
-		case SDLK_3:
-		case SDLK_4:
-		case SDLK_5:
-		case SDLK_6:
-		case SDLK_7:
-		case SDLK_8:
-			time           = state.command - '1';
-			state.command  = '1';
-			state.activate = true;
-			return true;
-
-		case SDLK_R:
-			state.command  = 'r';
-			state.activate = true;
-			return true;
-
-		default:
-			break;
-		}
-	}
-
-	switch (state.command) {
-		// Set Current
-	case SDLK_S:
-		state.command  = 's';
-		state.input[0] = 0;
-		state.SetMode(CP_Activity);
-		state.val_min = 0;
-		state.val_max = 31;
-		break;
-
-		// X and Escape leave
-	case SDLK_ESCAPE:
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		return false;
-
-		// Unknown
-	default:
-		state.command = 0;
-		state.SetMode(CP_InvalidCom, false);
-		break;
-	}
-
-	return true;
+		return true;
+	};
+	return menu;
 }
 
 //

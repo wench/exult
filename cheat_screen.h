@@ -832,11 +832,7 @@ private:
 	bool         FlagCheck(Actor* actor);
 	Cheat_Prompt AdvancedFlagLoop(int flagnum, Actor* actor);
 
-	void BusinessLoop(Actor* actor);
-	void BusinessDisplay(Actor* actor);
-	void BusinessMenu(Actor* actor);
-	void BusinessActivate(Actor* actor, int& time, int& prev);
-	bool BusinessCheck(Actor* actor, int& time);
+	std::shared_ptr<Menu> BusinessMenu(Actor* actor);
 
 	void StatLoop(Actor* actor);
 	void StatMenu(Actor* actor);
