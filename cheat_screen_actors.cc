@@ -37,8 +37,6 @@
 #include <algorithm>
 #include <cstring>
 
-
-
 CheatScreen::InputHandlers::NPC::NPC(bool empty_allowed, std::string&& promptmsg)
 		: GameObject(empty_allowed, std::move(promptmsg)) {
 	hotspots.clear();
@@ -90,134 +88,14 @@ void CheatScreen::ActivityDisplay() {
 }
 
 //
-// NPCs
+// NPC Menu
 //
 
-CheatScreen::Cheat_Prompt CheatScreen::NPCLoop(int num) {
-	Actor* actor;
+std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
+	std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> items;
+	std::shared_ptr<MenuCommand>                                        command;
+	const char*                                                         label;
 
-	bool looping = true;
-
-	ClearState clear(state);
-	while (looping) {
-		hotspots.clear();
-		if (num == -1) {
-			actor = grabbed;
-		} else {
-			actor = gwin->get_npc(num);
-		}
-		grabbed = actor;
-		if (actor) {
-			num = actor->get_npc_num();
-		}
-
-		gwin->clear_screen();
-
-		// First the display
-		NPCDisplay(actor, num);
-
-		// Now the Menu Column
-		NPCMenu(actor, num);
-
-		// Finally the Prompt...
-		SharedPrompt();
-		// Draw it!
-		EndFrame();
-
-		// Check to see if we need to change menus
-		if (state.activate) {
-			NPCActivate(actor, num);
-			state.activate = false;
-			continue;
-		}
-
-		if (SharedInput()) {
-			looping = NPCCheck(actor, num);
-		}
-	}
-	return CP_Command;
-}
-
-void CheatScreen::NPCDisplay(Actor* actor, int& num) {
-	char buf[512];
-#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	const int offsetx  = 15;
-	const int offsety1 = 73;
-#else
-	const int offsetx  = 0;
-	const int offsety1 = 0;
-#endif
-	if (actor) {
-		const Tile_coord t = actor->get_tile();
-
-		// Paint the actors shape
-		Shape_frame* shape = actor->get_shape();
-		if (shape) {
-			actor->paint_shape(shape->get_xright() + 240, shape->get_yabove());
-		}
-
-		// Now the info
-		const std::string namestr = actor->get_npc_name();
-		snprintf(buf, sizeof(buf), "NPC %i - %s%s", num, namestr.c_str(), actor->is_unused() ? " (Unused)" : "");
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, 0, 8, fontcolor.colors);
-
-		snprintf(buf, sizeof(buf), "Loc (%04i, %04i, %02i)", t.tx, t.ty, t.tz);
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, 9, 8, fontcolor.colors);
-
-		snprintf(
-				buf, sizeof(buf), "Shape %04i:%02i  %s", actor->get_shapenum(), actor->get_framenum(),
-				actor->get_flag(Obj_flags::met) ? "Met" : "Not Met");
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, 18, 8, fontcolor.colors);
-
-		snprintf(
-				buf, sizeof(buf), "Current Activity: %2i - %s", actor->get_schedule_type(),
-				Strings::ScheduleActivity[actor->get_schedule_type()]);
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 36, 8, fontcolor.colors);
-
-		snprintf(buf, sizeof(buf), "Experience: %i", actor->get_property(Actor::exp));
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 45, 8, fontcolor.colors);
-
-		snprintf(buf, sizeof(buf), "Level: %i", actor->get_level());
-		font->paint_text_fixedwidth(ibuf, buf, offsetx + 144, offsety1 + 45, 8, fontcolor.colors);
-
-		snprintf(
-				buf, sizeof(buf), "Training: %2i  Health: %2i", actor->get_property(Actor::training),
-				actor->get_property(Actor::health));
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 54, 8, fontcolor.colors);
-
-		if (num != -1) {
-			int ucitemnum = 0x10000 - num;
-			if (!num) {
-				ucitemnum = 0xfe9c;
-			}
-			snprintf(buf, sizeof(buf), "Usecode item %4x function %x", ucitemnum, actor->get_usecode());
-			font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 63, 8, fontcolor.colors);
-		} else {
-			snprintf(buf, sizeof(buf), "Usecode function %x", actor->get_usecode());
-			font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 63, 8, fontcolor.colors);
-		}
-
-		if (actor->get_flag(Obj_flags::charmed)) {
-			snprintf(
-					buf, sizeof(buf), "Alignment: %s (orig: %s)", Strings::Alignment[actor->get_effective_alignment()],
-					Strings::Alignment[actor->get_alignment()]);
-		} else {
-			snprintf(buf, sizeof(buf), "Alignment: %s", Strings::Alignment[actor->get_alignment()]);
-		}
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 72, 8, fontcolor.colors);
-
-		if (actor->get_polymorph() != -1) {
-			snprintf(buf, sizeof(buf), "Polymorphed from %04i", actor->get_polymorph());
-			font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 81, 8, fontcolor.colors);
-		}
-	} else {
-		snprintf(buf, sizeof(buf), "NPC %i - Invalid NPC!", num);
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, 0, 8, fontcolor.colors);
-	}
-}
-
-void CheatScreen::NPCMenu(Actor* actor, int& num) {
-	ignore_unused_variable_warning(num);
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 	const int offsetx  = 15;
 	const int offsety1 = 74;
@@ -226,6 +104,7 @@ void CheatScreen::NPCMenu(Actor* actor, int& num) {
 	const int offsetx3 = 175;
 	const int offsety3 = 63;
 	const int offsety4 = 72;
+	const int offsetx1 = 6;
 #else
 	const int offsetx  = 0;
 	const int offsety1 = 0;
@@ -234,272 +113,310 @@ void CheatScreen::NPCMenu(Actor* actor, int& num) {
 	const int offsetx3 = offsetx + 160;
 	const int offsety3 = maxy - 45;
 	const int offsety4 = maxy - 36;
+	const int offsetx1 = 0;
 #endif
 	// Left Column
+	auto hideifnoactor = [](MenuCommand* self) {
+		bool hide = !MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu());
+		self->hotspot->setHidden(0, hide);
+		self->hotspot->setHidden(1, hide);
+	};
 
-	if (actor) {
-		// Business Activity
-		AddMenuItem(offsetx, maxy - offsety1 - 99, SDLK_B, "usiness Activity");
+	// Business Activity
+	command                  = std::make_shared<MenuCommand>();
+	command->events.run      = hideifnoactor;
+	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		// return BusinessMenu(MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu()));
+		BusinessLoop(MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu()));
+		return {};
+	};
+	label = Strings::NPCMenu::BusinessActivity;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 99, label[0], label + 1), command);
 
-		// Change Shape
-		AddMenuItem(offsetx, maxy - offsety1 - 90, SDLK_C, "hange Shape");
+	// Change Shape
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::Shape>(false, false));
+	command->events.run      = hideifnoactor;
+	label                    = Strings::NPCMenu::ChangeShape;
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto sinput = static_cast<InputHandlers::Shape*>(self->inputs[0].get());
+		if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu())) {
+			if (actor->get_npc_num() != 0) {
+				actor->set_shape(sinput->shapenum);
+			} else {
+				actor->set_polymorph(sinput->shapenum);
+			}
+			throw MenuCommandException{Strings::SHAPE_SET, true};
+		}
+		return {};
+	};
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 90, label[0], label + 1), command);
 
-		// XP
-		AddMenuItem(offsetx, maxy - offsety1 - 81, SDLK_E, "xperience");
+	// XP
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+			false, 0, Actor::max_exp, false, Strings::ENTER_VALUE, Strings::INVALID_VALUE));
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu())) {
+			actor->set_property(Actor::exp, static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
+		}
+		return {};
+	};
+	command->events.run = hideifnoactor;
+	label               = Strings::NPCMenu::Exprience;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 81, label[0], label + 1), command);
 
-		// NPC Flags
-		AddMenuItem(offsetx, maxy - offsety1 - 72, SDLK_N, "pc Flags");
+	label                    = Strings::NPCMenu::Npcflags;
+	command                  = std::make_shared<MenuCommand>();
+	command->events.run      = hideifnoactor;
+	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		// return NPCFlagMenu(MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu()));
+		FlagLoop(MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu()));
+		return {};
+	};
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 72, label[0], label + 1), command);
 
-		// Name
-		AddMenuItem(offsetx, maxy - offsety1 - 63, SDLK_1, " Name");
-	}
-
-	SharedMenu();
+	// Name
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::String>(false, Strings::ENTER_A_NEW_NAME, Strings::CANCELLED));
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto menu = self->GetMyMenu();
+		if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(menu)) {
+			actor->set_npc_name(self->inputs[0]->getInput());
+			throw MenuCommandException{Strings::NAME_CHANGED, true};
+		}
+		return {};
+	};
+	command->events.run = hideifnoactor;
+	label               = Strings::NPCMenu::Name;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 63, label[0], label + 1), command);
 
 	// Right Column
 
-	if (actor) {
-		// Stats
-		AddMenuItem(offsetx + 160, maxy - offsety1 - 99, SDLK_S, "tats");
-
-		// Training Points
-		AddMenuItem(offsetx + 160, maxy - offsety1 - 90, SDLK_2, " Training Points");
-
-		// Teleport
-		AddMenuItem(offsetx + 160, maxy - offsety1 - 81, SDLK_T, "eleport to NPC");
-
-		// Palette Effect
-		AddMenuItem(offsetx + 160, maxy - offsety1 - 72, SDLK_P, "alette Effect");
-
-		// Walk to Avatar
-		AddMenuItem(offsetx2 + 160, maxy - offsety2 - 63, SDLK_W, "alk to Avatar");
+	// stats -  This is its own menu but we generate it here insteads of using a separate menu function
+	std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> stats_items;
+	{
+		// Stats Left Column - Generated from this array
+		std::tuple<const char*, Actor::Item_properties, int, int> stats[] = {
+				{   Strings::NPCStatsMenu::Dexterity,    Actor::dexterity, 0, 255},
+				{   Strings::NPCStatsMenu::FoodLevel,   Actor::food_level, 0, 255},
+				{Strings::NPCStatsMenu::Intellicence, Actor::intelligence, 0, 255},
+				{    Strings::NPCStatsMenu::Strength,     Actor::strength, 0, 255},
+				{ Strings::NPCStatsMenu::CombatSkill,       Actor::combat, 0, 255},
+				{   Strings::NPCStatsMenu::HitPoints,       Actor::health, 0, 255},
+				{ Strings::NPCStatsMenu::MagicPoints,        Actor::magic, 0, 255},
+				{   Strings::NPCStatsMenu::ManaLevel,         Actor::mana, 0, 255},
+		};
+		int stat_posy = maxy - offsety1 - 108;
+		for (const auto& stat : stats) {
+			int prop = std::get<1>(stat);
+			command  = std::make_shared<MenuCommand>();
+			command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+					false, std::get<2>(stat), std::get<3>(stat), false, Strings::ENTER_VALUE, Strings::INVALID_VALUE));
+			command->events.run = [prop](MenuCommand* self) {
+				auto menu = self->GetMyMenu()->GetMyMenu();
+				if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(menu)) {
+					char buf[16];
+					snprintf(buf, sizeof(buf), "%3d", actor->get_property(prop));
+					self->hotspot->label_rw = self->hotspot->label + buf;
+				}
+			};
+			command->events.Activate = [prop](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+				auto menu = self->GetMyMenu()->GetMyMenu();
+				if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(menu)) {
+					actor->set_property(prop, static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
+				}
+				return {};
+			};
+			label = std::get<0>(stat);
+			stats_items.emplace_front(Hotspot(offsetx, stat_posy, label[0], label + 1), command);
+			stat_posy += 9;
+		}
 	}
+	command             = std::make_shared<Menu>(std::move(stats_items));
+	command->events.run = hideifnoactor;
+	label               = Strings::NPCMenu::Stats;
+	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety1 - 99, label[0], label + 1), command);
+
+	// Training Points
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+			false, 0, Actor::max_training, false, Strings::ENTER_VALUE, Strings::INVALID_VALUE));
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto menu = self->GetMyMenu();
+		if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(menu)) {
+			actor->set_property(Actor::training, static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
+		}
+		return {};
+	};
+	command->events.run = hideifnoactor;
+	label               = Strings::NPCMenu::TrainingPoints;
+	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety1 - 90, label[0], label + 1), command);
+
+	// Teleport
+	command                  = std::make_shared<MenuCommand>();
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto menu = self->GetMyMenu();
+		if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(menu)) {
+			Game_window::get_instance()->teleport_party(actor->get_tile(), false, actor->get_map_num());
+		}
+		return {};
+	};
+	command->events.run = hideifnoactor;
+	label               = Strings::NPCMenu::TeleporttoNPC;
+	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety1 - 81, label[0], label + 1), command);
+
+	// Palette Effect
+	command                  = std::make_shared<MenuCommand>();
+	command->events.run      = hideifnoactor;
+	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto menu = self->GetMyMenu();
+		if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(menu)) {
+			PalEffectLoop(actor);
+		}
+		return {};
+	};
+	label = Strings::NPCMenu::PaletteEffect;
+	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety1 - 72, label[0], label + 1), command);
+
+	// Walk to Avatar
+	command                  = std::make_shared<MenuCommand>();
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto menu = self->GetMyMenu();
+		if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(menu)) {
+			actor->approach_another(Game_window::get_instance()->get_main_actor());
+		}
+		return {};
+	};
+	command->events.run = hideifnoactor;
+	label               = Strings::NPCMenu::WalktoAvatar;
+	items.emplace_front(Hotspot(offsetx2 + 160, maxy - offsety2 - 63, label[0], label + 1), command);
 
 	// Change NPC
+	command                  = std::make_shared<MenuCommand>();
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto npcih = static_cast<InputHandlers::NPC*>(self->inputs[0].get());
+		if (npcih->actor) {
+			auto menu = self->GetMyMenu();
+			menu->setData<Actor*>(npcih->actor);
+		}
 
-	AddMenuItem(offsetx3, offsety3, SDLK_UP, " Change NPC");
+		return {};
+	};
+	command->inputs.push_back(std::make_shared<InputHandlers::NPC>(false));
 
+	label = Strings::NPCMenu::ChangeNPC;
+	items.emplace_front(Hotspot(offsetx3, offsety3, SDLK_UP, label), command);
 	// Scroll NPCs
 
-	AddLeftRightMenuItem(offsetx3, offsety4, "Scroll NPCs", num > 0, num < gwin->get_num_npcs(), false, true);
-}
-
-void CheatScreen::NPCActivate(Actor* actor, int& num) {
-	int       i       = std::atoi(state.input);
-	const int nshapes = Shape_manager::get_instance()->get_shapes().get_num_shapes();
-
-	state.SetMode(CP_Command, false);
-
-	if (state.command == '<') {
-		num--;
-		if (num < 0) {
-			num = 0;
-		} else if (num >= 356 && num <= 359) {
-			num = 355;
+	command                  = std::make_shared<LeftRightIntegerCommand>(0, gwin->get_num_npcs(), 0, false);
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto menu = self->GetMyMenu();
+		if (Actor* actor = gwin->get_npc(static_cast<LeftRightIntegerCommand*>(self)->currentval)) {
+			menu->setData<Actor*>(actor);
 		}
-	} else if (state.command == '>') {
-		num++;
-		if (num >= 356 && num <= 359) {
-			num = 360;
+
+		return {};
+	};
+	command->events.run = [](MenuCommand* self) {
+		// Make sure currentval is synced with the npc number because it could have chaged
+		auto menu = self->GetMyMenu();
+		if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(menu)) {
+			static_cast<LeftRightIntegerCommand*>(self)->currentval = actor->get_npc_num();
 		}
-	} else if (state.command == '^') {    // Change NPC
-		if (i < 0 || (i >= 356 && i <= 359)) {
-			state.SetMode(CP_InvalidNPC, false);
-		} else if (state.input[0]) {
-			num = i;
-		}
-	} else if (actor) {
-		switch (state.command) {
-		case SDLK_B:    // Business
-			BusinessLoop(actor);
-			break;
+	};
+	label = Strings::NPCMenu::ScrollNPCs;
+	items.emplace_front(Hotspot(offsetx3, offsety4, SDLK_LEFT, label, SDLK_RIGHT), command);
 
-		case SDLK_N:    // Npc flags
-			FlagLoop(actor);
-			break;
+	std::shared_ptr<Menu> menu = std::make_shared<Menu>(std::move(items));
+	menu->setData<Actor*>(actor);
+	menu->events.paint_display = [this](MenuCommand* self) {
+		int  num = -1;
+		char buf[512];
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+		const int offsetx  = 15;
+		const int offsety1 = 73;
+#else
+		const int offsetx  = 0;
+		const int offsety1 = 0;
+#endif
 
-		case SDLK_S:    // stats
-			StatLoop(actor);
-			break;
+		if (Actor* actor = self->getDataOrDefault<Actor*>()) {
+			num                = actor->get_npc_num();
+			const Tile_coord t = actor->get_tile();
 
-		case SDLK_P:
-			PalEffectLoop(actor);
-			break;
-
-		case SDLK_T:    // Teleport
-
-			Game_window::get_instance()->teleport_party(actor->get_tile(), false, actor->get_map_num());
-			break;
-
-		case SDLK_W:    // Walk to Avatar
-			actor->approach_another(Game_window::get_instance()->get_main_actor());
-			break;
-
-		case SDLK_E:    // Experience
-			if (i < 0) {
-				state.SetMode(CP_Canceled, false);
-			} else {
-				actor->set_property(Actor::exp, i);
+			// Paint the actors shape
+			Shape_frame* shape = actor->get_shape();
+			if (shape) {
+				actor->paint_shape(shape->get_xright() + 240, shape->get_yabove(), true);
 			}
-			break;
 
-		case SDLK_2:    // Training Points
-			if (i < 0) {
-				state.SetMode(CP_Canceled, false);
-			} else {
-				actor->set_property(Actor::training, i);
-			}
-			break;
+			// Now the info
+			const std::string namestr = actor->get_npc_name();
+			snprintf(
+					buf, sizeof(buf), "%s%i - %s%s", Strings::NPCMenu::NPC_(), num, namestr.c_str(),
+					actor->is_unused() ? Strings::NPCMenu::unused() : "");
+			font->paint_text_fixedwidth(ibuf, buf, offsetx, 0, 8, fontcolor.colors);
 
-		case SDLK_C:                        // Change shape
-			if (state.input[0] == 'b') {    // Browser
-				int n;
-				clear_buttons();    // Clear all button states before browser
-				if (!cheat.get_browser_shape(i, n)) {
-					state.SetMode(CP_WrongShapeFile);
-					break;
+			snprintf(buf, sizeof(buf), "%s(%04i, %04i, %02i)", Strings::NPCMenu::Loc_(), t.tx, t.ty, t.tz);
+			font->paint_text_fixedwidth(ibuf, buf, offsetx, 9, 8, fontcolor.colors);
+
+			snprintf(
+					buf, sizeof(buf), "%s%04i:%02i  %s", Strings::NPCMenu::Shape_(), actor->get_shapenum(), actor->get_framenum(),
+					actor->get_flag(Obj_flags::met) ? Strings::NPCMenu::Met() : Strings::NPCMenu::NotMet());
+			font->paint_text_fixedwidth(ibuf, buf, offsetx, 18, 8, fontcolor.colors);
+
+			snprintf(
+					buf, sizeof(buf), "%s%2i - %s", Strings::NPCMenu::CurrentActivity_(), actor->get_schedule_type(),
+					Strings::ScheduleActivity[actor->get_schedule_type()]);
+			font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 36, 8, fontcolor.colors);
+
+			snprintf(buf, sizeof(buf), "%s: %i", Strings::NPCMenu::Exprience(), actor->get_property(Actor::exp));
+			font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 45, 8, fontcolor.colors);
+
+			snprintf(buf, sizeof(buf), "%s%i", Strings::NPCMenu::Level_(), actor->get_level());
+			font->paint_text_fixedwidth(ibuf, buf, offsetx + 144, offsety1 + 45, 8, fontcolor.colors);
+
+			snprintf(
+					buf, sizeof(buf), "%s%2i%s%2i", Strings::NPCMenu::Training_(), actor->get_property(Actor::training),
+					Strings::NPCMenu::Health_(), actor->get_property(Actor::health));
+			font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 54, 8, fontcolor.colors);
+
+			if (num != -1) {
+				int ucitemnum = 0x10000 - num;
+				if (!num) {
+					ucitemnum = 0xfe9c;
 				}
-			}
-
-			if (i < 0) {
-				state.SetMode(CP_InvalidShape, false);
-			} else if (i >= nshapes) {
-				state.SetMode(CP_InvalidShape, false);
-			} else if (state.input[0]) {
-				if (actor->get_npc_num() != 0) {
-					actor->set_shape(i);
-				} else {
-					actor->set_polymorph(i);
-				}
-				state.SetMode(CP_ShapeSet, false);
-			}
-			break;
-
-		case SDLK_1:    // Name
-			if (!std::strlen(state.input)) {
-				state.SetMode(CP_Canceled, false);
+				snprintf(
+						buf, sizeof(buf), "%s%4x%s%x", Strings::NPCMenu::Usecodeitem(), ucitemnum, Strings::NPCMenu::function(),
+						actor->get_usecode());
+				font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 63, 8, fontcolor.colors);
 			} else {
-				actor->set_npc_name(state.input);
-				state.SetMode(CP_NameSet, false);
+				snprintf(buf, sizeof(buf), "%s%x", Strings::NPCMenu::Usecodefunction(), actor->get_usecode());
+				font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 63, 8, fontcolor.colors);
 			}
-			break;
 
-		default:
-			break;
-		}
-	}
-	std::memset(state.input, 0, sizeof(state.input));
+			if (actor->get_flag(Obj_flags::charmed)) {
+				snprintf(
+						buf, sizeof(buf), "%s%s (%s%s)", Strings::NPCMenu::Alignment(),
+						Strings::Alignment[actor->get_effective_alignment()], Strings::NPCMenu::orig(),
+						Strings::Alignment[actor->get_alignment()]);
+			} else {
+				snprintf(buf, sizeof(buf), "%s%s", Strings::NPCMenu::Alignment(), Strings::Alignment[actor->get_alignment()]);
+			}
+			font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 72, 8, fontcolor.colors);
 
-	state.command = 0;
-}
-
-// Checks the state.input
-bool CheatScreen::NPCCheck(Actor* actor, int& num) {
-	ignore_unused_variable_warning(num);
-	switch (state.command) {
-		// Simple commands
-	case SDLK_A:    // Attack mode
-	case SDLK_B:    // BUsiness
-	case SDLK_N:    // Npc flags
-	case SDLK_D:    // pop weapon
-	case SDLK_S:    // stats
-	case SDLK_Z:    // Target
-	case SDLK_T:    // Teleport
-	case SDLK_W:    // Walk
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		if (!actor) {
-			state.SetMode(CP_InvalidCom, false);
+			if (actor->get_polymorph() != -1) {
+				snprintf(buf, sizeof(buf), "%s%04i", Strings::NPCMenu::Polymorphedfrom(), actor->get_polymorph());
+				font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 81, 8, fontcolor.colors);
+			}
 		} else {
-			state.activate = true;
+			snprintf(buf, sizeof(buf), "%s %i - %s", Strings::NPCMenu::NPC_(), num, Strings::NPCMenu::InvalidNPC());
+			font->paint_text_fixedwidth(ibuf, buf, offsetx, 0, 8, fontcolor.colors);
 		}
-		break;
-
-		// Value entries
-	case SDLK_E:    // Experience
-	case SDLK_2:    // Training Points
-		if (!actor) {
-			state.SetMode(CP_InvalidCom, false);
-		} else {
-			state.SetMode(CP_EnterValue);
-			state.val_min = 255;
-		}
-		break;
-
-		// Palette Effect
-	case 'p':
-		if (!actor) {
-			state.SetMode(CP_InvalidCom, false);
-		} else {
-			state.activate = true;
-		}
-		break;
-
-		// Change shape
-	case SDLK_C:
-		if (!actor) {
-			state.SetMode(CP_InvalidCom, false);
-		} else {
-			state.SetMode(CP_Shape);
-			state.val_min = 0;
-			state.val_max = Shape_manager::get_instance()->get_shapes().get_num_shapes() - 1;
-		}
-		break;
-
-		// Name
-	case SDLK_1:
-		if (!actor) {
-			state.SetMode(CP_InvalidCom, false);
-		} else {
-			state.SetMode(CP_Name);
-		}
-		break;
-
-		// - NPC
-	case SDLK_LEFT:
-		state.command = '<';
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		state.activate = true;
-		break;
-
-		// + NPC
-	case SDLK_RIGHT:
-		state.command = '>';
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		state.activate = true;
-		break;
-
-		// * Change NPC
-	case SDLK_UP:
-		state.command  = '^';
-		state.input[0] = 0;
-		state.SetMode(CP_ChooseNPC);
-		state.val_min = 0;
-		state.val_max = gwin->get_num_npcs() - 1;
-		break;
-
-		// X and Escape leave
-	case SDLK_ESCAPE:
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		return false;
-
-	default:
-		state.SetMode(CP_InvalidCom, false);
-		if (!state.input[0]) {
-			state.input[0] = (state.command < 128 ? state.command : 0);
-		}
-		state.command = 0;
-		break;
-	}
-
-	return true;
+		return true;
+	};
+	return menu;
 }
 
 //
@@ -519,7 +436,7 @@ void CheatScreen::FlagLoop(Actor* actor) {
 
 #if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
 		// First the display
-		NPCDisplay(actor, num);
+		// NPCDisplay(actor, num);
 #endif
 
 		// Now the Menu Column
@@ -1461,7 +1378,7 @@ void CheatScreen::StatLoop(Actor* actor) {
 
 #if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
 		// First the display
-		NPCDisplay(actor, num);
+		// NPCDisplay(actor, num);
 #endif
 
 		// Now the Menu Column
@@ -1652,7 +1569,7 @@ void CheatScreen::PalEffectLoop(Actor* actor) {
 
 #if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
 		// First the display
-		NPCDisplay(actor, num);
+		// NPCDisplay(actor, num);
 #endif
 
 		// Now the Menu Column
@@ -1886,7 +1803,7 @@ CheatScreen::Cheat_Prompt CheatScreen::AdvancedFlagLoop(int num, Actor* actor) {
 		gwin->clear_screen();
 
 #if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
-		NPCDisplay(actor, npc_num);
+		// NPCDisplay(actor, npc_num);
 #endif
 
 		if (num < 0) {

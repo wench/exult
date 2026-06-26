@@ -2531,10 +2531,6 @@ void Actor::set_property(int prop, int val) {
 	if (prop == health && ((party_id != -1) || (npc_num == 0)) && cheat.in_god_mode() && val < properties[prop]) {
 		return;
 	}
-	// The originals have a cap of 999999 exp.
-	constexpr const int max_exp = 999999;
-	// The originals have a cap of 255 training points.
-	constexpr const int max_training = 255;
 	switch (static_cast<Item_properties>(prop)) {
 	case exp: {
 		// Experience.

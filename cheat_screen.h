@@ -423,7 +423,7 @@ private:
 		class Integer : public InputHandler {
 		protected:
 			bool        hexonly;
-			int        val_min, val_max;
+			int         val_min, val_max;
 			std::string invalidmsg;
 
 		public:
@@ -446,6 +446,18 @@ private:
 			Integer(bool empty_allowed, int min, int max, bool hex);
 			Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg);
 			Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg, std::string&& invalidmsg);
+		};
+
+		class Shape : public Integer {
+		public:
+			int  shapenum     = -1;
+			int  framenum     = -1;
+			bool wantframenum = false;
+			Shape(bool empty_allowed, bool wantframenum = false);
+			bool OnInput(SDL_Keycode key_sym) override;
+			void Parse() override;
+
+			void clear() override;
 		};
 
 		// GameObject inherits from Integer so npc number can be entered for an object
@@ -812,11 +824,7 @@ private:
 
 	std::shared_ptr<Menu> GlobalFlagMenu(unsigned num);
 
-	Cheat_Prompt NPCLoop(int num);
-	void         NPCDisplay(Actor* actor, int& num);
-	void         NPCMenu(Actor* actor, int& num);
-	void         NPCActivate(Actor* actor, int& num);
-	bool         NPCCheck(Actor* actor, int& num);
+	std::shared_ptr<Menu> NPCMenu(Actor* actor);
 
 	void         FlagLoop(Actor* actor);
 	void         FlagMenu(Actor* actor);

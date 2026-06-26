@@ -97,6 +97,12 @@ public:
 								   // casting frames should be disabled.
 	};
 
+	// The originals have a cap of 999999 exp.
+	static constexpr const int max_exp = 999999;
+	// The originals have a cap of 255 training points.
+	static constexpr const int max_training = 255;
+
+
 protected:
 	// Party positions
 	static const short party_pos[4][10][2];

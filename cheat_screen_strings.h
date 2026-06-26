@@ -130,8 +130,8 @@ struct Strings : public StringsBase {
 	static inline const String<0x937> Pick_Object_from_World = {};
 
 	static inline const String<0x938> Pick_NPC_from_World = {};
-	
-	static inline const String<0x939> Browse = {};
+
+	static inline const String<0x939> Browse      = {};
 	static inline const String<0x93A> ENTER_FRAME = {};
 
 	static inline const struct : public String<0x940, 35> {
@@ -194,52 +194,70 @@ struct Strings : public StringsBase {
 		static inline const String<0x9F9> WalktoAvatar     = {};
 		static inline const String<0x9FA> ChangeNPC        = {};
 		static inline const String<0x9FB> ScrollNPCs       = {};
+		static inline const String<0x9FC> NPC_             = {};
+		static inline const String<0x9FD> Loc_             = {};
+		static inline const String<0x9FE> Shape_           = {};
+		static inline const String<0x9FF> CurrentActivity_ = {};
+		static inline const String<0xA00> Level_           = {};
+		static inline const String<0xA01> Health_          = {};
+		static inline const String<0xA02> Training_        = {};
+		static inline const String<0xA03> Expriemce_       = {};
+		static inline const String<0xA04> unused           = {};
+		static inline const String<0xA05> Met              = {};
+		static inline const String<0xA06> NotMet           = {};
+		static inline const String<0xA07> Usecodeitem      = {};
+		static inline const String<0xA08> function         = {};
+		static inline const String<0xA09> Usecodefunction  = {};
+		static inline const String<0xA0A> Alignment        = {};
+		static inline const String<0xA0B> orig             = {};
+		static inline const String<0xA0C> Polymorphedfrom  = {};
+		static inline const String<0xA0D> InvalidNPC       = {};
 	};
 
 	struct NPCStatsMenu {
-		static inline const String<0xA00> Dexterity    = {};
-		static inline const String<0xA01> FoodLevel    = {};
-		static inline const String<0xA02> Intellicence = {};
-		static inline const String<0xA03> Strength     = {};
-		static inline const String<0xA04> CombatSkill  = {};
-		static inline const String<0xA05> HitPoints    = {};
-		static inline const String<0xA06> MagicPoints  = {};
-		static inline const String<0xA07> ManaLevel    = {};
+		static inline const String<0xA10> Dexterity    = {};
+		static inline const String<0xA11> FoodLevel    = {};
+		static inline const String<0xA12> Intellicence = {};
+		static inline const String<0xA13> Strength     = {};
+		static inline const String<0xA14> CombatSkill  = {};
+		static inline const String<0xA15> HitPoints    = {};
+		static inline const String<0xA16> MagicPoints  = {};
+		static inline const String<0xA17> ManaLevel    = {};
 	};
 
-	static inline const String<0xA08, 30> NPCFlagMenuItems;
+	static inline const String<0xA18, 30> NPCFlagMenuItems;
 
 	struct AdvancedFlags {
-		static inline const String<0xA26>       FlagIsSET   = {};
-		static inline const String<0xA27>       FlagIsUNSET = {};
-		static inline const String<0xA28>       ToggleFlag  = {};
-		static inline const stringString<0xA29> NPCFlag     = {};
-		static inline const stringString<0xA29> GlobalFlag  = {};
-		static inline const String<0xA2B>       unnamed     = {};
-		static inline const stringString<0xA2C>       ChangeFlag  = {};
-		static inline const stringString<0xA2D>       ScrollFlags = {};
-		static inline const String<0xA2E>       GlobalFlags = {};
+		static inline const String<0xA36>       FlagIsSET   = {};
+		static inline const String<0xA37>       FlagIsUNSET = {};
+		static inline const String<0xA38>       ToggleFlag  = {};
+		static inline const stringString<0xA39> NPCFlag     = {};
+		static inline const stringString<0xA3A> GlobalFlag  = {};
+		static inline const String<0xA3B>       unnamed     = {};
+		static inline const stringString<0xA3C> ChangeFlag  = {};
+		static inline const stringString<0xA3D> ScrollFlags = {};
+		static inline const String<0xA3E>       GlobalFlags = {};
 	};
 
 	struct TeleportMenu {
-		static inline const String<0xA30> GeographicCoordinates;
-		static inline const String<0xA31> TileCoordinates;
+		static inline const String<0xA40> GeographicCoordinates;
+		static inline const String<0xA41> TileCoordinates;
 
-		static inline const String<0xA32> NPCNumber;
-		static inline const String<0xA33> MapNumber;
+		static inline const String<0xA42> NPCNumber;
+		static inline const String<0xA43> MapNumber;
 
-		static inline const stringString<0xA34> Latitude;
-		static inline const String<0xA35>       NorthOr;
-		static inline const String<0xA36>       South;
-		static inline const stringString<0xA37> Longitude;
-		static inline const String<0xA38>       WestOr;
-		static inline const String<0xA39>       East;
-		static inline const String<0xA3A>       Teleport_Menu;
-		static inline const String<0xA3B>       Dangerous   = {};
-		static inline const String<0xA3C>       UseWithCare = {};
-		static inline const String<0xA3D>       Of          = {};
-		static inline const String<0xA3E>       OnMap       = {};
-		static inline const String<0xA3F>       Coords      = {};
+		static inline const stringString<0x434> Latitude;
+		static inline const String<0xA45>       NorthOr;
+		static inline const String<0xA46>       South;
+		static inline const stringString<0xA47> Longitude;
+		static inline const String<0xA48>       WestOr;
+		static inline const String<0xA49>       East;
+		static inline const String<0xA4A>       Teleport_Menu;
+		static inline const String<0xA4B>       Dangerous   = {};
+		static inline const String<0xA4C>       UseWithCare = {};
+		static inline const String<0xA4D>       Of          = {};
+		static inline const String<0xA4E>       OnMap       = {};
+		static inline const String<0xA4F>       Coords      = {};
 	};
 };
 

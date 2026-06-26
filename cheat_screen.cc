@@ -528,6 +528,76 @@ void CheatScreen::InputHandlers::GameObject::Parse() {
 	}
 }
 
+// Shape input Handler
+
+CheatScreen::InputHandlers::Shape::Shape(bool empty_allowed, bool wantframenum)
+		: Integer(empty_allowed, 0, sman->get_shapes().get_num_shapes() - 1, false, Strings::ENTER_SHAPE, Strings::INVALID_SHAPE),
+		  wantframenum(wantframenum) {
+	const char* label = Strings::Browse.GetNotEmpty("Browse");
+	hotspots.emplace_back(0, 0, label[0], label + 1);
+}
+
+bool CheatScreen::InputHandlers::Shape::OnInput(SDL_Keycode key_sym) {
+	// Enter browse Mode
+	if (hotspots[0].IsKeycode(key_sym)) {
+		cscreen->WaitButtonsUp(true);
+		cheat.shape_browser();
+
+		if (!cheat.get_browser_shape(shapenum, framenum)) {
+			throw MenuCommandException{Strings::WRONG_SHAPE_FILE_MUST_BE_SHAPES_VGA, false};
+		}
+
+		// Clear framenum if its not explicitly ask for
+		if (!wantframenum) {
+			framenum = -1;
+		}
+
+		return true;
+	}
+	if (Integer::OnInput(key_sym)) {
+		if (!wantframenum) {
+			return true;
+		}
+
+		Integer::Parse();
+		if (shapenum == -1) {
+			shapenum = value;
+			Integer::clear();
+			promptmsg = Strings::ENTER_FRAME;
+			val_min   = 0;
+			val_max   = sman->get_shapes().get_num_frames(shapenum) - 1;
+
+			if (sman->get_shapes().get_shape(shapenum)->is_rle() && val_max == 31) {
+				// Allow reflection framenums for RLE shapes with 31 frames
+				val_max |= 32;
+			}
+
+		} else {
+			framenum = value;
+			return true;
+		}
+	}
+	return false;
+}
+
+void CheatScreen::InputHandlers::Shape::Parse() {
+	if (shapenum == -1) {
+		Integer::Parse();
+		shapenum = value;
+	}
+	//
+	value = -1;
+}
+
+void CheatScreen::InputHandlers::Shape::clear() {
+	Integer::clear();
+	promptmsg = Strings::ENTER_SHAPE;
+	shapenum  = -1;
+	framenum  = -1;
+	val_min   = 0;
+	val_max   = Shape_manager::get_instance()->get_shapes().get_num_shapes() - 1;
+}
+
 //
 // DISPLAYS
 //
@@ -1170,7 +1240,7 @@ void CheatScreen::RunMenu(std::shared_ptr<Menu> menu) {
 	SDL_Keycode  key_sym          = SDLK_UNKNOWN;
 	SDL_Keycode  unicode          = SDLK_UNKNOWN;
 
-	// While the input stack is ont enpty run it
+	// While the input stack is not empty run it
 	while (!input_stack.empty()) {
 		auto current = input_stack.top();
 		if (current.get() != last) {
@@ -1466,8 +1536,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::RootMenu() {
 	// NPC Tool
 	command                  = std::make_shared<MenuCommand>();
 	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
-		NPCLoop(static_cast<InputHandlers::NPC*>(self->inputs[0].get())->actor->get_npc_num());
-		return {};
+		return NPCMenu(static_cast<InputHandlers::NPC*>(self->inputs[0].get())->actor);
 	};
 	command->inputs.push_back(std::make_shared<InputHandlers::NPC>(true));
 	label = Strings::RootMenu::NPCTool;

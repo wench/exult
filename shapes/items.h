@@ -196,15 +196,17 @@ struct StringsBase {
 	template <unsigned INDEX, unsigned COUNT = 1, typename TReturn = const char*>
 	struct String {
 	public:
+		const char* def_string;
+		String(const char* def_string = "\0\0\0\0\0\0\0\0"):def_string(def_string) {}
 		virtual ~String() {}
 
-		static TReturn get(unsigned offset = 0) {
+		TReturn get(unsigned offset = 0) const {
 			if (offset >= COUNT) {
-				return "";
+				return def_string;
 			}
 			offset += INDEX;
 			auto ret = get_text_msg(offset - msg_file_start);
-			return ret ? ret : "";
+			return ret && *ret ? ret : def_string;
 		}
 
 		static_assert(INDEX > msg_file_start, "StringsBase::String INDEX out of range for the msg file ");
