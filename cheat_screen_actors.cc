@@ -168,9 +168,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
 	command                  = std::make_shared<MenuCommand>();
 	command->events.run      = hideifnoactor;
 	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
-		// return NPCFlagMenu(MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu()));
-		FlagLoop(MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu()));
-		return {};
+		return NPCFlagMenu(MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu()));
 	};
 	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 72, label[0], label + 1), command);
 
@@ -421,632 +419,229 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
 // NPC Flags
 //
 
-void CheatScreen::FlagLoop(Actor* actor) {
-#if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
-	int num = actor->get_npc_num();
-#endif
-	bool looping = true;
-
-	ClearState clear(state);
-	while (looping) {
-		hotspots.clear();
-		gwin->clear_screen();
-
-#if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
-		// First the display
-		// NPCDisplay(actor, num);
-#endif
-
-		// Now the Menu Column
-		FlagMenu(actor);
-
-		// Finally the Prompt...
-		SharedPrompt();
-
-		// Draw it!
-		EndFrame();
-
-		// Check to see if we need to change menus
-		if (state.activate) {
-			FlagActivate(actor);
-			state.activate = false;
-			continue;
-		}
-
-		if (SharedInput()) {
-			looping = FlagCheck(actor);
-		}
-	}
-}
-
-void CheatScreen::FlagMenu(Actor* actor) {
-	char buf[512];
+std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCFlagMenu(Actor* actor) {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	const int offsetx  = 10;
+	const int offsetx  = 15;
+	const int offsety1 = 74;
+	const int offsetx2 = -145;
+	const int offsety2 = 65;
+	const int offsetx3 = 175;
+	const int offsety3 = 63;
+	const int offsety4 = 72;
 	const int offsetx1 = 6;
-	const int offsety1 = 92;
 #else
 	const int offsetx  = 0;
-	const int offsetx1 = 0;
 	const int offsety1 = 0;
+	const int offsetx2 = 0;
+	const int offsety2 = 0;
+	const int offsetx3 = offsetx + 160;
+	const int offsety3 = maxy - 45;
+	const int offsety4 = maxy - 36;
+	const int offsetx1 = 0;
 #endif
-
-	// Left Column
-
-	// Asleep
-	snprintf(buf, sizeof(buf), " Asleep.%c", actor->get_flag(Obj_flags::asleep) ? 'Y' : 'N');
-	AddMenuItem(offsetx, maxy - offsety1 - 108, SDLK_A, buf);
-
-	// Charmed
-	snprintf(buf, sizeof(buf), " Charmd.%c", actor->get_flag(Obj_flags::charmed) ? 'Y' : 'N');
-
-	AddMenuItem(offsetx, maxy - offsety1 - 99, SDLK_B, buf);
-
-	// Cursed
-	snprintf(buf, sizeof(buf), " Cursed.%c", actor->get_flag(Obj_flags::cursed) ? 'Y' : 'N');
-	AddMenuItem(offsetx, maxy - offsety1 - 90, SDLK_C, buf);
-
-	// Paralyzed
-	snprintf(buf, sizeof(buf), " Prlyzd.%c", actor->get_flag(Obj_flags::paralyzed) ? 'Y' : 'N');
-	AddMenuItem(offsetx, maxy - offsety1 - 81, SDLK_D, buf);
-
-	// Poisoned
-	snprintf(buf, sizeof(buf), " Poisnd.%c", actor->get_flag(Obj_flags::poisoned) ? 'Y' : 'N');
-	AddMenuItem(offsetx, maxy - offsety1 - 72, SDLK_E, buf);
-
-	// Protected
-	snprintf(buf, sizeof(buf), " Prtctd.%c", actor->get_flag(Obj_flags::protection) ? 'Y' : 'N');
-	AddMenuItem(offsetx, maxy - offsety1 - 63, SDLK_F, buf);
-
-	// Tournament (Original is SI only -- allowing for BG in Exult)
-	snprintf(buf, sizeof(buf), " Tourna.%c", actor->get_flag(Obj_flags::tournament) ? 'Y' : 'N');
-	AddMenuItem(offsetx, maxy - offsety1 - 54, SDLK_G, buf);
-
-	// Polymorph
-	snprintf(buf, sizeof(buf), " Polymo.%c", actor->get_flag(Obj_flags::polymorph) ? 'Y' : 'N');
-	AddMenuItem(offsetx, maxy - offsety1 - 45, SDLK_H, buf);
-	// Advanced Editor
-
-	AddMenuItem(offsetx, maxy - offsety1 - 36, SDLK_UP, "Advanced");
-
-	SharedMenu();
-
-	// Center Column
-
-	// Party
-	snprintf(buf, sizeof(buf), " Party..%c", actor->get_flag(Obj_flags::in_party) ? 'Y' : 'N');
-	AddMenuItem(offsetx1 + 104, maxy - offsety1 - 108, SDLK_I, buf);
-
-	// Invisible
-	snprintf(buf, sizeof(buf), " Invsbl.%c", actor->get_flag(Obj_flags::invisible) ? 'Y' : 'N');
-	AddMenuItem(offsetx1 + 104, maxy - offsety1 - 99, SDLK_J, buf);
-
-	// Fly
-	snprintf(buf, sizeof(buf), " Fly....%c", actor->get_type_flag(Actor::tf_fly) ? 'Y' : 'N');
-	AddMenuItem(offsetx1 + 104, maxy - offsety1 - 90, SDLK_K, buf);
-
-	// Walk
-	snprintf(buf, sizeof(buf), " Walk...%c", actor->get_type_flag(Actor::tf_walk) ? 'Y' : 'N');
-	AddMenuItem(offsetx1 + 104, maxy - offsety1 - 81, SDLK_L, buf);
-
-	// Swim
-	snprintf(buf, sizeof(buf), " Swim...%c", actor->get_type_flag(Actor::tf_swim) ? 'Y' : 'N');
-	AddMenuItem(offsetx1 + 104, maxy - offsety1 - 72, SDLK_M, buf);
-
-	// Ethereal
-	snprintf(buf, sizeof(buf), " Ethrel.%c", actor->get_type_flag(Actor::tf_ethereal) ? 'Y' : 'N');
-	AddMenuItem(offsetx1 + 104, maxy - offsety1 - 63, SDLK_N, buf);
-
-	// Protectee
-	snprintf(buf, sizeof(buf), " Prtcee.%c", '?');
-	AddMenuItem(offsetx1 + 104, maxy - offsety1 - 54, SDLK_O, buf);
-
-	// Conjured
-	snprintf(buf, sizeof(buf), " Conjrd.%c", actor->get_type_flag(Actor::tf_conjured) ? 'Y' : 'N');
-	AddMenuItem(offsetx1 + 104, maxy - offsety1 - 45, SDLK_P, buf);
-
-	// Naked (AV ONLY)
-	if (!actor->get_npc_num()) {
-		snprintf(buf, sizeof(buf), " Naked..%c", actor->get_flag(Obj_flags::naked) ? 'Y' : 'N');
-		AddMenuItem(offsetx1 + 104, maxy - offsety1 - 36, SDLK_7, buf);
+	if (!actor) {
+		return {};
 	}
 
-	// Right Column
+	//
+	// Menu layout is mostly automated being generated from 3 arrays containing the flags that should be in each of the three
+	// columns
+	//
+	std::shared_ptr<MenuCommand>                                        command;
+	std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> items;
 
-	// Summoned
-	snprintf(buf, sizeof(buf), " Summnd.%c", actor->get_type_flag(Actor::tf_summonned) ? 'Y' : 'N');
-	AddMenuItem(offsetx1 + 208, maxy - offsety1 - 108, SDLK_Q, buf);
+	enum FlagType {
+		NotAFlag,             // entry is not a flag and Menu Item should not be shown unless custom Menu Comand is supplied
+		Unknown,              // entry is an unknoen flag. It is drawn as a flag that is false. Interacting with it does nothing
+		ObjFlag,              // Entry is from Obj_flags
+		TypeFlag,             // Entry is an Actor Type Flag
+		AvatarOnly = 256,     // Should be shown for Avatar Only
+		PartyOnly  = 512,     // Should be shown for Party members only (inc Avatar)
+		NotAvatar  = 1024,    // zShould be shown for everyone except the Avatar
+		Mask       = AvatarOnly | PartyOnly | NotAvatar
+	};
 
-	// Bleeding
-	snprintf(buf, sizeof(buf), " Bleedn.%c", actor->get_type_flag(Actor::tf_bleeding) ? 'Y' : 'N');
-	AddMenuItem(offsetx1 + 208, maxy - offsety1 - 99, SDLK_R, buf);
+	using Flag_tuple = std::tuple<
+			SDL_Keycode, int /*label index in Strings::NPCFlagMenuItems*/, int /*flag number*/,
+			std::shared_ptr<MenuCommand> /*custom MenuCommand to use instead of auto generated one. Required for NotAFlag*/,
+			int /*FlagType*/, std::array<const char*, 2> /*false_true_strings*/>;
 
-	if (!actor->get_npc_num()) {    // Avatar
-		// Sex
-		snprintf(buf, sizeof(buf), " Sex....%c", actor->get_type_flag(Actor::tf_sex) ? 'F' : 'M');
-		AddMenuItem(offsetx1 + 208, maxy - offsety1 - 90, SDLK_S, buf);
-
-		// Skin
-		snprintf(buf, sizeof(buf), " Skin...%d", actor->get_skin_color());
-		AddMenuItem(offsetx1 + 208, maxy - offsety1 - 81, SDLK_1, buf);
-
-		// Read
-		snprintf(buf, sizeof(buf), " Read...%c", actor->get_flag(Obj_flags::read) ? 'Y' : 'N');
-		AddMenuItem(offsetx1 + 208, maxy - offsety1 - 72, SDLK_4, buf);
-	} else {    // Not Avatar
-		// Met
-		snprintf(buf, sizeof(buf), " Met....%c", actor->get_flag(Obj_flags::met) ? 'Y' : 'N');
-		AddMenuItem(offsetx1 + 208, maxy - offsety1 - 90, SDLK_T, buf);
-
-		// NoCast
-		snprintf(buf, sizeof(buf), " NoCast.%c", actor->get_flag(Obj_flags::no_spell_casting) ? 'Y' : 'N');
-		AddMenuItem(offsetx1 + 208, maxy - offsety1 - 81, SDLK_U, buf);
-
-		// ID
-		snprintf(buf, sizeof(buf), " ID#:%02i", actor->get_ident());
-		AddMenuItem(offsetx1 + 208, maxy - offsety1 - 72, SDLK_V, buf);
-	}
-
-	// Freeze
-	snprintf(buf, sizeof(buf), " Freeze.%c", actor->get_flag(Obj_flags::freeze) ? 'Y' : 'N');
-	AddMenuItem(offsetx1 + 208, maxy - offsety1 - 63, SDLK_W, buf);
-
-	// Party
-	if (actor->is_in_party()) {
-		// Temp
-		snprintf(buf, sizeof(buf), " Temp: %02i", actor->get_temperature());
-		AddMenuItem(offsetx1 + 208, maxy - offsety1 - 54, SDLK_Y, buf);
-
-		// Warmth
-		snprintf(buf, sizeof(buf), "Warmth: %04i", actor->figure_warmth());
-		font->paint_text_fixedwidth(ibuf, buf, offsetx1 + 208, maxy - offsety1 - 45, 8, fontcolor.colors);
-	}
-
-	// Petra (AV SI ONLY)
-	if (!actor->get_npc_num()) {
-		snprintf(buf, sizeof(buf), " Petra..%c", actor->get_flag(Obj_flags::petra) ? 'Y' : 'N');
-		AddMenuItem(offsetx1 + 208, maxy - offsety1 - 36, SDLK_5, buf);
-	}
-}
-
-void CheatScreen::FlagActivate(Actor* actor) {
-	int       i       = std::atoi(state.input);
-	const int nshapes = Shape_manager::get_instance()->get_shapes().get_num_shapes();
-
-	state.SetMode(CP_Command, false);
-	switch (state.command) {
-		// Everyone
-
-		// Toggles
-	case SDLK_A:    // Asleep
-		if (actor->get_flag(Obj_flags::asleep)) {
-			actor->clear_flag(Obj_flags::asleep);
-		} else {
-			actor->set_flag(Obj_flags::asleep);
-		}
-		break;
-
-	case SDLK_B:    // Charmed
-		if (actor->get_flag(Obj_flags::charmed)) {
-			actor->clear_flag(Obj_flags::charmed);
-		} else {
-			actor->set_flag(Obj_flags::charmed);
-		}
-		break;
-
-	case SDLK_C:    // Cursed
-		if (actor->get_flag(Obj_flags::cursed)) {
-			actor->clear_flag(Obj_flags::cursed);
-		} else {
-			actor->set_flag(Obj_flags::cursed);
-		}
-		break;
-
-	case SDLK_D:    // Paralyzed
-		if (actor->get_flag(Obj_flags::paralyzed)) {
-			actor->clear_flag(Obj_flags::paralyzed);
-		} else {
-			actor->set_flag(Obj_flags::paralyzed);
-		}
-		break;
-
-	case SDLK_E:    // Poisoned
-		if (actor->get_flag(Obj_flags::poisoned)) {
-			actor->clear_flag(Obj_flags::poisoned);
-		} else {
-			actor->set_flag(Obj_flags::poisoned);
-		}
-		break;
-
-	case SDLK_F:    // Protected
-		if (actor->get_flag(Obj_flags::protection)) {
-			actor->clear_flag(Obj_flags::protection);
-		} else {
-			actor->set_flag(Obj_flags::protection);
-		}
-		break;
-
-	case SDLK_J:    // Invisible
-		if (actor->get_flag(Obj_flags::invisible)) {
-			actor->clear_flag(Obj_flags::invisible);
-		} else {
-			actor->set_flag(Obj_flags::invisible);
-		}
-		pal.apply();
-		break;
-
-	case SDLK_K:    // Fly
-		if (actor->get_type_flag(Actor::tf_fly)) {
-			actor->clear_type_flag(Actor::tf_fly);
-		} else {
-			actor->set_type_flag(Actor::tf_fly);
-		}
-		break;
-
-	case SDLK_L:    // Walk
-		if (actor->get_type_flag(Actor::tf_walk)) {
-			actor->clear_type_flag(Actor::tf_walk);
-		} else {
-			actor->set_type_flag(Actor::tf_walk);
-		}
-		break;
-
-	case SDLK_M:    // Swim
-		if (actor->get_type_flag(Actor::tf_swim)) {
-			actor->clear_type_flag(Actor::tf_swim);
-		} else {
-			actor->set_type_flag(Actor::tf_swim);
-		}
-		break;
-
-	case SDLK_N:    // Ethrel
-		if (actor->get_type_flag(Actor::tf_ethereal)) {
-			actor->clear_type_flag(Actor::tf_ethereal);
-		} else {
-			actor->set_type_flag(Actor::tf_ethereal);
-		}
-		break;
-
-	case SDLK_P:    // Conjured
-		if (actor->get_type_flag(Actor::tf_conjured)) {
-			actor->clear_type_flag(Actor::tf_conjured);
-		} else {
-			actor->set_type_flag(Actor::tf_conjured);
-		}
-		break;
-
-	case SDLK_Q:    // Summoned
-		if (actor->get_type_flag(Actor::tf_summonned)) {
-			actor->clear_type_flag(Actor::tf_summonned);
-		} else {
-			actor->set_type_flag(Actor::tf_summonned);
-		}
-		break;
-
-	case SDLK_R:    // Bleeding
-		if (actor->get_type_flag(Actor::tf_bleeding)) {
-			actor->clear_type_flag(Actor::tf_bleeding);
-		} else {
-			actor->set_type_flag(Actor::tf_bleeding);
-		}
-		break;
-
-	case SDLK_S:    // Sex
-		if (actor->get_type_flag(Actor::tf_sex)) {
-			actor->clear_type_flag(Actor::tf_sex);
-		} else {
-			actor->set_type_flag(Actor::tf_sex);
-		}
-		break;
-
-	case SDLK_4:    // Read
-		if (actor->get_flag(Obj_flags::read)) {
-			actor->clear_flag(Obj_flags::read);
-		} else {
-			actor->set_flag(Obj_flags::read);
-		}
-		break;
-
-	case SDLK_5:    // Petra
-		if (actor->get_flag(Obj_flags::petra)) {
-			actor->clear_flag(Obj_flags::petra);
-		} else {
-			actor->set_flag(Obj_flags::petra);
-		}
-		break;
-
-	case SDLK_7:    // Naked
-		if (actor->get_flag(Obj_flags::naked)) {
-			actor->clear_flag(Obj_flags::naked);
-		} else {
-			actor->set_flag(Obj_flags::naked);
-		}
-		break;
-
-	case SDLK_T:    // Met
-		if (actor->get_flag(Obj_flags::met)) {
-			actor->clear_flag(Obj_flags::met);
-		} else {
-			actor->set_flag(Obj_flags::met);
-		}
-		break;
-
-	case SDLK_U:    // No Cast
-		if (actor->get_flag(Obj_flags::no_spell_casting)) {
-			actor->clear_flag(Obj_flags::no_spell_casting);
-		} else {
-			actor->set_flag(Obj_flags::no_spell_casting);
-		}
-		break;
-
-	case SDLK_Z:    // Zombie
-		if (actor->get_flag(Obj_flags::si_zombie)) {
-			actor->clear_flag(Obj_flags::si_zombie);
-		} else {
-			actor->set_flag(Obj_flags::si_zombie);
-		}
-		break;
-
-	case SDLK_W:    // Freeze
-		if (actor->get_flag(Obj_flags::freeze)) {
-			actor->clear_flag(Obj_flags::freeze);
-		} else {
-			actor->set_flag(Obj_flags::freeze);
-		}
-		break;
-
-	case SDLK_I:    // Party
-		if (actor->get_flag(Obj_flags::in_party)) {
-			gwin->get_party_man()->remove_from_party(actor);
-			gwin->revert_schedules(actor);
-			// Just to be sure.
-			actor->clear_flag(Obj_flags::in_party);
-		} else if (gwin->get_party_man()->add_to_party(actor)) {
-			actor->set_schedule_type(Schedule::follow_avatar);
-		}
-		break;
-
-	case SDLK_O:    // Protectee
-		break;
-
-		// Value
-	case SDLK_V:    // ID
-		if (i < 0) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (i > 63) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (i == -1 || !state.input[0]) {
-			state.SetMode(CP_Canceled);
-		} else {
-			actor->set_ident(unsigned(i));
-		}
-		break;
-
-	case SDLK_1:    // Skin color
+	// false_true_strings for false = "N" and true = "Y"
+	std::array<const char*, 2> NY = {"N", "Y"};
+	// Flags Column Arrrays - These are used to generate ech menu column
+	Flag_tuple flags_left[] = {
+			{      0, 0,     Obj_flags::asleep, nullptr,  ObjFlag, NY},
+			{      0, 1,    Obj_flags::charmed, nullptr,  ObjFlag, NY},
+			{      0, 2,     Obj_flags::cursed, nullptr,  ObjFlag, NY},
+			{      0, 3,  Obj_flags::paralyzed, nullptr,  ObjFlag, NY},
+			{      0, 4,   Obj_flags::poisoned, nullptr,  ObjFlag, NY},
+			{      0, 5, Obj_flags::protection, nullptr,  ObjFlag, NY},
+			{      0, 6, Obj_flags::tournament, nullptr,  ObjFlag, NY},
+			{      0, 7,  Obj_flags::polymorph, nullptr,  ObjFlag, NY},
+			{SDLK_UP, 8,                     0, nullptr, NotAFlag, {}}, // Advanced
+	};
+	Flag_tuple flags_centre[] = {
+			{0,  9,  Obj_flags::in_party, nullptr,              ObjFlag,         NY},
+            {0, 10, Obj_flags::invisible, nullptr,              ObjFlag,         NY},
+			{0, 11,        Actor::tf_fly, nullptr,             TypeFlag,         NY},
+            {0, 12,       Actor::tf_walk, nullptr,             TypeFlag,         NY},
+			{0, 13,       Actor::tf_swim, nullptr,             TypeFlag,         NY},
+            {0, 14,   Actor::tf_ethereal, nullptr,             TypeFlag,         NY},
+			{0, 15,					0, nullptr,              Unknown, {"?", "?"}}, // Prtcee
+			{0, 16,   Actor::tf_conjured, nullptr,             TypeFlag,         NY},
+            {0, 17,     Obj_flags::naked, nullptr, ObjFlag | AvatarOnly,         NY},
+	};
+	Flag_tuple flags_right[] = {
+			{0, 18,         Actor::tf_summonned, nullptr,              TypeFlag,         NY},
+			{0, 19,          Actor::tf_bleeding, nullptr,              TypeFlag,         NY},
+			{0, 20,               Actor::tf_sex, nullptr, TypeFlag | AvatarOnly, {"M", "F"}},
+			{0, 21,						   0, nullptr, NotAFlag | AvatarOnly,         {}}, // Skin
+			{0, 22,             Obj_flags::read, nullptr,  ObjFlag | AvatarOnly,         NY},
+			{0, 23,              Obj_flags::met, nullptr,   ObjFlag | NotAvatar,         NY},
+			{0, 24, Obj_flags::no_spell_casting, nullptr,   ObjFlag | NotAvatar,         NY},
+			{0, 25,						   0, nullptr,  NotAFlag | NotAvatar,         {}}, // ID
+			{0, 26,           Obj_flags::freeze, nullptr,               ObjFlag,         NY},
+			{0, 27,						   0, nullptr,              NotAFlag,         {}}, // Temp
+			{0, 28,						   0, nullptr,              NotAFlag,         {}}, //  Warmth
+			{0, 29,            Obj_flags::petra, nullptr,  ObjFlag | AvatarOnly,         NY},
+	};
+	// Skin (right column)
+	std::get<3>(flags_right[3]) = command = std::make_shared<MenuCommand>();
+	command->events.run                   = [actor](MenuCommand* self) {
+        self->hotspot->setHidden(0, actor->get_npc_num() != 0);
+        char buf[8];
+        snprintf(buf, sizeof(buf), "%d", actor->get_skin_color());
+        self->hotspot->label_rw = self->hotspot->label + buf;
+	};
+	command->events.Activate = [actor](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
 		actor->set_skin_color(Shapeinfo_lookup::GetNextSkin(
 				actor->get_skin_color(), actor->get_type_flag(Actor::tf_sex), Shape_manager::get_instance()->have_si_shapes()));
-		break;
+		return {};
+	};
+	// Temperature (right column)
+	std::get<3>(flags_right[9]) = command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(
+			std::make_shared<InputHandlers::Integer>(false, 0, 63, false, Strings::ENTER_TEMPERATURE, Strings::INVALID_VALUE));
 
-	case SDLK_G:    // Tournament
-		if (actor->get_flag(Obj_flags::tournament)) {
-			actor->clear_flag(Obj_flags::tournament);
-		} else {
-			actor->set_flag(Obj_flags::tournament);
-		}
-		break;
+	command->events.run = [actor](MenuCommand* self) {
+		char buf[8];
+		snprintf(buf, sizeof(buf), " %02i", actor->get_temperature());
+		self->hotspot->label_rw = self->hotspot->label + buf;
+	};
+	command->events.Activate = [actor](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		actor->set_temperature(static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
+		return {};
+	};    // ID#: (right column)
+	std::get<3>(flags_right[7]) = command = std::make_shared<MenuCommand>();
+	command->events.run                   = [actor](MenuCommand* self) {
+        int num = actor->get_npc_num();
+        self->hotspot->setHidden(0, num == 0);
+        self->hotspot->label_only = num != 0;
+        char buf[8];
+        snprintf(buf, sizeof(buf), " %02i", actor->get_ident());
+        self->hotspot->label_rw = self->hotspot->label + buf;
+	};
+	// Warmth (right column)
+	std::get<3>(flags_right[10]) = command = std::make_shared<MenuCommand>();
+	command->events.run                    = [actor](MenuCommand* self) {
+        self->hotspot->label_only = true;
+        char buf[8];
+        snprintf(buf, sizeof(buf), " %04i", actor->figure_warmth());
+        self->hotspot->label_rw = self->hotspot->label + buf;
+	};
+	// advanced flags  (left column) This is a menu
+	std::get<3>(flags_left[8]) = command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(
+			std::make_shared<InputHandlers::Integer>(false, 0, 63, false, Strings::ENTER_NPC_FLAG, Strings::INVALID_VALUE));
+	command->events.Activate = [actor, this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		return AdvancedFlagMenu(static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value, actor);
+	};
 
-	case SDLK_Y:    // Warmth
-		if (i < -1) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (i > 63) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (i == -1 || !state.input[0]) {
-			state.SetMode(CP_Canceled);
-		} else {
-			actor->set_temperature(i);
-		}
-		break;
+	// Generate all the menu items for a column
+	auto do_column = [&](tcb::span<Flag_tuple> column, int offsetx) {
+		int offsety  = maxy - offsety1 - 108;
+		int avtype   = 0;
+		int runstart = offsety;
+		for (auto& flag : column) {
+			// Special Handling so AvatarOnly and NotAvatar flags can take up the same rows when drawn
+			int flagtype = std::get<4>(flag);
+			if ((flagtype & (AvatarOnly | NotAvatar)) != avtype) {
+				bool wasall = avtype == 0;
 
-	case SDLK_H:    // Polymorph
-
-		// Clear polymorph
-		if (actor->get_polymorph() != -1) {
-			actor->set_polymorph(actor->get_polymorph());
-			break;
-		}
-
-		if (state.input[0] == 'b') {    // Browser
-			int n;
-			clear_buttons();    // Clear all button states before browser
-			if (!cheat.get_browser_shape(i, n)) {
-				state.SetMode(CP_WrongShapeFile);
-				break;
+				if (wasall) {
+					runstart = offsety;
+				} else if (flagtype & (AvatarOnly | NotAvatar)) {
+					offsety = runstart;
+				}
 			}
-		}
+			avtype = flagtype & (AvatarOnly | NotAvatar);
 
-		if (i == -1) {
-			state.SetMode(CP_Canceled);
-		} else if (i < 0) {
-			state.SetMode(CP_InvalidShape, false);
-		} else if (i >= nshapes) {
-			state.SetMode(CP_InvalidShape, false);
-		} else if (state.input[0] && (state.input[0] != '-' || state.input[1])) {
-			actor->set_polymorph(i);
-			state.SetMode(CP_ShapeSet);
-		}
+			int                          flagnum = std::get<2>(flag);
+			std::shared_ptr<MenuCommand> command = std::get<3>(flag);
+			SDL_Keycode                  keycode = std::get<0>(flag);
+			const char*                  label   = Strings::NPCFlagMenuItems[std::get<1>(flag)];
 
-		break;
+			if (!command && ((flagtype & ~Mask) != NotAFlag)) {
+				command             = std::make_shared<ToggleCommand>(false, std::move(std::get<5>(flag)));
+				command->events.run = [flagnum, flagtype, actor](MenuCommand* self) {
+					self->hotspot->setHidden(0, false);
+					auto menu = self->GetMyMenu()->GetMyMenu();
+					self->hotspot->setHidden(
+							0, (flagtype & AvatarOnly && actor->get_npc_num() != 0)
+									   || (flagtype & NotAvatar && actor->get_npc_num() == 0)
+									   || (flagtype & PartyOnly && !actor->is_in_party()));
 
-		// Advanced Numeric Flag Editor
-	case '^':
-		if (i < 0 || i > 63) {
-			state.SetMode(CP_InvalidValue, false);
-		} else if (!state.input[0]) {
-			state.SetMode(CP_Canceled);
-		} else {
-			state.SetMode(AdvancedFlagLoop(i, actor));
-		}
-		break;
+					auto& state = static_cast<ToggleCommand*>(self)->state;
+					if ((flagtype & ~Mask) == ObjFlag) {
+						state = actor->get_flag(flagnum);
+					} else if ((flagtype & ~Mask) == TypeFlag) {
+						state = actor->get_type_flag(flagnum);
+					}
+				};
+				command->events.Activate
+						= [flagnum, flagtype, actor](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+					if ((flagtype & AvatarOnly && actor->get_npc_num() != 0) || (flagtype & NotAvatar && actor->get_npc_num() == 0)
+						|| (flagtype & PartyOnly && !actor->is_in_party())) {
+						throw MenuCommandException{Strings::INVALID_COMMAND, true};
+					}
 
-	default:
-		break;
-	}
-	std::memset(state.input, 0, sizeof(state.input));
+					auto state = static_cast<ToggleCommand*>(self)->state;
 
-	state.command = 0;
-}
+					if ((flagtype & ~Mask) == ObjFlag) {
+						if (state) {
+							actor->set_flag(flagnum);
+						} else {
+							actor->clear_flag(flagnum);
+						}
+					} else if ((flagtype & ~Mask) == TypeFlag) {
+						if (state) {
+							actor->set_type_flag(flagnum);
+						} else {
+							actor->clear_type_flag(flagnum);
+						}
+					}
+					return {};
+				};
 
-// Checks the state.input
-bool CheatScreen::FlagCheck(Actor* actor) {
-	switch (state.command) {
-		// Everyone
-
-		// Toggles
-	case SDLK_A:    // Asleep
-	case SDLK_B:    // Charmed
-	case SDLK_C:    // Cursed
-	case SDLK_D:    // Paralyzed
-	case SDLK_E:    // Poisoned
-	case SDLK_F:    // Protected
-	case SDLK_I:    // Party
-	case SDLK_J:    // Invisible
-	case SDLK_K:    // Fly
-	case SDLK_L:    // Walk
-	case SDLK_M:    // Swim
-	case SDLK_N:    // Ethrel
-	case SDLK_O:    // Protectee
-	case SDLK_P:    // Conjured
-	case SDLK_Q:    // Summoned
-	case SDLK_R:    // Bleedin
-	case SDLK_W:    // Freeze
-	case SDLK_G:    // Tournament
-		state.activate = true;
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		break;
-
-		// Value
-	case SDLK_H:    // Polymorph
-		if (actor->get_polymorph() == -1) {
-			state.SetMode(CP_Shape);
-			state.val_min  = 0;
-			state.val_max  = Shape_manager::get_instance()->get_shapes().get_num_shapes() - 1;
-			state.input[0] = 0;
-		} else {
-			state.activate = true;
-			if (!state.input[0]) {
-				state.input[0] = state.command;
+				std::get<3>(flag) = command;
 			}
+			if (command) {
+				if (label && *label) {
+					if (command->events.Activate && !keycode) {
+						// Items with no specified key binding but can be activated take their keybinding from the label
+						keycode = *label++;
+					}
+					items.emplace_front(Hotspot(offsetx, offsety, keycode, label), command);
+				}
+			}
+			offsety += 9;
 		}
-		break;
+	};
+	do_column(flags_left, offsetx);
+	do_column(flags_centre, offsetx1 + 104);
+	do_column(flags_right, offsetx1 + 208);
 
-		// Party Only
-
-		// Value
-	case SDLK_Y:    // Temp
-		if (!actor->is_in_party()) {
-			state.command = 0;
-		} else {
-			state.SetMode(CP_TempNum);
-			state.val_max = 0;
-			state.val_min = 63;
-		}
-		state.input[0] = 0;
-		break;
-
-		// Avatar Only
-
-		// Toggles
-	case SDLK_S:    // Sex
-	case SDLK_4:    // Read
-		if (actor->get_npc_num()) {
-			state.command = 0;
-		} else {
-			state.activate = true;
-		}
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		break;
-
-		// Toggles SI
-	case SDLK_5:    // Petra
-	case SDLK_7:    // Naked
-		if (actor->get_npc_num()) {
-			state.command = 0;
-		} else {
-			state.activate = true;
-		}
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		break;
-
-		// Value SI
-	case SDLK_1:    // Skin
-		if (actor->get_npc_num()) {
-			state.command = 0;
-		} else {
-			state.activate = true;
-		}
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		break;
-
-		// Everyone but avatar
-
-		// Toggles
-	case SDLK_T:    // Met
-	case SDLK_U:    // No Cast
-	case SDLK_Z:    // Zombie
-		if (!actor->get_npc_num()) {
-			state.command = 0;
-		} else {
-			state.activate = true;
-		}
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		break;
-
-		// Value
-	case SDLK_V:    // ID
-		if (!actor->get_npc_num()) {
-			state.command = 0;
-		} else {
-			state.SetMode(CP_EnterValue);
-			state.val_min = 0;
-			state.val_max = 63;
-		}
-		state.input[0] = 0;
-		break;
-
-		// NPC Flag Editor
-
-	case SDLK_UP:
-		state.command  = '^';
-		state.input[0] = 0;
-		state.SetMode(CP_NFlagNum);
-		state.val_max = 0;
-		state.val_min = 63;
-		break;
-
-		// X and Escape leave
-	case SDLK_ESCAPE:
-		if (!state.input[0]) {
-			state.input[0] = state.command;
-		}
-		return false;
-
-		// Unknown
-	default:
-		state.command = 0;
-		break;
-	}
-
-	return true;
+	return std::make_shared<Menu>(std::move(items));
 }
 
 //
@@ -1665,160 +1260,90 @@ bool CheatScreen::PalEffectCheck(Actor* actor) {
 // Advanced Flag Editor
 //
 
-CheatScreen::Cheat_Prompt CheatScreen::AdvancedFlagLoop(int num, Actor* actor) {
+std::shared_ptr<CheatScreen::Menu> CheatScreen::AdvancedFlagMenu(unsigned flag_num, Actor* actor) {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 	const int offsetx  = 15;
 	const int offsety1 = 83;
 	// const int offsety2 = 72;
 #else
-	int       npc_num  = actor->get_npc_num();
 	const int offsetx  = 0;
 	const int offsety1 = 0;
 	// const int offsety2 = maxy - 36;
 #endif
-	bool looping = true;
-	char buf[64];
 
-	ClearState clear(state);
-	while (looping) {
-		hotspots.clear();
-		gwin->clear_screen();
+	std::shared_ptr<MenuCommand>                                        command;
+	std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> items;
 
-#if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
-		// NPCDisplay(actor, npc_num);
-#endif
+	// "NPC Flag number: name" message
+	command             = std::make_shared<MenuCommand>();
+	command->events.run = [](MenuCommand* self) {
+		auto flag_num = MenuCommand::getDataOrDefault<unsigned>(self->GetMyMenu());
 
-		if (num < 0) {
-			num = 0;
-		} else if (num > 63) {
-			num = 63;
-		}
+		char buf[8];
+		snprintf(buf, sizeof(buf), "%d", flag_num);
+		auto flag_name = Strings::NPCFlag[flag_num];
 
-		// First the info
-		auto flag_name = Strings::NPCFlag[num];
-		if (flag_name && *flag_name) {
-			snprintf(buf, sizeof(buf), "NPC Flag %i: %s", num, flag_name);
+		self->hotspot->label_rw.reserve(self->hotspot->label.size() + 4 + flag_name.size());
+
+		self->hotspot->label_rw = self->hotspot->label;
+		self->hotspot->label_rw += buf;
+		self->hotspot->label_rw += flag_name;
+		self->hotspot->label_only = true;
+	};
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 108, 0, Strings::AdvancedFlags::NPCFlag), command);
+
+	// "Flag is " message
+	command             = std::make_shared<MenuCommand>();
+	command->events.run = [actor](MenuCommand* self) {
+		auto flag_num = MenuCommand::getDataOrDefault<unsigned>(self->GetMyMenu());
+		self->hotspot->label_rw
+				= actor->get_flag(flag_num) ? Strings::AdvancedFlags::FlagIsSET() : Strings::AdvancedFlags::FlagIsUNSET();
+		self->hotspot->label_only = true;
+	};
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 90, 0, ""), command);
+
+	// toggle command
+	command = std::make_shared<MenuCommand>();
+
+	command->events.Activate = [actor](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto flag_num = MenuCommand::getDataOrDefault<unsigned>(self->GetMyMenu());
+		if (actor->get_flag(flag_num)) {
+			actor->clear_flag(flag_num);
 		} else {
-			snprintf(buf, sizeof(buf), "NPC Flag %i", num);
-		}
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, maxy - offsety1 - 108, 8, fontcolor.colors);
-
-		snprintf(buf, sizeof(buf), "Flag is %s", actor->get_flag(num) ? "SET" : "UNSET");
-		font->paint_text_fixedwidth(ibuf, buf, offsetx, maxy - offsety1 - 90, 8, fontcolor.colors);
-
-		// Now the Menu Column
-		if (!actor->get_flag(num)) {
-			AddMenuItem(offsetx + 160, maxy - offsety1 - 90, SDLK_S, "et Flag");
-		} else {
-			AddMenuItem(offsetx + 160, maxy - offsety1 - 90, SDLK_U, "nset Flag");
+			actor->set_flag(flag_num);
 		}
 
-		// Change Flag
-		AddMenuItem(offsetx, maxy - offsety1 - 72, SDLK_UP, " Change Flag");
-
-		AddLeftRightMenuItem(offsetx, maxy - offsety1 - 63, "Scroll Flags", num > 0, num < 63, false, true);
-
-		SharedMenu();
-
-		// Finally the Prompt...
-		SharedPrompt();
-
-		// Draw it!
-		EndFrame();
-
-		// Check to see if we need to change menus
-		if (state.activate) {
-			state.SetMode(CP_Command);
-			if (state.command == '<') {    // Decrement
-				num--;
-				if (num < 0) {
-					num = 0;
-				}
-			} else if (state.command == '>') {    // Increment
-				num++;
-				if (num > 63) {
-					num = 63;
-				}
-			} else if (state.command == '^') {    // Change Flag
-				int i = std::atoi(state.input);
-				if (i < 0 || i > 63) {
-					state.SetMode(CP_InvalidValue, false);
-				} else if (state.input[0]) {
-					num = i;
-				}
-			} else if (state.command == 's') {    // Set
-				actor->set_flag(num);
-				if (num == Obj_flags::in_party) {
-					gwin->get_party_man()->add_to_party(actor);
-					actor->set_schedule_type(Schedule::follow_avatar);
-				}
-			} else if (state.command == 'u') {    // Unset
-				if (num == Obj_flags::in_party) {
-					gwin->get_party_man()->remove_from_party(actor);
-					gwin->revert_schedules(actor);
-				}
-				actor->clear_flag(num);
-			}
-
-			ClearState clearer(state);
-			continue;
-		}
-
-		if (SharedInput()) {
-			switch (state.command) {
-				// Simple commands
-			case SDLK_S:    // Set Flag
-			case SDLK_U:    // Unset flag
-				if (!state.input[0]) {
-					state.input[0] = state.command;
-				}
-				state.activate = true;
-				break;
-
-				// Decrement
-			case SDLK_LEFT:
-				state.command = '<';
-				if (!state.input[0]) {
-					state.input[0] = state.command;
-				}
-				state.activate = true;
-				break;
-
-				// Increment
-			case SDLK_RIGHT:
-				state.command = '>';
-				if (!state.input[0]) {
-					state.input[0] = state.command;
-				}
-				state.activate = true;
-				break;
-
-				// * Change Flag
-			case SDLK_UP:
-				state.command  = '^';
-				state.input[0] = 0;
-				state.SetMode(CP_NFlagNum);
-				state.val_max = 0;
-				state.val_min = 63;
-				break;
-
-				// X and Escape leave
-			case SDLK_ESCAPE:
-				if (!state.input[0]) {
-					state.input[0] = state.command;
-				}
-				looping = false;
-				break;
-
-			default:
-				state.SetMode(CP_InvalidCom, false);
-				if (!state.input[0]) {
-					state.input[0] = (state.command < 128 ? state.command : 0);
-				}
-				state.command = 0;
-				break;
-			}
-		}
+		return {};
+	};
+	const char* label = Strings::AdvancedFlags::ToggleFlag;
+	if (label && *label) {
+		items.emplace_front(Hotspot(offsetx + 160, maxy - offsety1 - 90, *label, label + 1), command);
 	}
-	return CP_Command;
+
+	// Change Flag
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(
+			std::make_shared<InputHandlers::Integer>(false, 0, 63, false, Strings::ENTER_NPC_FLAG, Strings::INVALID_VALUE));
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		self->GetMyMenu()->setData<int>(static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
+
+		return {};
+	};
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 72, SDLK_UP, " Change Flag"), command);
+
+	// Scroll Flags
+	command                  = std::make_shared<LeftRightIntegerCommand>(0, 63, 0, false);
+	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		self->GetMyMenu()->setData<unsigned>(static_cast<LeftRightIntegerCommand*>(self)->currentval);
+		return {};
+	};
+	command->events.run = [](MenuCommand* self) {
+		// Make sure currentval is synced with the flag number
+		static_cast<LeftRightIntegerCommand*>(self)->currentval = MenuCommand::getDataOrDefault<unsigned>(self->GetMyMenu());
+	};
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 63, SDLK_LEFT, "Scroll Flags", SDLK_RIGHT), command);
+
+	auto menu = std::make_shared<Menu>(std::move(items));
+	menu->setData<unsigned>(std::min<unsigned>(63, flag_num));
+	return menu;
 }
