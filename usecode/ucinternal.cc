@@ -1723,12 +1723,22 @@ Usecode_machine* Usecode_machine::create() {
 	return new Usecode_internal();
 }
 
+
+
 /*
  *  Create machine from a 'usecode' file.
  */
 
 Usecode_internal::Usecode_internal() : stack(new Usecode_value[1024]) {
 	sp = stack;
+	read_usecode();
+	//  set_breakpoint();
+}
+
+/*
+ *  Read in usecode from static and patch. Called by Usecode_internal constructor but can be called again later to reload usecode 
+ */
+void Usecode_internal::read_usecode() {
 	// Read in usecode.
 	std::cout << "Reading usecode file." << std::endl;
 	try {
@@ -1754,8 +1764,6 @@ Usecode_internal::Usecode_internal() : stack(new Usecode_value[1024]) {
 		auto& file = *pFile;
 		read_usecode(file, true);
 	}
-
-	//  set_breakpoint();
 }
 
 /*
