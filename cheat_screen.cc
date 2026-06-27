@@ -442,9 +442,9 @@ bool CheatScreen::InputHandlers::Integer::OnInput(SDL_Keycode key_sym) {
 
 CheatScreen::InputHandlers::Integer::Integer(
 		bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg, std::string&& invalidmsg,
-		std::optional<int> special)
+		std::optional<int> special, std::function<bool(Integer*)> validate)
 		: InputHandler(empty_allowed, std::move(promptmsg)), hexonly(hex), val_min(std::min(max, min)), val_max(std::max(max, min)),
-		  invalidmsg(std::move(invalidmsg)), special(special) {}
+		  invalidmsg(std::move(invalidmsg)), special(special), validate(validate) {}
 
 CheatScreen::InputHandlers::Integer::Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg)
 		: Integer(empty_allowed, min, max, hex, std::move(promptmsg), Strings::INVALID_VALUE) {}
@@ -471,8 +471,12 @@ void CheatScreen::InputHandlers::Integer::Parse() {
 		if (input_end != input && ((val >= val_min && val <= val_max) || special.value_or(val_min) == val)) {
 			value = int(val);
 		} else {
-			throw MenuCommandException{Strings::INVALID_VALUE};
+			throw MenuCommandException{invalidmsg, false};
 		}
+	}
+
+	if (validate && !validate(this)) {
+		throw MenuCommandException{invalidmsg, false};
 	}
 }
 
@@ -1545,17 +1549,11 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::RootMenu() {
 
 	// Global Flag Editor
 	// This is its own menu createdin the kambda for the Activate even just below
-	command = std::make_shared<MenuCommand>();
-	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
-			false, 0, Usecode_machine::last_gflag, false, Strings::ENTER_GLOBAL_FLAG, Strings::INVALID_VALUE));
-	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
-		// Load global flag names if not yet loaded
-		if (!global_flag_names_loaded) {
-			load_global_flag_names();
-		}
-		return GlobalFlagMenu(static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
+	command                  = std::make_shared<MenuCommand>();
+	command->events.Activate = [this](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		return UsecodeMenu();
 	};
-	label = Strings::RootMenu::FlagModifier;
+	label = Strings::RootMenu::Usecode;
 	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety2 - 90, label[0], label + 1), command);
 
 	// Teleport
@@ -1687,6 +1685,111 @@ int CheatScreen::PaintArrow(int offsetx, int offsety, int type) {
 	}
 
 	return 8;
+}
+
+//
+// Usecode
+//
+std::shared_ptr<CheatScreen::Menu> CheatScreen::UsecodeMenu() {
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+	const int offsetx  = 15;
+	const int offsety1 = 64;
+	const int offsetx2 = 175;
+	const int offsety2 = 63;
+	// const int offsety3 = 72;
+#else
+	const int offsetx  = 0;
+	const int offsety1 = 0;
+	const int offsetx2 = offsetx;
+	const int offsety2 = maxy - 63;
+	// const int offsety3 = maxy - 36;
+#endif
+	std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> items;
+	std::shared_ptr<MenuCommand>                                        command;
+	const char*                                                         label;
+
+	// Left Column
+
+	// Call Usecode
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::GameObject>(false));
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+			false, 0, gwin->get_usecode()->get_num_funcs() - 1, false, Strings::UsecodeMenu::Prompts::Enterusecodenumber,
+			Strings::UsecodeMenu::Prompts::InvalidUsecodeNumber, std::nullopt, [this](InputHandlers::Integer* self) -> bool {
+				return gwin->get_usecode()->function_exists(self->value);
+			}));
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+			false, 0, int(Usecode_machine::num_events) - 1, false, Strings::UsecodeMenu::Prompts::EnterUsecodeEventid,
+			Strings::UsecodeMenu::Prompts::InvalidUsecodeEventNumber));
+	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		auto target_input   = static_cast<InputHandlers::GameObject*>(self->inputs[0].get());
+		auto ucnum_input    = static_cast<InputHandlers::Integer*>(self->inputs[1].get());
+		auto eventnum_input = static_cast<InputHandlers::Integer*>(self->inputs[2].get());
+		auto usecode        = gwin->get_usecode();
+		// Always Reload usecode before calling so modders don't need to do it manually every time they want to test a change
+		usecode->read_usecode();
+		// Calling usecode might do things that use a different event loop so first wait for button ups
+		cscreen->WaitButtonsUp(true);
+		gwin->get_usecode()->call_usecode(
+				ucnum_input->value, target_input->object, Usecode_machine::Usecode_events(eventnum_input->value));
+		return {};
+	};
+	label = Strings::UsecodeMenu::MenuItems::CallUsecode;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 99, label[0], label + 1), command);
+
+	// Reload Usecode
+	command                  = std::make_shared<MenuCommand>();
+	command->events.Activate = [this](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		gwin->get_usecode()->read_usecode();
+		return {};
+	};
+	label = Strings::UsecodeMenu::MenuItems::ReloadUsecode;
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 90, label[0], label + 1), command);
+
+	// Global Flag Editors
+	command = std::make_shared<MenuCommand>();
+	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
+			false, 0, Usecode_machine::last_gflag, false, Strings::ENTER_GLOBAL_FLAG, Strings::INVALID_VALUE));
+	label                    = Strings::UsecodeMenu::MenuItems::FlagEditor;
+	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+		// Load global flag names if not yet loaded
+		if (!global_flag_names_loaded) {
+			load_global_flag_names();
+		}
+		return GlobalFlagMenu(static_cast<InputHandlers::Integer*>(self->inputs[0].get())->value);
+	};
+	items.emplace_front(Hotspot(offsetx, maxy - offsety1 - 81, label[0], label + 1), command);
+
+	auto menu = std::make_shared<Menu>(std::move(items));
+
+	menu->events.paint_display = [this](MenuCommand*) -> bool {
+		char buf[41];
+
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+		const int offsetx  = 15;
+		const int offsety1 = 54;
+#else
+		const int offsetx  = 0;
+		const int offsety1 = 0;
+#endif
+
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+		snprintf(
+				buf, sizeof(buf), "%s - %s!", Strings::UsecodeMenu::Display::UsecodeMenu(),
+				Strings::UsecodeMenu::Display::Dangerous());
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 0, 8, fontcolor.colors);
+#else
+		font->paint_text_fixedwidth(ibuf, Strings::UsecodeMenu::Display::UsecodeMenu, offsetx, 0, 8, fontcolor.colors);
+		snprintf(
+				buf, sizeof(buf), "%s - %s!", Strings::UsecodeMenu::Display::Dangerous(),
+				Strings::UsecodeMenu::Display::usewithcare());
+		font->paint_text_fixedwidth(ibuf, buf, offsetx, 18, 8, fontcolor.colors);
+#endif
+
+		return true;
+	};
+
+	return menu;
 }
 
 //

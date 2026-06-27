@@ -176,7 +176,7 @@ struct Strings : public StringsBase {
 		static inline const String<0X9E5> EggsVisible  = {};
 		static inline const String<0X9E6> SetTime      = {};
 		static inline const String<0X9E7> NPCTool      = {};
-		static inline const String<0X9E8> FlagModifier = {};
+		static inline const String<0X9E8> Usecode = {};
 		static inline const String<0X9E9> Teleport     = {};
 		static inline const String<0X9EA> TimeRate     = {};
 	};
@@ -287,6 +287,27 @@ struct Strings : public StringsBase {
 			static inline const stringString<0xA5F> enterXFORMIndex;
 			static inline const stringString<0xA60> entershiftamount;
 			static inline const stringString<0xA61> enterToRampnumberIndex;
+		};
+	};
+
+	struct UsecodeMenu {
+		struct Prompts {
+			static inline const stringString<0xA64> Enterusecodenumber;
+			static inline const stringString<0XA65> InvalidUsecodeNumber;
+			static inline const stringString<0XA66> EnterUsecodeEventid;
+			static inline const stringString<0XA67> InvalidUsecodeEventNumber;
+		};
+
+		struct Display {
+			;
+			static inline const String<0xA68> UsecodeMenu;
+			static inline const String<0xA69> Dangerous;
+			static inline const String<0xA6A> usewithcare;
+		};
+		struct MenuItems {
+			static inline const String<0xA6B> CallUsecode;
+			static inline const String<0xA6C> ReloadUsecode;
+			static inline const String<0xA6D> FlagEditor;
 		};
 	};
 };

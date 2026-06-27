@@ -426,6 +426,7 @@ private:
 			int                val_min, val_max;
 			std::string        invalidmsg;
 			std::optional<int> special;
+			std::function<bool(Integer*)> validate;
 
 		public:
 			int value = 0;
@@ -447,7 +448,7 @@ private:
 			Integer(bool empty_allowed, int min, int max, bool hex);
 			Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg);
 			Integer(bool empty_allowed, int min, int max, bool hex, std::string&& promptmsg, std::string&& invalidmsg,
-					std::optional<int> special = {});
+					std::optional<int> special = {}, std::function<bool(Integer*)> validate = {});
 		};
 
 		class Shape : public Integer {
@@ -797,11 +798,11 @@ private:
 	Game_clock*           clock = nullptr;
 	int                   maxx = 0, maxy = 0;
 	int                   centerx = 0, centery = 0;
-	Palette               pal;
-	Xform_palette         highlighttable;
-	Xform_palette         hovertable;
-	Xform_palette         fontcolor;
-	Xform_palette         fontcolor2;
+	Palette               pal            = {};
+	Xform_palette         highlighttable = {};
+	Xform_palette         hovertable = {};
+	Xform_palette         fontcolor = {};
+	Xform_palette         fontcolor2 = {};
 
 	// Turn off clang-format so it doesn't wrap the long comments
 	// clang-format off
@@ -824,6 +825,7 @@ private:
 
 	int PaintKeyName(int offsetx, int offsety, SDL_Keycode key_sym);
 
+	std::shared_ptr<Menu> UsecodeMenu();
 	std::shared_ptr<Menu> GlobalFlagMenu(unsigned num);
 
 	std::shared_ptr<Menu> NPCMenu(Actor* actor);
