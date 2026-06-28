@@ -782,12 +782,20 @@
 0x8FC:East
 0x8FD:Coords in hex 
 0x8FE:Coords in dec 
-0x8FF:Yes
-0x900:No
-0x901:On
-0x902:Off
-
-#key names
+0x8FF:No
+0x900:Yes
+0x901:Off
+0x902:On
+0x903: Press A Key
+0x904:Waiting for up events: 
+0x905: Fingers
+0x906: Finger
+0x907: Left Mouse Button
+0x908: Middle Mouse Button
+0x909: Right Mouse Button
+0x90A: Key 
+0x90B: Unknown Key #
+#3 char key names
 0x90C:ESC
 0x90D:???
 0x90E:Tab
@@ -795,7 +803,7 @@
 # Prompt Messages
 0x910:Enter Command.
 0x911:Hit a key.
-0x912:Not yet available.
+
 0x913:Invalid NPC.
 0x914:Invalid Object.
 0x915:Invalid Command.
@@ -803,12 +811,12 @@
 0x917:Input Required
 0x918:Invalid Value
 0x919:Which NPC?
-0x91A:Enter NPC number or
-0x91B:To Cancel
+0x91A:Enter NPC number
+
 0x91C:Clock Set.
 0x91D:Invalid Time.
 0x91E:Invalid Shape.
-0x91F:Item Created.
+
 0x920:Shape Set.
 0x922:Name Changed.
 0x923:Wrong shape file. Must be SHAPES.VGA.
@@ -828,13 +836,16 @@
 0x931:Enter Latitude.
 0x932:Enter Longitude.
 0x934:Enter a new Name...
-0x935:Latitude [N]orth or [S]outh?
-0x936:Longitude [W]est or [E]ast?
+0x935:  Min: 
+0x936:  Max: 
 0x937:Pick Object from World
 0x938:Pick NPC from World
 0x939:Browse
 0x93A:Enter Frame
-# Schedules - 33 INDICES 0x940 - 0x960
+0x93B:Press
+0x93C: to exit now
+
+# Schedules - 35 indices 0x940 - 0x962
 0x940:Combat
 0x941:Hor. Pace
 0x942:Ver. Pace
@@ -872,15 +883,14 @@
 0x962:Arrest Avatar
 
 
-# NPC flags 64 indces 0x970 - 0x9AF (some empty)
-# This all have
+# NPC flags 64 indices 0x970 - 0x9AF (some empty)
 0x970:: invisible
 0x971:: asleep
 0x972:: charmed
 0x973:: cursed
 0x974:: dead
 0x976:: in_party
-#0X975:
+#0x975:
 0x977:: paralyzed
 
 0x978:: poisoned
@@ -1025,71 +1035,74 @@
 0xA33:Y Temp:
 0xA34:Warmth:
 0xA35:5 Petra..
-
+0xA36:N
+0xA37:Y
+0xA38:M
+0xA39:F
 #advanced Flag Menu and Global Flags
-0xA36:Flag is SET
-0xA37:Flag is UNSET
-0xA38:Toggle Flag
-0xA39:NPC Flag 
-0xA3A:Global Flag 
-0xA3B:(unnamed)
-0xA3C: Change Flag
-0xA3D:Scroll Flags
-0xA3E:Global Flags
+0xA3A:Flag is SET
+0xA3B:Flag is UNSET
+0xA3C:Toggle Flag
+0xA3D:NPC Flag 
+0xA3E:Global Flag 
+0xA3F:(unnamed)
+0xA40: Change Flag
+0xA41:Scroll Flags
+0xA42:Global Flags
 
 #teleport Menu
-0xA40:Geographic Coordinates
-0xA41:Tile Coordinates
-0xA42:NPC Number
-0xA43:Map Number
-0xA44:Latitude
-0xA45:North or
-0xA46:South?
-0xA47:Longitude
-0xA48:West or
-0xA49:East?
-0xA4A:Teleport Menu
-0xA4B:Dangerous
-0xA4C:use with care!
-0xA4D:of
-0xA4E:OnMap #
-0xA4F:Coords 
+0xA43:Geographic Coordinates
+0xA44:Tile Coordinates
+0xA45:NPC Number
+0xA46:Map Number
+0xA47:Latitude
+0xA48:North or
+0xA49:South?
+0xA4a:Longitude
+0xA4b:West or
+0xA4c:East?
+0xA4d:Teleport Menu
+0xA4e:Dangerous
+0xA4f:use with care!
+0xA50:of
+0xA51:OnMap #
+0xA52:Coords 
 
 #palette effect Menu
 #menu items
-0xA50:Ramp Remap
-0xA51:Xform
-0xA52:shift
-0xA53:Clear
+0xA53:Ramp Remap
+0xA54:Xform
+0xA55:shift
+0xA56:Clear
 #display Strings
-0xA54:Palette effect: 
-0xA55:None
-0xA56:Ramp Remap All To 
-0xA57:Ramp Remap 
-0xA58: To 
-0xA59:Xform 
-0xA5A:Shift by 
-0xA5B:From Ramp: All
-0xA5C:From Ramp: 
+0xA57:Palette effect: 
+0xA58:None
+0xA59:Ramp Remap All To 
+0xA5A:Ramp Remap 
+0xA5B: To 
+0xA5C:Xform 
+0xA5D:Shift by 
+0xA5E:From Ramp: All
+0xA5F:From Ramp: 
 
 #prompts
-0xA5D: enter From Ramp 
-0xA5E: or 255 for all
-0xA5F: enter XFORM Index
-0xA60: enter shift amount
-0xA61: enter To Ramp
+0xA60: enter From Ramp 
+0xA61: or 255 for all
+0xA62: enter XFORM Index
+0xA63: enter shift amount
+0xA64: enter To Ramp
 
 #usecode Menu
 #prompts
-0xA64:Enter usecode number
-0XA65:Invalid Usecode Number
-0XA66:Enter Usecode Event id
-0XA67:Invalid Usecode Event Number
+0xA65:Enter usecode number
+0xA66:Invalid Usecode Number
+0xA67:Enter Usecode Event id
+0xA68:Invalid Usecode Event Number
 #display
-0xA68:Usecode Menu
-0xA69:Dangerous
-0xA6A:use with care!
+0xA69:Usecode Menu
+0xA6A:Dangerous
+0xA6B:use with care!
 #menu items
-0xA6B:Call Usecode
-0xA6C:Reload Usecode
-0xA6D:Flag Editor
+0xA6C:Call Usecode
+0xA6D:Reload Usecode
+0xA6E:Flag Editor

@@ -69,8 +69,6 @@ class CheatScreen : protected Game_singletons {
 	void                     load_global_flag_names();
 
 public:
-	CheatScreen() : highlighttable(), hovertable(), buttons_down() {}
-
 	void show_screen();
 
 	void SetGrabbedActor(Actor* g) {
@@ -96,67 +94,24 @@ public:
 	};
 
 private:
-	enum Cheat_Prompt {
-		CP_Command = 0,
-
-		CP_HitKey         = 1,
-		CP_NotAvail       = 2,
-		CP_InvalidNPC     = 3,
-		CP_InvalidCom     = 4,
-		CP_Canceled       = 5,
-		CP_ClockSet       = 6,
-		CP_InvalidTime    = 7,
-		CP_InvalidShape   = 8,
-		CP_InvalidValue   = 9,
-		CP_Created        = 10,
-		CP_ShapeSet       = 11,
-		CP_ValueSet       = 12,
-		CP_NameSet        = 13,
-		CP_WrongShapeFile = 14,
-
-		CP_ChooseNPC  = 16,
-		CP_EnterValue = 17,
-		CP_Minute     = 18,
-		CP_Hour       = 19,
-		CP_Day        = 20,
-		CP_Shape      = 21,
-		CP_Activity   = 22,
-		CP_XCoord     = 23,
-		CP_YCoord     = 24,
-		CP_Lift       = 25,
-		CP_GFlagNum   = 26,
-		CP_NFlagNum   = 27,
-		CP_TempNum    = 28,
-		CP_NLatitude  = 29,
-		CP_SLatitude  = 30,
-		CP_WLongitude = 31,
-		CP_ELongitude = 32,
-
-		CP_Name       = 33,
-		CP_NorthSouth = 34,
-		CP_WestEast   = 35,
-
-		CP_HexXCoord          = 37,
-		CP_HexYCoord          = 38,
-		CP_EnterValueNoCancel = 39,
-		CP_CustomValue
-	};
-
-	// Get the 3 charcter key name for a character
+	// Get a 1 to 3 char name for a keycode
 	static const char* getKeyName(SDL_Keycode keycode);
 
-	// Hotspot for Mouse/Touch input
-	// Base TileRect can be changed after construction but keycode and label cannot be changed
+	// Hotspot is used to associate Label to a Keycodes and are used to determine what key press to simulate in response to
+	// mouse clicks and touch events Hotspots used for Menu items are manually position using the coordinates passed to the
+	// constructor or by setting x and y fields Hotspots added to Input Handlers are positioned automatically and the x and y fields
+	// will be overwritten with the auto arranged position A hotspot may have upto 2 keycodes associated with it. If both keycodes
+	// are 0 Only the label will be shown
 	class Hotspot {
 		SDL_Keycode keycode[2] = {0};
 		int         namew[2]   = {0};    // Name Width of each keycode
 		bool        hide[2]    = {false, false};
 
 	public:
-		const std::string label      = {};       // This is drawn to the right of above
-		bool              label_only = false;    // Don't hit check keycodes. Only draw the label
-		std::string       label_rw   = {};       // if this is set it is used instead of label
-		int               x, y, w = 0, h = 0;
+		const std::string label = {};    // This is drawn to the right of above
+		bool label_only = false;      // Don't hit check keycodes. Only draw the label. When this is set the label is always painted
+		std::string label_rw = {};    // if this is set it is used instead of label
+		int         x, y;
 
 		const std::string& get_label() const {
 			return label_rw.empty() ? label : label_rw;
@@ -167,15 +122,6 @@ private:
 
 		Hotspot(int x, int y, SDL_Keycode keycode, std::string&& label, SDL_Keycode keycode2 = SDLK_UNKNOWN);
 
-		Hotspot(SDL_Keycode keycode, int x, int y, int w, int h) : x(x), y(y), w(w), h(h) {
-			this->keycode[0] = keycode;
-			this->keycode[1] = 1;
-		}
-
-		TileRect ToTR() const {
-			return TileRect(x, y, w, h);
-		}
-
 		void setKeycode(SDL_Keycode code, unsigned index) {
 			if (index >= std::size(keycode)) {
 				return;
@@ -184,6 +130,9 @@ private:
 			namew[index]   = GetKeyNameWidth(code);
 		}
 
+		// Used to dynamically hide or show a Hotspot's keycodes. When a hidden a keycode will be ignored when checking input
+		// If all keycodes are hidden the label will also be hidden
+		// This has no effect if label_only is set
 		void setHidden(unsigned index, bool hidden) {
 			if (index >= std::size(keycode)) {
 				return;
@@ -207,7 +156,7 @@ private:
 		}
 
 		TileRect GetRect(unsigned key, bool inclabel) const {
-			if (key > 1 || !keycode[key] || hide[key]) {
+			if (key >= std::size(keycode) || !keycode[key] || hide[key]) {
 				return {};
 			}
 			TileRect r(x, y, 0, 8);
@@ -218,7 +167,7 @@ private:
 				r.w = 8 + 8 * namew[1];
 			}
 
-			// Include label if only 1 keycode
+			// Include label only if only 1 keycode
 			if (inclabel && !keycode[1 - key]) {
 				r.w += 8 * get_label().size();
 			}
@@ -226,6 +175,7 @@ private:
 			return r;
 		}
 
+		// Get the number of Non Zero non hidden keycodes
 		unsigned GetNumkeycodes() const {
 			unsigned num = 0;
 			for (size_t i = 0; i < std::size(keycode); i++) {
@@ -236,6 +186,8 @@ private:
 			return num;
 		}
 
+		// Get the total width of the hotspot on screen
+		// Includes brackets and label
 		int getWidth() {
 			if (label_only) {
 				return get_label().size() * 8;
@@ -257,24 +209,14 @@ private:
 			return std::max(rect0.w, rect1.w);
 		}
 
-		SDL_Keycode HitCheck(int x, int y) const {
-			if (label_only) {
-				return SDLK_UNKNOWN;
-			}
+		// Hit check a vector of HotSpots within (distance) of point (mx,my)
+		// Returns the Keycode at the point
+		// Uses TileRect::distance for calculating distance
+		static SDL_Keycode HitCheck(const std::vector<Hotspot*>& hotspots, int mx, int my, int distance = 4);
 
-			if (keycode[0] && !hide[0] && GetRect(0, false).has_point(x, y)) {
-				return FixUppercaseKeycode(keycode[0]);
-			} else if (keycode[1] && !hide[1] && GetRect(1, false).has_point(x, y)) {
-				return FixUppercaseKeycode(keycode[1]);
-			}
-
-			return SDLK_UNKNOWN;
-		}
-
-		static SDL_Keycode HitCheck(const std::vector<Hotspot*>& hotspots, int mx, int my, int radius = 4);
-
+		// Check if this HotSpot has a keycode matching code. Mask is a bit mask used to select which keycode to check
 		bool IsKeycode(SDL_Keycode code, unsigned mask = 0xFFFFFFFF) const {
-			if (!label_only) {
+			if (!label_only && code) {
 				code = FixUppercaseKeycode(code);
 				for (unsigned i = 0; i < std::size(keycode); i++) {
 					if (!hide[i] && (mask & 1 << i) && FixUppercaseKeycode(keycode[i]) == code) {
@@ -286,48 +228,55 @@ private:
 		}
 
 		// if the code is an uppercase letter make it lowercase
+		// so it is a valid SDL_Keycode
 		static SDL_Keycode FixUppercaseKeycode(SDL_Keycode code) {
 			return code >= 'A' && code <= 'Z' ? std::tolower(code) : code;
 		}
 	};
 
-	std::vector<Hotspot> hotspots;
-
+	// The Base InputHandler class
+	// This doesn't do much by itself beyond defining the InputHandler interface
 	class InputHandler {
 	protected:
 		// Actual text input
-		char   input[17]     = {0};
-		size_t curlen        = 0;        // the current lendth of the input string
-		bool   empty_allowed = false;    // if false it is an error if the user doesn't input anything and presses enter
-		bool   was_empty     = false;    // set if empty_allowed and there was no input
+		char input[31] = {0};    // Input size of 31 is the limit of how much can fit on screen at 320 pixel screen width with the
+								 // prompt from the english exultmsg
+		size_t curlen = 0;       // the current length of the input string. This should must match strlen(input) and be less than
+								 // std::size(input)
+		bool empty_allowed = false;    // if false it is an error if the user doesn't input anything and presses enter
+		bool was_empty     = false;    // set if empty_allowed and there was no input
 
-		std::string promptmsg;
-		bool        cancellable = true;
+		std::string promptmsg;    // The prompt message to be shown at the bottom of the screen below the input line
 
 	public:
 		virtual ~InputHandler() {}
 
 		// Hotspots are automatically placed to the right of the Prompt Text
+		// Generally there would only be room for 2 hotspots on screen.
 		std::vector<Hotspot> hotspots;
 
+		// Change the prompt message dynamically
 		void SetPromptMessage(std::string&& promptmsg) {
 			this->promptmsg = std::move(promptmsg);
 		}
 
 		virtual void GetPromptMessage(char* buf, size_t buf_size) {
 			snprintf(buf, buf_size, "%s", promptmsg.c_str());
-		}    // Handle Keypress. Returns teue if input finished
+		}
 
+		// Handle Keypress. Returns true if input handler wants no more input
 		virtual bool OnInput(SDL_Keycode key_sym) = 0;
-		// Parse the input, throws InputException on error
+		// Parse the input, throws InputException on error. This is called immediately after OnInput returns true
 		virtual void Parse();
 
-		// Arranges the hotspots
+		// Arranges the hotspots updating their x and y fields
 		virtual void ArrangeHotspots(int x, int y, unsigned lines = 1);
 		// Paint The Prompt and Input, return pixel width drawn
 		virtual int PaintPrompt(int x, int y, SDL_Keycode lastkey);
 
+		// Returns if input buffer is completely filled
 		virtual bool input_full() {
+			// 1 char is always left for nul terminating
 			return curlen >= std::size(input) - 1;
 		}
 
@@ -344,6 +293,7 @@ private:
 			return input;
 		}
 
+		// Clear input and reset the Input Handler back to inital State
 		virtual void clear() {
 			curlen = 0;
 			memset(input, 0, sizeof(input));
@@ -352,9 +302,11 @@ private:
 
 		InputHandler(bool empty_allowed, std::string&& promptmsg) : empty_allowed(empty_allowed), promptmsg(std::move(promptmsg)) {}
 
+		// Construct with an initial vector of hotspots
 		InputHandler(bool empty_allowed, std::string&& promptmsg, std::vector<Hotspot>&& hotspots)
 				: empty_allowed(empty_allowed), promptmsg(std::move(promptmsg)), hotspots(std::move(hotspots)) {}
 
+		// Add pointers to the hotspots to the vector
 		void GatherHotspots(std::vector<Hotspot*>& gathered) {
 			gathered.reserve(gathered.size() + hotspots.size());
 			for (auto& hs : hotspots) {
@@ -363,18 +315,20 @@ private:
 		}
 	};
 
+	// InputHandlers class contains all the InputHandler subclasses
 	class InputHandlers {
 	public:
+		// Input Handler to Capture a single keypress.
+		// If InputHandler::hotspots is not empty any keypress that doesn't correspond to a hotspot will display invalid command
+		// key_sym is set to the key that was pressed
 		class KeyOnly : public InputHandler {
 		public:
 			SDL_Keycode key_sym = SDLK_UNKNOWN;
 
-			struct {
-				std::function<void(InputHandler*)> Parsed = {};
-			} events;
+			// Construct with no hotspots. Any keypress is allowed and will be capture
+			KeyOnly(std::string&& promptmsg) : InputHandler(true, std::move(promptmsg)) {}
 
-			KeyOnly(std::string&& promptmsg) : InputHandler(true, std::move(promptmsg)), events() {}
-
+			// Constructs with a vector of hotspots
 			KeyOnly(std::string&& promptmsg, std::vector<Hotspot>&& hotspots)
 					: InputHandler(true, std::move(promptmsg), std::move(hotspots)) {}
 
@@ -392,6 +346,7 @@ private:
 				return this->key_sym == Hotspot::FixUppercaseKeycode(key_sym);
 			}
 
+			// Parse makes sure the pressed key is in hotspots
 			void Parse() override;
 
 			void clear() override {
@@ -400,13 +355,13 @@ private:
 			}
 		};
 
+		// PressAKey is the same as KeyOnly except it adds "Press a Key" to the end of the prompt message
+		// This is used by RunMenu to show messages from MenuCommandExceptions
 		class PressAKey : public KeyOnly {
 		public:
 			PressAKey(std::string&& promptmsg = {}) : KeyOnly(std::move(promptmsg)) {}
 
-			virtual void GetPromptMessage(char* buf, size_t buf_size) override {
-				snprintf(buf, buf_size, "%s%sPress a Key", promptmsg.c_str(), promptmsg.empty() ? "" : " ");
-			}
+			void GetPromptMessage(char* buf, size_t buf_size) override;
 		};
 
 		class String : public InputHandler {
@@ -420,12 +375,20 @@ private:
 			void Parse() override;
 		};
 
+		// Integer Input Handler
+		// Used to get a integer numeric input from the user
+		// val_min and val_max are used to do bounds checking
+		// The prompt message will be painted showing the valid range
+		// Use INT_MIN and INT_MAX to suppress bound checking and showing the range
+		// If parsing fails for whatever reason a MenuCommandException will be thrown with the message set to invalidmsg
+		// optional special is an out of bounds value that will be allowed and not fail parsing if the user enters it
+		// Validate function is called at the end of parsing if it returns false Parsing will fail
 		class Integer : public InputHandler {
 		protected:
-			bool               hexonly;
-			int                val_min, val_max;
-			std::string        invalidmsg;
-			std::optional<int> special;
+			bool                          hexonly;
+			int                           val_min, val_max;
+			std::string                   invalidmsg;
+			std::optional<int>            special;
 			std::function<bool(Integer*)> validate;
 
 		public:
@@ -451,6 +414,12 @@ private:
 					std::optional<int> special = {}, std::function<bool(Integer*)> validate = {});
 		};
 
+		// Shape Input Handler is a sub class of Integer
+		// It allows the user to enter a numeric value for a shape  from shapes.vga
+		// Or the user can choose to use the Shape Browser to pick a shape there
+		// This class can also get a frame number at the same time. If wantframenum is true, After Entering a shape number, the user
+		// will be prompted for a frame number unless they used the shape browser where the frame number will also be taken from
+		// there
 		class Shape : public Integer {
 		public:
 			int  shapenum     = -1;
@@ -463,7 +432,9 @@ private:
 			void clear() override;
 		};
 
-		// GameObject inherits from Integer so npc number can be entered for an object
+		// GameObject is a subclass of Integer so user can enter a npc number for the object
+		// Alternatively they can Pick an object from the Game World in Target Mode
+		// If empty_allowed is true, empty input will use the grabbed NPC if NPC grabbing is enabled
 		class GameObject : public Integer {
 		public:
 			Game_object* object = nullptr;
@@ -479,12 +450,14 @@ private:
 			}
 		};
 
-		class NPC : public GameObject {
+		// Actor is a simple subclass of GameObject with only real the difference that when using pick mode only Actors are allowed
+		// Message are also changed to be specific to NPCs
+		class Actor : public GameObject {
 		public:
-			NPC(bool empty_allowed);
-			NPC(bool empty_allowed, std::string&& promptmsg);
-			Actor* actor = nullptr;
-			void   Parse() override;
+			Actor(bool empty_allowed);
+			Actor(bool empty_allowed, std::string&& promptmsg);
+			::Actor* actor = nullptr;
+			void     Parse() override;
 
 			void clear() override {
 				GameObject::clear();
@@ -495,6 +468,18 @@ private:
 
 	struct Menu;
 
+	// MenuCommand the class everything is built from
+	// Uses a simple event model. Events can be handled by subclassing or by using callback in the Events struct
+	// Menu Commands have a vector on Input handler that will process input from the user before the MenuCommand is Activated
+	// Events are
+	// Activate: Called once all input handlers have finished processing input. Returns a Menu Command that should take over and be
+	// pushed to the top of the stack. if null is returned  this command will be popped. If this is returned, input processing will
+	// be reset
+	// paint_display: Called to paint the display region when a Menu Command is top of the stack or if the Menu Command
+	// above has forwarded the event down the stack to us. Returns true if event handled. returns false to forward to below
+	// run: Called once per frame when a Menu Command or it's owner Menu is top of the stack and processing input
+	// cancelled: called if input processing for the Menu Command was cancelled because the user pressed Escape or
+	// if the MenuCommand was popped from the stack because of a MenuCommandException
 	class MenuCommand : public std::enable_shared_from_this<MenuCommand> {
 		bool input_active = false;
 
@@ -510,13 +495,14 @@ private:
 
 		MenuCommand() {}
 
-		virtual ~MenuCommand() {}    // Funtcion Callbacks for Events
+		virtual ~MenuCommand() {}
 
+		// Function Callbacks for Events
 		struct Events {
 			std::function<std::shared_ptr<MenuCommand>(MenuCommand*, SDL_Keycode keycode)> Activate      = {};
 			std::function<bool(MenuCommand*)>                                              paint_display = {};
 			std::function<void(MenuCommand*)>                                              run           = {};
-			std::function<void(MenuCommand*)> cancelled = {};    // Called if input was cancelled (escape pressed) by user
+			std::function<void(MenuCommand*)>                                              cancelled     = {};
 		} events;
 
 		// Virtual methods for input handlers
@@ -593,6 +579,18 @@ private:
 			return phase >= inputs.size();
 		}
 
+		// Unready goes back an input phase
+		void UnReady() {
+			if (inputs.size()) {
+				phase--;
+				input_active = false;
+			}
+		}
+
+		size_t NumPhases() {
+			return inputs.size();
+		}
+
 		std::shared_ptr<Menu> GetMyMenu() {
 			if (owner) {
 				return std::static_pointer_cast<Menu>(owner->shared_from_this());
@@ -635,6 +633,10 @@ private:
 		}
 	};
 
+	// LeftRightIntegerCommand subclass of MenuCommand
+	// A menu command that scrolls a value between a min an max value. Must have a hotspot with 2 keycodes
+	// First keycode decrements and second keycode increments
+	// Hotspot label is updated to reflect the current value
 	struct LeftRightIntegerCommand : public MenuCommand {
 		int  min, max, currentval;
 		bool update_label;
@@ -675,12 +677,15 @@ private:
 		}
 	};
 
+	// ToggleCommand subclass of MenuCommand
+	// A simple menu command that manages and updates its Hotspot label to refect a boolean state using the supplied string array
+	// when activated the boolean state is toggled
 	struct ToggleCommand : public MenuCommand {
-		bool                       state;
-		std::array<const char*, 2> state_string;
+		bool                              state;
+		const std::array<const char*, 2>& state_strings;
 
-		ToggleCommand(bool state, std::array<const char*, 2>&& state_string = {"N", "Y"})
-				: MenuCommand(), state(state), state_string(std::move(state_string)) {}
+		ToggleCommand(bool state, const std::array<const char*, 2>& state_strings)
+				: MenuCommand(), state(state), state_strings(state_strings) {}
 
 		std::shared_ptr<MenuCommand> Activate(SDL_Keycode keycode) override {
 			state = !state;
@@ -693,30 +698,44 @@ private:
 			// Set the hotspot label based on the currentstate
 
 			if (hotspot) {
-				hotspot->label_rw = hotspot->label + state_string[int(state)];
+				hotspot->label_rw = hotspot->label + state_strings[int(state)];
 			}
 		}
 	};
 
-	// A menu is a menu command and can be directly used as a menu item to create multi level menus
+	// A menu is a MenuCommand and can be directly used as a menu item to create multi level menus
+	// If Menu needs additional input before it is shown it is recommended to return the Menu from the activate event of a
+	// MenuCommand instead. Adding InputHandlers to a Menu object to require additional input before the Menu is shown should work
+	// but it is untested. The Menu Constructor adds a KeyOnly input handler to activate keypresses that select Menu Items and
+	// should be the last input handler so do not push back or emplace back additional input handlers to a menu
 	struct Menu : public MenuCommand {
-		std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>> items;
+		// Type Alias for a Menu Item
+		// The Hotspot defines the label and keycode of the Menu Item and the MenuCommand is what the it should do when the user
+		// selects it
+		using Item = std::pair<Hotspot, std::shared_ptr<MenuCommand>>;
+
+	protected:
+		// hThe menu items. Changing this out of the Menu constructor is not a good idea
+		std::forward_list<Item> items;
 
 	public:
-		Menu(std::forward_list<std::pair<Hotspot, std::shared_ptr<MenuCommand>>>&& items);
+		// Construct a Menu from a moved std::forward_list of Items
+		Menu(std::forward_list<Item>&& items);
 
+		// Respond to Activate event. This checks the Menu's items and returns the MenuCommand associated with the Keycode that
+		// caused activation If enter is pressed it returns itself which causes the keypress to be silently ignored. Otherwise it
+		// throws MenuCommandException to show the Invalid Command Message
 		std::shared_ptr<MenuCommand> Activate(SDL_Keycode keycode) override;
 
 		void GatherHotspots(std::vector<Hotspot*>& gathered) override {
 			for (auto& it : items) {
 				gathered.push_back(&it.first);
-				// it.second->GatherHotspots(gathered);
 			}
 		}
 
 		void run() override {
 			if (isInputActive()) {
-				// Forward to our children if we are recieving input
+				// Forward to our children if we are receiving input. If we are not receiving input the event was forward to us
 				for (const auto& it : items) {
 					if (it.second) {
 						it.second->run();
@@ -735,63 +754,7 @@ private:
 		// Accumulated swipe deltas. We treat these as a vector
 		float dx = 0;
 		float dy = 0;
-
 	} swipe;
-
-	struct {
-		Uint32      highlight     = 0;
-		Uint32      highlighttime = 0;
-		char        input[17]     = {0};
-		int         command       = 0;
-		bool        activate      = false;
-		const char* custom_prompt = nullptr;
-		int         saved_value   = 0;
-		long        val_min       = LONG_MIN;
-		long        val_max       = LONG_MAX;
-		long        value;
-		Uint32      last_swipe = 0;
-		// Accumulated swipe deltas. We treat these as a vector
-		float swipe_dx = 0;
-		float swipe_dy = 0;
-
-	private:
-		Cheat_Prompt mode = CP_Command;
-
-	public:
-		Cheat_Prompt GetMode() {
-			return mode;
-		}
-
-		void SetMode(Cheat_Prompt newmode, bool clearinput = true) {
-			// Clear the input if changing to or from a text/value input mode
-			if (clearinput) {
-				input[0] = 0;
-			}
-			mode = newmode;
-		}
-	} state;
-
-	template <class T>
-	struct ClearState {
-		T* ptr = nullptr;
-
-		ClearState() = delete;
-
-		ClearState(T& obj, bool now = true, bool on_destruct = true) : ptr(&obj) {
-			if (now) {
-				*ptr = T();
-			}
-			if (!on_destruct) {
-				ptr = nullptr;
-			}
-		}
-
-		~ClearState() {
-			if (ptr) {
-				*ptr = T();
-			}
-		}
-	};
 
 	Image_buffer8*        ibuf  = nullptr;
 	std::shared_ptr<Font> font  = nullptr;
@@ -800,25 +763,17 @@ private:
 	int                   centerx = 0, centery = 0;
 	Palette               pal            = {};
 	Xform_palette         highlighttable = {};
-	Xform_palette         hovertable = {};
-	Xform_palette         fontcolor = {};
-	Xform_palette         fontcolor2 = {};
+	Xform_palette         hovertable     = {};
+	Xform_palette         fontcolor      = {};
+	Xform_palette         fontcolor2     = {};
 
-	// Turn off clang-format so it doesn't wrap the long comments
-	// clang-format off
+	const float  swipe_threshold  = 0.075f;    // Threshold for Swipes to be converted into key inputs.
+	const Uint32 highlighttimeout = 500;       // Timeout (ms) for how long hotspots should highlight for after a keypress
+	const Uint32 cursorflashtime  = 500;       // Duty cycle time (ms) for cursor flash
+	const Uint32 messagetimeout
+			= 1000;    // Timeout (ms) for how long Press a Key messages should stay before Automatically dismissing
 
-	// Constants used for touch input
-	const float  swipe_threshold     = 0.075f;	// Threshold for Swipes to be converted into key inputs.
-
-	// clang-format on
-
-	void                  SharedPrompt();
-	bool                  SharedInput();
-	void                  SharedMenu();
-	void                  PaintHotspots();
 	std::shared_ptr<Menu> RootMenu();
-
-	void ActivityDisplay();
 
 	// Paint an arrow using the font, type is one of '^' 'v' '<' '>'
 	int PaintArrow(int offsetx, int offsety, int type);
@@ -830,54 +785,21 @@ private:
 
 	std::shared_ptr<Menu> NPCMenu(Actor* actor);
 
-	void                  FlagLoop(Actor* actor);
 	std::shared_ptr<Menu> NPCFlagMenu(Actor* actor);
-	void                  FlagActivate(Actor* actor);
-	bool                  FlagCheck(Actor* actor);
 	std::shared_ptr<Menu> AdvancedFlagMenu(unsigned flagnum, Actor* actor);
 
 	std::shared_ptr<Menu> BusinessMenu(Actor* actor);
 
-	void                  StatLoop(Actor* actor);
-	void                  StatMenu(Actor* actor);
-	void                  StatActivate(Actor* actor);
-	bool                  StatCheck(Actor* actor);
-	void                  PalEffectLoop(Actor*);
 	std::shared_ptr<Menu> PalEffectMenu(Actor* actor);
-	void                  PalEffectActivate(Actor* actor);
-	bool                  PalEffectCheck(Actor* actor);
 
 	std::shared_ptr<Menu> TeleportMenu();
 
-	//! @brief Add a menu item with a hotspot for the Specified key
-	//! @param offsetx X coord for the menu item
-	//! @param offsety Y coord for the menu item
-	//! @param keycode Keycode used to activate the menuitem
-	//! @param label Label of the Menu item
-	//! @return Width in pixels of the menu item
-	int AddMenuItem(int offsetx, int offsety, SDL_Keycode keycode, const char* label);
-
-	//! @brief Add a menuitem for left and right cursor keys
-	//! @param offsetx X coord for the menu item
-	//! @param offsety  Y coord for the menu item
-	//! @param label Label of the Menu item
-	//! @param left Flag for if the left arrow should be shown
-	//! @param right Flag for if the right arrow should be shown
-	//! @param leaveempty Flag to indicate that blank space should be used
-	//! inplace of missing arrows
-	//! @param fixedlabel Flag to indicate the label should be drawn at a fixed
-	//! position if arrows are mising and !leaveempty
-	//! @return Width in pixels of the menu item
-	int AddLeftRightMenuItem(
-			int offsetx, int offsety, const char* label, bool left, bool right, bool leaveempty, bool fixedlabel = false);
-
-	int  highest_map = INT_MIN;
-	int  Get_highest_map();
-	void EndFrame();
+	int highest_map = INT_MIN;
+	int Get_highest_map();
 
 	//
 	static inline const int      button_down_finger = -1;
-	std::unordered_multiset<int> buttons_down;
+	std::unordered_multiset<int> buttons_down       = {};
 	void                         WaitButtonsUp(bool silent = false);
 };
 
