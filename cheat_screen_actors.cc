@@ -394,8 +394,8 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
 
 std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCFlagMenu(Actor* actor) {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	const int offsetx  = 15;
-	const int offsety1 = 74;
+	const int offsetx  = 10;
+	const int offsety1 = 92;
 	const int offsetx1 = 6;
 #else
 	const int offsetx  = 0;
@@ -631,7 +631,18 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCFlagMenu(Actor* actor) {
 	do_column(flags_centre, offsetx1 + 104);
 	do_column(flags_right, offsetx1 + 208);
 
-	return std::make_shared<Menu>(std::move(items));
+	auto menu                  = std::make_shared<Menu>(std::move(items));
+	menu->events.paint_display = [](MenuCommand*) -> bool {
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+		// return true if mobile to supress painting of the NPCMenu display
+		return true;
+
+#else
+		// Not mobile so return false so NPCMenu Display is painted
+		return false;
+#endif
+	};
+	return menu;
 }
 
 //
