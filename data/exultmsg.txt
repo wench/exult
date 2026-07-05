@@ -838,8 +838,8 @@
 0x934:Enter a new Name...
 0x935:  Min: 
 0x936:  Max: 
-0x937:Pick Object from World
-0x938:Pick NPC from World
+0x937:Pick Object  
+0x938:Pick NPC          
 0x939:Browse
 0x93A:Enter Frame
 0x93B:Press
@@ -1056,11 +1056,11 @@
 0xA45:NPC Number
 0xA46:Map Number
 0xA47:Latitude
-0xA48:North or
-0xA49:South?
+0xA48:North or 
+0xA49:South?         
 0xA4a:Longitude
-0xA4b:West or
-0xA4c:East?
+0xA4b:West or 
+0xA4c:East?          
 0xA4d:Teleport Menu
 0xA4e:Dangerous
 0xA4f:use with care!
@@ -1087,7 +1087,7 @@
 
 #prompts
 0xA60: enter From Ramp 
-0xA61: or 255 for all
+0xA61: or 255 for all 
 0xA62: enter XFORM Index
 0xA63: enter shift amount
 0xA64: enter To Ramp

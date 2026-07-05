@@ -285,25 +285,39 @@ void CheatScreen::InputHandler::Parse() {
 	}
 }
 
-void CheatScreen::InputHandler::ArrangeHotspots(int x, int y, unsigned lines) {
+void CheatScreen::InputHandler::Arrange00Hotspots(int x, int y, unsigned lines) {
+	size_t count00 = 0;
+	for (const auto& hs : hotspots) {
+		if (hs.x == 0 && hs.y == 0) {
+			count00++;
+		}
+	}
+
 	// If only one and it would fit put it on the bottom line
-	if (hotspots.size() == 1 && x <= (320 - hotspots.back().getWidth())) {
-		auto& hs = hotspots.back();
-		hs.x     = x;
-		hs.y     = y + 9 * (lines - 1);
+	if (count00 == 1 && x <= (320 - hotspots.back().getWidth())) {
+		for (auto& hs : hotspots) {
+			if (hs.x == 0 && hs.y == 0) {
+				hs.x = x;
+				hs.y = y + 9 * (lines - 1);
+			}
+		}
 	}
 	// One per line right align to edge of screen
-	else if (lines >= hotspots.size()) {
+	else if (lines >= count00) {
 		for (auto& hs : hotspots) {
-			hs.x = 320 - 8 - hs.getWidth();
-			hs.y = y;
-			y += 9;
+			if (hs.x == 0 && hs.y == 0) {
+				hs.x = 320 - 8 - hs.getWidth();
+				hs.y = y;
+				y += 9;
+			}
 		}
 	} else {    // put them all on 1 line
 		for (auto& hs : hotspots) {
-			hs.x = x;
-			hs.y = y;
-			x += hs.getWidth() + 8;
+			if (hs.x == 0 && hs.y == 0) {
+				hs.x = x;
+				hs.y = y;
+				x += hs.getWidth() + 8;
+			}
 		}
 	}
 }
@@ -351,9 +365,7 @@ void CheatScreen::InputHandlers::PressAKey::GetPromptMessage(char* buf, size_t b
 //
 
 CheatScreen::InputHandlers::String::String(bool empty_allowed, std::string&& promptmsg, std::string&& invalidmsg)
-		: InputHandler(empty_allowed, std::move(promptmsg)), invalidmsg(std::move(invalidmsg)) {
-	hotspots.emplace_back(0, 0, SDLK_ESCAPE, Strings::TO_CANCEL);
-}
+		: InputHandler(empty_allowed, std::move(promptmsg)), invalidmsg(std::move(invalidmsg)) {}
 
 bool CheatScreen::InputHandlers::String::OnInput(SDL_Keycode key_sym) {
 	// Backspace last character
@@ -392,7 +404,7 @@ inline void CheatScreen::InputHandlers::Integer::GetPromptMessage(char* buf, siz
 	bool hex = hexonly || !strncmp(input, "0x", 2) || !strncmp(input, "-0x", 3);
 
 	if (hasmin && hasmax) {
-		snprintf(buf, buf_size, (hex ? "%s  0x%x-0x%x " : "%s  %d-%d "), promptmsg.c_str(), val_min, val_max);
+		snprintf(buf, buf_size, (hex ? "%s 0x%x-0x%x " : "%s %d-%d "), promptmsg.c_str(), val_min, val_max);
 	} else if (hasmin || hasmax) {
 		snprintf(
 				buf, buf_size, (hex ? "%s%s0x%x " : "%s%s%d "), promptmsg.c_str(), hasmin ? Strings::Min_() : Strings::Max_(),
@@ -515,8 +527,14 @@ void CheatScreen::InputHandlers::Integer::Parse() {
 
 CheatScreen::InputHandlers::GameObject::GameObject(bool empty_allowed, std::string&& promptmsg, std::string&& invalidmsg)
 		: Integer(empty_allowed, 0, gwin->get_num_npcs() - 1, false, std::move(promptmsg), std::move(invalidmsg)) {
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+	const int offsety = 90;
+#else
+	const int offsety = cscreen->maxy - 9;
+#endif
 	const char* label = Strings::Pick_Object_from_World;
-	hotspots.emplace_back(0, 0, label[0], label + 1);
+	hotspots.emplace_back(0, offsety, label[0], label + 1);
+	hotspots.back().PositionLeftOf();
 }
 
 CheatScreen::InputHandlers::GameObject::GameObject(bool empty_allowed, std::string&& promptmsg)
@@ -860,15 +878,20 @@ SDL_Keycode CheatScreen::GetKey(const std::vector<Hotspot*>& hotspots, SDL_Keyco
 
 void CheatScreen::RunMenu(std::shared_ptr<Menu> menu) {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	const int prompty = 81;
-	const int promptx = 15;
+	const int offsetx  = 15;
+	const int prompty  = 81;
+	const int promptx  = 15;
+	const int offsety5 = 72;
 #else
-	const int prompty = maxy - 18;
-	const int promptx = 0;
+	const int offsetx  = 0;
+	const int prompty  = maxy - 18;
+	const int promptx  = 0;
+	const int offsety5 = maxy - 36;
 #endif
 
 	std::shared_ptr<MenuCommand> message_command = std::make_shared<MenuCommand>();
 	Uint32                       messagetime     = 0;
+	Hotspot                      EscapeHotspot   = {offsetx + 160, offsety5 + 9, SDLK_ESCAPE, ""};
 
 	message_command->inputs.push_back(std::make_shared<InputHandlers::PressAKey>());
 	std::stack<std::shared_ptr<MenuCommand>> input_stack;
@@ -898,8 +921,8 @@ void CheatScreen::RunMenu(std::shared_ptr<Menu> menu) {
 
 		try {
 			while (current && current->BeginPhase()) {
-				// Current Input Handler that needs to recieve input
-				auto ih = current->GetInputHandler();
+				// Current Input Handler that needs to receive input
+				InputHandler* ih = current->GetInputHandler();
 
 				for (;;) {
 					current->run();
@@ -907,6 +930,20 @@ void CheatScreen::RunMenu(std::shared_ptr<Menu> menu) {
 					gwin->clear_screen();
 					current->paint_display();
 					current->GatherHotspots(hotspots);
+
+					if (dynamic_cast<Menu*>(current.get())
+						|| (current == message_command && dynamic_cast<Menu*>(current->below.get()))) {
+						// Menus show escape hotspot with Exit label
+						// message_command is treated as a menu if a menu is below it in the stack
+						EscapeHotspot.label_rw = Strings::Exit();
+					} else {
+						// Non menus show To Cancel label
+						EscapeHotspot.label_rw = Strings::TO_CANCEL();
+					}
+
+					// Add Escape hotspot
+					hotspots.push_back(&EscapeHotspot);
+
 					// 64 is big enough as the screen res is only big enough for 40x25 text
 					char buf[64];
 
@@ -920,7 +957,7 @@ void CheatScreen::RunMenu(std::shared_ptr<Menu> menu) {
 								ibuf, Strings::CURSOR, promptx + cursor_offset, prompty, 8,
 								ih->input_full() ? fontcolor2.colors : fontcolor.colors);
 					}
-					ih->ArrangeHotspots(promptx + promptmsgwidth + 8, prompty, 2);
+					ih->Arrange00Hotspots(promptx + promptmsgwidth + 8, prompty, 2);
 					ih->GatherHotspots(hotspots);
 
 					if (highlighttime && highlighttime < SDL_GetTicks()) {
@@ -1020,6 +1057,18 @@ void CheatScreen::RunMenu(std::shared_ptr<Menu> menu) {
 	}
 
 	WaitButtonsUp();
+}
+
+void CheatScreen::Hotspot::PositionLeftOf(const Hotspot* hotspot) {
+	if (hotspot) {
+		// positionn to left of hotspot
+		// copy y coord
+		y = hotspot->y;
+		x = hotspot->x - getWidth();
+	} else {
+		// position to left of right edge of screen or 320 which is smaller
+		x = std::min(320,cscreen->maxx) - getWidth();
+	}
 }
 
 SDL_Keycode CheatScreen::Hotspot::HitCheck(const std::vector<Hotspot*>& hotspots, int mx, int my, int distance) {
@@ -1539,11 +1588,13 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::TeleportMenu() {
 	const int offsety1 = 64;
 	const int offsetx2 = 175;
 	const int offsety2 = 63;
+	const int offsety3 = 90;
 #else
 	const int offsetx  = 8;
 	const int offsety1 = 0;
 	const int offsetx2 = offsetx;
 	const int offsety2 = maxy - 63;
+	const int offsety3 = maxy - 9;
 #endif
 	std::forward_list<Menu::Item> items;
 	const char*                   label;
@@ -1557,24 +1608,32 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::TeleportMenu() {
 	// Integer to enter longitude
 	// Run event is used to update mins and max values of Integer input handlers based on the North/South or East/West InputHandlers
 
-	command                        = std::make_shared<MenuCommand>();
-	const char*         labelNorth = Strings::TeleportMenu::NorthOr;
-	const char*         labelSouth = Strings::TeleportMenu::South;
-	const char*         labelWest  = Strings::TeleportMenu::WestOr;
-	const char*         labelEast  = Strings::TeleportMenu::East;
+	command                         = std::make_shared<MenuCommand>();
+	const char*          labelNorth = Strings::TeleportMenu::NorthOr;
+	const char*          labelSouth = Strings::TeleportMenu::South;
+	const char*          labelWest  = Strings::TeleportMenu::WestOr;
+	const char*          labelEast  = Strings::TeleportMenu::East;
 	std::vector<Hotspot> hotspots;
 	hotspots.reserve(2);
-	hotspots.emplace_back(0, 0, labelNorth[0], labelNorth + 1);
-	hotspots.emplace_back(0, 0, labelSouth[0], labelSouth + 1);
+	hotspots.emplace_back(0, offsety3, labelNorth[0], labelNorth + 1);
+	hotspots.emplace_back(0, offsety3, labelSouth[0], labelSouth + 1);
+	// Hotspot 1(South) is placed on right edgeof screen
+	hotspots[1].PositionLeftOf();
+	// Notspot 0(North) is placed to the left of Hotspot 1(South)
+	hotspots[0].PositionLeftOf(&(hotspots[1]));
 
 	command->inputs.push_back(std::make_shared<InputHandlers::KeyOnly>(Strings::TeleportMenu::Latitude, std::move(hotspots)));
 	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, 193, false, Strings::ENTER_LATITUDE));
 
 	// reinitialized moved hotspots vector just to be safe
 	hotspots = std::vector<Hotspot>();
-	hotspots.reserve(2);
-	hotspots.emplace_back(0, 0, labelWest[0], labelWest + 1);
-	hotspots.emplace_back(0, 0, labelEast[0], labelEast + 1);
+	hotspots.emplace_back(0, offsety3, labelWest[0], labelWest + 1);
+	hotspots.emplace_back(0, offsety3, labelEast[0], labelEast + 1);
+
+	// Hotspot 1(East) is placed on right edge of screen
+	hotspots[1].PositionLeftOf();
+	// Notspot 0(West) is placed to the left of Hotspot 1(East)
+	hotspots[0].PositionLeftOf(&(hotspots[1]));
 
 	command->inputs.push_back(std::make_shared<InputHandlers::KeyOnly>(Strings::TeleportMenu::Longitude, std::move(hotspots)));
 	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, 193, false, Strings::ENTER_LONGITUDE));
@@ -1819,7 +1878,7 @@ void CheatScreen::WaitButtonsUp(bool silent) {
 			const int offsetx_start = 0;
 			const int offsetx1      = 160;
 			const int offsety5      = maxy - 36;
-#endif    // eXit
+#endif
 
 			int         offsetx     = offsetx_start;
 			const char* msg_waiting = Strings::Waitingforupevents;
@@ -1928,23 +1987,6 @@ CheatScreen::Menu::Menu(std::forward_list<Menu::Item>&& items) : items(std::move
 		}
 	}
 
-#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
-	const int offsetx = 15;
-	// const int offsety1 = 73;
-	// const int offsety2 = 55;
-	// const int offsetx1 = 160;
-	// const int offsety4 = 36;
-	const int offsety5 = 72;
-#else
-	const int offsetx = 0;
-	// const int offsety1 = 0;
-	// const int offsety2 = 0;
-	// const int offsetx1 = 160;
-	// const int offsety4 = maxy - 45;
-	const int offsety5 = cscreen->maxy - 36;
-#endif    // eXit
-		  // Add Escape hotspot
-	this->items.emplace_front(Hotspot(offsetx + 160, offsety5 + 9, SDLK_ESCAPE, Strings::Exit()), nullptr);
 	// Input handler to select Menu items
 	inputs.emplace_back(std::make_unique<InputHandlers::KeyOnly>(Strings::ENTER_COMMAND));
 }

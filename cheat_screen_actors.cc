@@ -39,9 +39,15 @@
 
 CheatScreen::InputHandlers::Actor::Actor(bool empty_allowed, std::string&& promptmsg)
 		: GameObject(empty_allowed, std::move(promptmsg)) {
-	hotspots.clear();
+#if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
+	const int offsety = 90;
+#else
+	const int offsety = cscreen->maxy - 9;
+#endif
+	hotspots.pop_back();
 	const char* label = Strings::Pick_NPC_from_World;
-	hotspots.emplace_back(0, 0, label[0], label + 1);
+	hotspots.emplace_back(0, offsety, label[0], label + 1);
+	hotspots.back().PositionLeftOf();
 }
 
 CheatScreen::InputHandlers::Actor::Actor(bool empty_allowed) : Actor(empty_allowed, Strings::WHICH_NPC) {}
@@ -847,12 +853,12 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::PalEffectMenu(Actor* actor) {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 	const int offsetx  = 15;
 	const int offsety1 = 81;
+	const int offsety2 = 90;
 #else
 	const int offsetx  = 0;
 	const int offsety1 = 0;
-
+	const int offsety2 = maxy - 9;
 #endif
-
 	std::shared_ptr<MenuCommand>  command;
 	std::forward_list<Menu::Item> items;
 	const char*                   label;
@@ -868,7 +874,8 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::PalEffectMenu(Actor* actor) {
 	gwin->get_pal()->get_ramps(numramps);
 	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
 			false, 0, numramps, false, Strings::PaletteEffect::Prompts::enterFromRamp, Strings::INVALID_VALUE, 255));
-	command->inputs[0]->hotspots.emplace_back(0, 0, 0, Strings::PaletteEffect::Prompts::or255forall);
+	command->inputs[0]->hotspots.emplace_back(0, offsety2, 0, Strings::PaletteEffect::Prompts::or255forall);
+	command->inputs[0]->hotspots.back().PositionLeftOf();
 	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
 			false, 0, numramps, false, Strings::PaletteEffect::Prompts::enterToRampnumberIndex, Strings::INVALID_VALUE));
 	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {

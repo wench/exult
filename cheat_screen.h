@@ -97,13 +97,12 @@ private:
 	static const char* getKeyName(SDL_Keycode keycode);
 
 	// Hotspot is used to associate Label to a Keycodes and are used to determine what key press to simulate in response to
-	// mouse clicks and touch events Hotspots used for Menu items are manually position using the coordinates passed to the
-	// constructor or by setting x and y fields Hotspots added to Input Handlers are positioned automatically and the x and y fields
-	// will be overwritten with the auto arranged position A hotspot may have upto 2 keycodes associated with it. If both keycodes
-	// are 0 Only the label will be shown
+	// mouse clicks and touch events. Position a hotspot using the coordinates passed to the constructor or by setting x and y
+	// fields or by using the PositionLeftOf() method. A hotspot may have upto 2 keycodes associated with it. If both keycodes are 0
+	// Only the label will be shown
 	class Hotspot {
 		SDL_Keycode keycode[2] = {0};
-		int         namew[2]   = {0};    // Name Width of each keycode
+		int         namew[2]   = {0};    // Width of the of each keycode's Name in chars
 		bool        hide[2]    = {false, false};
 
 	public:
@@ -208,6 +207,11 @@ private:
 			return std::max(rect0.w, rect1.w);
 		}
 
+		// Position this hotspot to the left of another
+		// Or from the right edge of screen if hotspot argument is null
+		// Copies y of hotspot, if not null
+		void PositionLeftOf(const Hotspot* hotspot = nullptr);
+
 		// Hit check a vector of HotSpots within (distance) of point (mx,my)
 		// Returns the Keycode at the point
 		// Uses TileRect::distance for calculating distance
@@ -268,8 +272,10 @@ private:
 		// Parse the input, throws InputException on error. This is called immediately after OnInput returns true
 		virtual void Parse();
 
-		// Arranges the hotspots updating their x and y fields
-		virtual void ArrangeHotspots(int x, int y, unsigned lines = 1);
+		// Arranges the hotspots that are at coord {0,0}
+		// Adding additonal hotspots that need auto arranging after this method has been called would not be a good idea
+		// This method is called by RunMenu every frame after PaintPrompt is called
+		virtual void Arrange00Hotspots(int x, int y, unsigned lines = 1);
 		// Paint The Prompt and Input, return pixel width drawn
 		virtual int PaintPrompt(int x, int y, SDL_Keycode lastkey);
 
@@ -328,7 +334,7 @@ private:
 			KeyOnly(std::string&& promptmsg) : InputHandler(true, std::move(promptmsg)) {}
 
 			// Constructs with a vector of hotspots
-						KeyOnly(std::string&& promptmsg, std::vector<Hotspot>&& hotspots)
+			KeyOnly(std::string&& promptmsg, std::vector<Hotspot>&& hotspots)
 					: InputHandler(true, std::move(promptmsg), std::move(hotspots)) {}
 
 			void GetPromptMessage(char* buf, size_t buf_size) override {

@@ -81,7 +81,7 @@ struct Strings : public StringsBase {
 
 	static inline const stringString<0x91A> ENTERNPCNUMBER;
 
-	static inline const stringString<0x91B> TO_CANCEL;
+	static inline const String<0x91B> TO_CANCEL;
 
 	static inline const stringString<0x91C> CLOCK_SET;
 
