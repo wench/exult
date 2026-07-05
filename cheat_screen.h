@@ -305,6 +305,12 @@ private:
 			was_empty = false;
 		}
 
+		virtual void SetInput(const char* new_input) {
+			curlen = std::min<size_t>(strlen(new_input), std::size(input) - 1);
+			memcpy(input, new_input, curlen);
+			input[curlen] = 0;
+		}
+
 		InputHandler(bool empty_allowed, std::string&& promptmsg) : empty_allowed(empty_allowed), promptmsg(std::move(promptmsg)) {}
 
 		// Construct with an initial vector of hotspots
@@ -484,14 +490,16 @@ private:
 	// run: Called once per frame when a Menu Command or it's owner Menu is top of the stack and processing input
 	// cancelled: called if input processing for the Menu Command was cancelled because the user pressed Escape or
 	// if the MenuCommand was popped from the stack because of a MenuCommandException
+	// begin_phase: called when a new input phase has begun
+	// end_phase: called when an input phase is ending
 	class MenuCommand : public std::enable_shared_from_this<MenuCommand> {
 		bool input_active = false;
 
 	public:
-		size_t                                     phase = 0;
-		std::vector<std::shared_ptr<InputHandler>> inputs;
-		// Back reference to the MenuCommand below us in the stack
-		std::shared_ptr<MenuCommand> below;
+		size_t phase = 0;    // The current input phase inputs[phase] is the input handler for the phase
+		std::vector<std::shared_ptr<InputHandler>>
+									 inputs;    // The input handlers that should recieve input before this command is activated
+		std::shared_ptr<MenuCommand> below;     // Back reference to the MenuCommand below us in the stack
 
 	protected:
 		// If set this is a pointer to our hotspot in the menu we are in
@@ -512,6 +520,8 @@ private:
 			std::function<bool(MenuCommand*)>                                              paint_display = {};
 			std::function<void(MenuCommand*)>                                              run           = {};
 			std::function<void(MenuCommand*)>                                              cancelled     = {};
+			std::function<void(MenuCommand*)>                                              begin_phase   = {};
+			std::function<void(MenuCommand*)>                                              end_phase     = {};
 		} events;
 
 		// Virtual methods for input handlers
@@ -567,10 +577,16 @@ private:
 			}
 			inputs[phase]->clear();
 			input_active = true;
+			if (events.begin_phase) {
+				events.begin_phase(this);
+			}
 			return true;
 		}
 
 		virtual void EndPhase() {
+			if (events.end_phase) {
+				events.end_phase(this);
+			}
 			++phase;
 			if (phase >= inputs.size()) {
 				input_active = false;

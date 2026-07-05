@@ -1384,6 +1384,20 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::UsecodeMenu() {
 	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
 			false, 0, int(Usecode_machine::num_events) - 1, false, Strings::UsecodeMenu::Prompts::EnterUsecodeEventid,
 			Strings::UsecodeMenu::Prompts::InvalidUsecodeEventNumber));
+	command->events.begin_phase = [=](MenuCommand* self) {
+		// Get the object from input 0 and get its usecode function number and prefill input[1]
+		if (self->phase == 1) {
+			auto object_h = static_cast<InputHandlers::GameObject*>(self->inputs[0].get());
+			auto ucnum_ih = static_cast<InputHandlers::Integer*>(self->inputs[1].get());
+
+			int ucnum = object_h->object->get_usecode();
+			if (gwin->get_usecode()->function_exists(ucnum)) {
+				char buf[16];
+				snprintf(buf, std::size(buf), "0x%x", ucnum);
+				ucnum_ih->SetInput(buf);
+			}
+		}
+	};
 	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
 		auto target_input   = static_cast<InputHandlers::GameObject*>(self->inputs[0].get());
 		auto ucnum_input    = static_cast<InputHandlers::Integer*>(self->inputs[1].get());
@@ -1599,7 +1613,10 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::TeleportMenu() {
 	std::forward_list<Menu::Item> items;
 	const char*                   label;
 	std::shared_ptr<MenuCommand>  command;
+	//
 	// Left Column
+	//
+
 	// Geographic
 	// 4 input handlers
 	// KeyOnly to select north or south
@@ -1638,7 +1655,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::TeleportMenu() {
 	command->inputs.push_back(std::make_shared<InputHandlers::KeyOnly>(Strings::TeleportMenu::Longitude, std::move(hotspots)));
 	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, 193, false, Strings::ENTER_LONGITUDE));
 
-	command->events.run = [=](MenuCommand* self) {
+	command->events.begin_phase = [=](MenuCommand* self) {
 		// Check phase 0 input and update maximum accepted for input[1]
 		if (self->phase == 1) {
 			auto latkeypress = static_cast<InputHandlers::KeyOnly*>(self->inputs[0].get());
