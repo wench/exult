@@ -316,7 +316,7 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 			for (int y = 0; y < logh; y++) {
 				memcpy(sp + static_cast<size_t>(y + gb) * sp_pitch + gb, src + static_cast<size_t>(y) * spitch, logw);
 			}
-			ok = scale_layer_color(src8, logw, logh, dst32);
+			ok = scale_layer_color(layer, src8, logw, logh, dst32);
 		}
 	}
 

@@ -187,6 +187,7 @@ int Conversation::get_conv_layer() {
 	if (conv_layer < 0) {
 		conv_layer = gwin->create_layer(conv_width, conv_height, conv_transparent);
 		if (conv_layer >= 0) {
+			gwin->layer_set_ui_kind(conv_layer, Image_window::UiLayerConversations);
 			// Let the layer render translucent (Guardian/serpent) pixels with
 			// real texture alpha. The original engine applied this
 			// translucency twice for large faces - a full-screen tint plus the
@@ -222,7 +223,7 @@ int Conversation::get_conv_layer() {
  */
 void Conversation::position_conv_layer(int layer) {
 	SDL_FRect fr;
-	gwin->get_win()->compute_ui_layer_dest(conv_width, conv_height, fr);
+	gwin->get_win()->compute_ui_layer_dest(conv_width, conv_height, fr, Image_window::UiLayerConversations);
 	gwin->layer_set_dest(
 			layer, static_cast<int>(fr.x), static_cast<int>(fr.y), static_cast<int>(fr.w), static_cast<int>(fr.h));
 }

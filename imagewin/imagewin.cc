@@ -1607,6 +1607,16 @@ void Image_window::layer_clear_dest(int handle) {
 	layers[handle]->has_dest = false;
 }
 
+void Image_window::layer_set_ui_kind(int handle, UiLayerKind kind) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
+		kind = UiLayerDefault;
+	}
+	layers[handle]->ui_kind = kind;
+}
+
 void Image_window::mark_all_layers_dirty() {
 	for (auto& lp : layers) {
 		if (lp) {
@@ -1615,8 +1625,9 @@ void Image_window::mark_all_layers_dirty() {
 	}
 }
 
-int Image_window::layer_render_scale() const {
-	const int uscaler = eff_ui_scaler();
+int Image_window::layer_render_scale(const Layer& layer) const {
+	const UiLayerConfig& cfg     = get_ui_cfg(layer.ui_kind);
+	const int            uscaler = eff_ui_scaler(cfg);
 	if (uscaler < 0 || static_cast<size_t>(uscaler) >= Scalers.size()) {
 		return 1;
 	}
@@ -1632,18 +1643,19 @@ int Image_window::layer_render_scale() const {
 			return f;
 		}
 	}
-	const int uscale = eff_ui_scale();
+	const int uscale = eff_ui_scale(cfg);
 	if (uscale >= 2 && (mask & (1u << (uscale - 1))) != 0) {
 		return uscale;
 	}
 	return 1;
 }
 
-bool Image_window::scale_layer_color(SDL_Surface* src8, int logw, int logh, SDL_Surface* dst32) {
+bool Image_window::scale_layer_color(const Layer& layer, SDL_Surface* src8, int logw, int logh, SDL_Surface* dst32) {
 	if (src8 == nullptr || dst32 == nullptr || ibuf == nullptr) {
 		return false;
 	}
-	const int uscaler = eff_ui_scaler();
+	const UiLayerConfig& cfg     = get_ui_cfg(layer.ui_kind);
+	const int            uscaler = eff_ui_scaler(cfg);
 	if (uscaler < 0 || static_cast<size_t>(uscaler) >= Scalers.size()) {
 		return false;
 	}
@@ -1653,7 +1665,7 @@ bool Image_window::scale_layer_color(SDL_Surface* src8, int logw, int logh, SDL_
 	}
 	// The destination is sized by layer_render_scale(); the scaler must run at
 	// that same factor so it does not write past the destination.
-	const int factor = layer_render_scale();
+	const int factor = layer_render_scale(layer);
 	// Temporarily repoint the scaling state at the layer's surfaces (and the
 	// UI scaler's scale factor), run the scaler, then restore. The source
 	// must be guard-banded (guard_band padding on every side) with its content
@@ -1688,21 +1700,44 @@ void Image_window::get_layer_dest(const Layer& layer, SDL_FRect& dst) {
 		dst = layer.dest;
 		return;
 	}
-	compute_layer_fill_dest(layer.logw, layer.logh, dst);
+	compute_layer_fill_dest(layer.logw, layer.logh, dst, layer.ui_kind);
 }
 
 void Image_window::set_ui_config(int size_mode, bool use_game_scaling, int scaler_, FillMode fmode, int fill_scaler_) {
-	ui_size_mode        = size_mode;
-	ui_use_game_scaling = use_game_scaling;
-	ui_scaler           = scaler_;
-	ui_fill_mode        = fmode;
-	ui_fill_scaler      = fill_scaler_;
+	UiLayerConfig cfg;
+	cfg.size_mode        = size_mode;
+	cfg.use_game_scaling = use_game_scaling;
+	cfg.scaler           = scaler_;
+	cfg.fill_mode        = fmode;
+	cfg.fill_scaler      = fill_scaler_;
+	for (int i = 0; i < NumUiLayerKinds; ++i) {
+		ui_cfgs[i] = cfg;
+	}
 	// Sizes/scale may have changed; force layer textures to rebuild.
 	mark_all_layers_dirty();
 }
 
+void Image_window::set_ui_layer_config(
+		UiLayerKind kind, int size_mode, bool use_game_scaling, int scaler_, FillMode fmode, int fill_scaler_) {
+	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
+		return;
+	}
+	UiLayerConfig& cfg   = ui_cfgs[static_cast<int>(kind)];
+	cfg.size_mode        = size_mode;
+	cfg.use_game_scaling = use_game_scaling;
+	cfg.scaler           = scaler_;
+	cfg.fill_mode        = fmode;
+	cfg.fill_scaler      = fill_scaler_;
+	mark_all_layers_dirty();
+}
+
 int Image_window::get_ui_width() const {
-	switch (ui_size_mode) {
+	return get_ui_width(UiLayerDefault);
+}
+
+int Image_window::get_ui_width(UiLayerKind kind) const {
+	const UiLayerConfig& cfg = get_ui_cfg(kind);
+	switch (cfg.size_mode) {
 	case 1:
 		return game_width / 4;
 	case 2:
@@ -1717,7 +1752,12 @@ int Image_window::get_ui_width() const {
 }
 
 int Image_window::get_ui_height() const {
-	switch (ui_size_mode) {
+	return get_ui_height(UiLayerDefault);
+}
+
+int Image_window::get_ui_height(UiLayerKind kind) const {
+	const UiLayerConfig& cfg = get_ui_cfg(kind);
+	switch (cfg.size_mode) {
 	case 1:
 		return game_height / 4;
 	case 2:
@@ -1771,10 +1811,20 @@ void Image_window::compute_fill_dest(int logw, int logh, FillMode fmode, int esc
 }
 
 void Image_window::compute_layer_fill_dest(int logw, int logh, SDL_FRect& dst) const {
-	compute_fill_dest(logw, logh, eff_ui_fill_mode(), eff_ui_scale(), dst);
+	compute_layer_fill_dest(logw, logh, dst, UiLayerDefault);
+}
+
+void Image_window::compute_layer_fill_dest(int logw, int logh, SDL_FRect& dst, UiLayerKind kind) const {
+	const UiLayerConfig& cfg = get_ui_cfg(kind);
+	compute_fill_dest(logw, logh, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), dst);
 }
 
 float Image_window::get_ui_scale_factor() const {
+	return get_ui_scale_factor(UiLayerDefault);
+}
+
+float Image_window::get_ui_scale_factor(UiLayerKind kind) const {
+	const UiLayerConfig& cfg = get_ui_cfg(kind);
 	// The 320x200 overlay layout (conversation, pointer) is scaled uniformly
 	// onto the display by this per-pixel factor.
 	//   Full  = the per-pixel scale a 320x200 game area would get on this
@@ -1790,16 +1840,16 @@ float Image_window::get_ui_scale_factor() const {
 	//           Auto keeps the sizes meaningful even when the game area is
 	//           explicitly set to 320x200 (where Auto == Full).
 	SDL_FRect r;
-	compute_fill_dest(320, 200, fill_mode, scale, r);
+	compute_fill_dest(320, 200, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), r);
 	const float ffw   = r.w / 320.0f;
 	const float ffh   = r.h / 200.0f;
 	const float sFull = ffw < ffh ? ffw : ffh;
 
-	if (ui_size_mode == 0) {
+	if (cfg.size_mode == 0) {
 		return sFull > 0.0f ? sFull : 1.0f;    // Full.
 	}
-	if (ui_size_mode == 4) {                   // Auto: the real game area scale.
-		compute_fill_dest(game_width, game_height, fill_mode, scale, r);
+	if (cfg.size_mode == 4) {    // Auto: the real game area scale.
+		compute_fill_dest(game_width, game_height, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), r);
 		const float faw = game_width > 0 ? r.w / static_cast<float>(game_width) : sFull;
 		const float fah = game_height > 0 ? r.h / static_cast<float>(game_height) : sFull;
 		const float f   = faw < fah ? faw : fah;
@@ -1807,9 +1857,9 @@ float Image_window::get_ui_scale_factor() const {
 	}
 
 	// 1/2/3: interpolate from the automatic (display/scale) game-area scale.
-	const float sAuto = static_cast<float>(scale);
+	const float sAuto = static_cast<float>(eff_ui_scale(cfg));
 	float       t     = 0.5f;
-	switch (ui_size_mode) {
+	switch (cfg.size_mode) {
 	case 1:
 		t = 0.25f;
 		break;
@@ -1826,9 +1876,10 @@ float Image_window::get_ui_scale_factor() const {
 	return f > 0.0f ? f : 1.0f;
 }
 
-float Image_window::ui_full_pixel_scale() const {
+float Image_window::ui_full_pixel_scale(UiLayerKind kind) const {
+	const UiLayerConfig& cfg = get_ui_cfg(kind);
 	SDL_FRect   r;
-	compute_fill_dest(320, 200, fill_mode, scale, r);
+	compute_fill_dest(320, 200, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), r);
 	const float fw = r.w / 320.0f;
 	const float fh = r.h / 200.0f;
 	const float s  = fw < fh ? fw : fh;
@@ -1836,12 +1887,17 @@ float Image_window::ui_full_pixel_scale() const {
 }
 
 void Image_window::compute_ui_layer_dest(int logw, int logh, SDL_FRect& dst) const {
+	compute_ui_layer_dest(logw, logh, dst, UiLayerDefault);
+}
+
+void Image_window::compute_ui_layer_dest(int logw, int logh, SDL_FRect& dst, UiLayerKind kind) const {
+	const UiLayerConfig& cfg = get_ui_cfg(kind);
 	// Shape the layout with the UI fill mode (Fill stretches to the display,
 	// Fit keeps 1:1 pixels, AspectCorrect* uses 1:1.2, Centre a fixed scale).
-	compute_fill_dest(logw, logh, eff_ui_fill_mode(), eff_ui_scale(), dst);
+	compute_fill_dest(logw, logh, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), dst);
 	// Scale by the UI size (get_ui_scale_factor relative to Full), then centre.
-	const float sFull = ui_full_pixel_scale();
-	const float ratio = sFull > 0.0f ? get_ui_scale_factor() / sFull : 1.0f;
+	const float sFull = ui_full_pixel_scale(kind);
+	const float ratio = sFull > 0.0f ? get_ui_scale_factor(kind) / sFull : 1.0f;
 	const float dw    = display_surface ? static_cast<float>(display_surface->w) : dst.w;
 	const float dh    = display_surface ? static_cast<float>(display_surface->h) : dst.h;
 	dst.w *= ratio;
@@ -1880,13 +1936,6 @@ void Image_window::composite_layers() {
 	if (layers.empty() || screen_renderer == nullptr) {
 		return;
 	}
-	// Match the layers' scaling to the game's: a smooth (bilinear / SDL)
-	// scaler uses linear filtering, everything else uses crisp nearest. This
-	// keeps overlay layers consistent with the main image while preserving
-	// their fixed logical size.
-	const bool smooth = (eff_ui_scaler() == bilinear) || (eff_ui_scaler() == SDLScaler) || (eff_ui_fill_scaler() == bilinear)
-						|| (eff_ui_fill_scaler() == SDLScaler);
-	const SDL_ScaleMode smode = smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
 	// Gather the visible layers and composite them from lowest to highest z.
 	std::vector<Layer*> ordered;
 	ordered.reserve(layers.size());
@@ -1901,11 +1950,16 @@ void Image_window::composite_layers() {
 	std::stable_sort(ordered.begin(), ordered.end(), [](const Layer* a, const Layer* b) {
 		return a->z < b->z;
 	});
-	// If a software (member) scaler is active, layers are pre-scaled by it to
-	// this factor; otherwise they are uploaded 1:1 and scaled on the GPU.
-	const int render_scale = layer_render_scale();
 	for (Layer* lptr : ordered) {
 		Layer& layer = *lptr;
+		const UiLayerConfig& cfg = get_ui_cfg(layer.ui_kind);
+		// Match filtering to this layer's scaler/fill scaler.
+		const bool smooth = (eff_ui_scaler(cfg) == bilinear) || (eff_ui_scaler(cfg) == SDLScaler)
+							|| (eff_ui_fill_scaler(cfg) == bilinear) || (eff_ui_fill_scaler(cfg) == SDLScaler);
+		const SDL_ScaleMode smode = smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
+		// If a software (member) scaler is active, layers are pre-scaled by it
+		// to this factor; otherwise they are uploaded 1:1 and scaled on the GPU.
+		const int render_scale = layer_render_scale(layer);
 		// Recreate the texture if the render scale changed (its size depends
 		// on it) or it was dropped.
 		if (layer.render_scale != render_scale && layer.texture != nullptr) {

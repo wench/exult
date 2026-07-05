@@ -67,6 +67,15 @@ public:
 	using scalefun   = void (Image_window::*)(int, int, int, int);
 	using ScalerType = int;
 
+	enum UiLayerKind {
+		UiLayerDefault = 0,
+		UiLayerConversations,
+		UiLayerMousePointer,
+		UiLayerGumps,
+		UiLayerOnscreenText,
+		NumUiLayerKinds
+	};
+
 	enum FillMode {
 		Fill = 1,                ///< Game area fills all of the display surface
 		Fit  = 2,                ///< Game area is stretched to the closest edge, maintaining
@@ -106,6 +115,14 @@ public:
 		Image_window::scalefun fun8to8;
 	};
 
+	struct UiLayerConfig {
+		int      size_mode        = 0;       // 0=Full,1=1/4,2=1/2,3=3/4,4=Auto.
+		bool     use_game_scaling = true;    // Use game scaler/fill settings.
+		int      scaler           = 0;
+		FillMode fill_mode        = Fit;
+		int      fill_scaler      = 0;
+	};
+
 	struct Resolution {
 		sint32 width;
 		sint32 height;
@@ -137,6 +154,7 @@ public:
 		int                           z        = 0;        // Composite order (higher = on top).
 		bool                          has_dest = false;    // Explicit destination override?
 		SDL_FRect                     dest{};              // Destination rect (display coords).
+		UiLayerKind                   ui_kind = UiLayerDefault;
 		int                           render_scale = 1;    // 1 = 1:1 upload; >1 = pre-scaled by
 														   // the game's scaler at this factor.
 		// Optional 256-entry ARGB override, one per palette index. A non-zero
@@ -269,30 +287,31 @@ protected:
 	// game/width sets the render size); it is presented at the game's scale.
 	// Scaler/fill settings (unless ui_use_game_scaling) come from ui_scaler /
 	// ui_fill_mode / ui_fill_scaler.
-	int      ui_size_mode        = 0;       // 0=Full(320x200),1=1/4,2=1/2,3=3/4,4=Auto.
-	bool     ui_use_game_scaling = true;    // Use the game's scaler/fill settings.
-	int      ui_scaler           = 0;       // Defaults to the first (point) scaler.
-	FillMode ui_fill_mode        = Fit;
-	int      ui_fill_scaler      = 0;
+	UiLayerConfig ui_cfgs[NumUiLayerKinds];
 
-	// Effective UI scaling values (the game's when ui_use_game_scaling).
-	int eff_ui_scaler() const {
-		return ui_use_game_scaling ? scaler : ui_scaler;
+	const UiLayerConfig& get_ui_cfg(UiLayerKind kind) const {
+		return ui_cfgs[static_cast<int>(kind)];
 	}
 
-	int eff_ui_scale() const {
+	// Effective UI scaling values (the game's when use_game_scaling).
+	int eff_ui_scaler(const UiLayerConfig& cfg) const {
+		return cfg.use_game_scaling ? scaler : cfg.scaler;
+	}
+
+	int eff_ui_scale(const UiLayerConfig& cfg) const {
 		// Layers render at the UI size and are presented at the game's scale;
 		// there is no separate UI scale factor (mirroring how game/width sets
 		// the render size while the display scale drives presentation).
+		ignore_unused_variable_warning(cfg);
 		return scale;
 	}
 
-	FillMode eff_ui_fill_mode() const {
-		return ui_use_game_scaling ? fill_mode : ui_fill_mode;
+	FillMode eff_ui_fill_mode(const UiLayerConfig& cfg) const {
+		return cfg.use_game_scaling ? fill_mode : cfg.fill_mode;
 	}
 
-	int eff_ui_fill_scaler() const {
-		return ui_use_game_scaling ? fill_scaler : ui_fill_scaler;
+	int eff_ui_fill_scaler(const UiLayerConfig& cfg) const {
+		return cfg.use_game_scaling ? fill_scaler : cfg.fill_scaler;
 	}
 
 	static SDL_DisplayMode desktop_displaymode;
@@ -315,12 +334,13 @@ protected:
 	void get_layer_dest(const Layer& layer, struct SDL_FRect& dst);
 	// Place a logw x logh layer on the display using the UI fill mode / scale.
 	void compute_layer_fill_dest(int logw, int logh, struct SDL_FRect& dst) const;
+	void compute_layer_fill_dest(int logw, int logh, struct SDL_FRect& dst, UiLayerKind kind) const;
 	// Place a logw x logh area on the display using an explicit fill mode /
 	// scale (used to size a hypothetical game area, e.g. 320x200 for "Full").
 	void compute_fill_dest(int logw, int logh, FillMode fmode, int escl, struct SDL_FRect& dst) const;
 	// Per-pixel scale a 320x200 game area would get on this display (the "Full"
 	// overlay scale), used to turn get_ui_scale_factor() into a size ratio.
-	float ui_full_pixel_scale() const;
+	float ui_full_pixel_scale(UiLayerKind kind) const;
 	// Composite all visible layers onto the renderer (after the main image,
 	// before presenting).
 	void composite_layers();
@@ -333,12 +353,12 @@ protected:
 
 	// Scale factor the current game scaler would apply to overlay layers, or
 	// 1 if the layers should just be uploaded 1:1 (arb / GPU scalers).
-	int layer_render_scale() const;
+	int layer_render_scale(const Layer& layer) const;
 	// Run the current (member) scaler on a guard-banded 8-bit source surface
 	// into a 32-bit destination surface, by temporarily repointing the
 	// scaling state.  Returns false if the current scaler can't be used this
 	// way (arb or SDL scaler).  Used to apply the game scaler to layers.
-	bool scale_layer_color(struct SDL_Surface* src8, int logw, int logh, struct SDL_Surface* dst32);
+	bool scale_layer_color(const Layer& layer, struct SDL_Surface* src8, int logw, int logh, struct SDL_Surface* dst32);
 	// Free any GPU textures owned by layers (e.g. before the renderer is
 	// destroyed).  The layers and their buffers are kept.
 	void free_layer_textures();
@@ -606,6 +626,7 @@ public:
 	// (e.g. the mouse cursor) freely. layer_clear_dest() restores auto-fit.
 	void layer_set_dest(int handle, int x, int y, int w, int h);
 	void layer_clear_dest(int handle);
+	void layer_set_ui_kind(int handle, UiLayerKind kind);
 	// Set (or clear, with nullptr) a layer's 256-entry ARGB override table.
 	// Non-zero entries replace the opaque palette colour for that index,
 	// carrying their own alpha (used for translucent pixels).
@@ -618,20 +639,25 @@ public:
 	// game's scale.  When use_game_scaling is true the game's scaler/fill
 	// settings are used; otherwise the given ones are.
 	void set_ui_config(int size_mode, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
+	void set_ui_layer_config(UiLayerKind kind, int size_mode, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
 
 	int get_ui_width() const;
 	int get_ui_height() const;
+	int get_ui_width(UiLayerKind kind) const;
+	int get_ui_height(UiLayerKind kind) const;
 
 	// Uniform scale factor applied to the fixed 320x200 overlay layout
 	// (conversation, pointer) to place it on screen. Full = the size a
 	// 320x200 game area would get (independent of the real game area); Auto =
 	// the real game area size; 1/2/3 = 1/4, 1/2, 3/4 of Auto.
 	float get_ui_scale_factor() const;
+	float get_ui_scale_factor(UiLayerKind kind) const;
 	// Compute an overlay layer's on-screen destination for a logw x logh
 	// layout: shaped by the UI fill mode (Fill stretches, Fit keeps 1:1 pixels,
 	// AspectCorrect* uses 1:1.2, Centre a fixed scale) and scaled by the UI
 	// size, centred in display coords.
 	void compute_ui_layer_dest(int logw, int logh, struct SDL_FRect& dst) const;
+	void compute_ui_layer_dest(int logw, int logh, struct SDL_FRect& dst, UiLayerKind kind) const;
 	// Mark every layer's texture stale so it is re-converted (e.g. after a
 	// palette change, since a layer texture is a snapshot of the palette).
 	void mark_all_layers_dirty();

@@ -2907,78 +2907,136 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 	}
 	bool ui_universal;
 	config->value("config/video/ui/universal", ui_universal, true);
-	string ui_size;
-	config->value("config/video/ui/size", ui_size, "Full");
-	// Size mode: 0=Full(320x200), 1=1/4, 2=1/2, 3=3/4, 4=Auto of the game area.
-	int size_mode;
-	if (ui_size == "Auto") {
-		size_mode = 4;
-	} else if (ui_size == "1") {
-		size_mode = 1;
-	} else if (ui_size == "2") {
-		size_mode = 2;
-	} else if (ui_size == "3") {
-		size_mode = 3;
-	} else {
-		ui_size   = "Full";
-		size_mode = 0;
-	}
-	int                    ui_scaler;
-	int                    ui_fill_scaler;
-	Image_window::FillMode ui_fillmode;
 
-	const bool use_game_scaling = ui_size == "Auto";
-	if (use_game_scaling) {
-		ui_scaler      = scaler;
-		ui_fillmode    = fillmode;
-		ui_fill_scaler = fill_scaler;
+	auto parse_size_mode = [](string& size) {
+		if (size == "Auto") {
+			return 4;
+		}
+		if (size == "1") {
+			return 1;
+		}
+		if (size == "2") {
+			return 2;
+		}
+		if (size == "3") {
+			return 3;
+		}
+		size = "Full";
+		return 0;
+	};
+
+	struct LayerUiCfg {
+		string                 size;
+		int                    size_mode;
+		bool                   use_game_scaling;
+		int                    scaler;
+		Image_window::FillMode fillmode;
+		int                    fill_scaler;
+	};
+
+	auto read_layer_cfg = [&](const string& base, const LayerUiCfg& fallback) {
+		LayerUiCfg cfg = fallback;
+		config->value(base + "/size", cfg.size, fallback.size.c_str());
+		cfg.size_mode        = parse_size_mode(cfg.size);
+		cfg.use_game_scaling = (cfg.size == "Auto");
+		if (cfg.use_game_scaling) {
+			cfg.scaler      = scaler;
+			cfg.fillmode    = fillmode;
+			cfg.fill_scaler = fill_scaler;
+			return cfg;
+		}
+
+		string s;
+		config->value(base + "/scale_method", s, Image_window::get_name_for_scaler(fallback.scaler));
+		cfg.scaler = Image_window::get_scaler_for_name(s.c_str());
+		if (cfg.scaler == Image_window::NoScaler) {
+			cfg.scaler = fallback.scaler;
+		}
+
+		string fb_fmode;
+		Image_window::fillmode_to_string(fallback.fillmode, fb_fmode);
+		string fm;
+		config->value(base + "/fill_mode", fm, fb_fmode.c_str());
+		cfg.fillmode = Image_window::string_to_fillmode(fm.c_str());
+		if (cfg.fillmode == 0) {
+			cfg.fillmode = fallback.fillmode;
+		}
+
+		string fs;
+		config->value(base + "/fill_scaler", fs, Image_window::get_name_for_scaler(fallback.fill_scaler));
+		cfg.fill_scaler = Image_window::get_scaler_for_name(fs.c_str());
+		if (cfg.fill_scaler == Image_window::NoScaler) {
+			cfg.fill_scaler = fallback.fill_scaler;
+		}
+		return cfg;
+	};
+
+	auto write_layer_cfg = [&](const string& base, const LayerUiCfg& cfg, bool overwrite) {
+		if (overwrite || !config->key_exists(base + "/size")) {
+			config->set(base + "/size", cfg.size, false);
+		}
+		if (overwrite || !config->key_exists(base + "/scale_method")) {
+			config->set(base + "/scale_method", Image_window::get_name_for_scaler(cfg.scaler), false);
+		}
+		if (overwrite || !config->key_exists(base + "/fill_mode")) {
+			string fmode_s;
+			Image_window::fillmode_to_string(cfg.fillmode, fmode_s);
+			config->set(base + "/fill_mode", fmode_s, false);
+		}
+		if (overwrite || !config->key_exists(base + "/fill_scaler")) {
+			config->set(base + "/fill_scaler", Image_window::get_name_for_scaler(cfg.fill_scaler), false);
+		}
+	};
+
+	LayerUiCfg global_cfg;
+	global_cfg.size = "Full";
+	config->value("config/video/ui/size", global_cfg.size, "Full");
+	global_cfg.size_mode        = parse_size_mode(global_cfg.size);
+	global_cfg.use_game_scaling = (global_cfg.size == "Auto");
+	if (global_cfg.use_game_scaling) {
+		global_cfg.scaler      = scaler;
+		global_cfg.fillmode    = fillmode;
+		global_cfg.fill_scaler = fill_scaler;
 	} else {
 		string s;
 		config->value("config/video/ui/scale_method", s, Image_window::get_name_for_scaler(scaler));
-		ui_scaler = Image_window::get_scaler_for_name(s.c_str());
-		if (ui_scaler == Image_window::NoScaler) {
-			ui_scaler = scaler;
+		global_cfg.scaler = Image_window::get_scaler_for_name(s.c_str());
+		if (global_cfg.scaler == Image_window::NoScaler) {
+			global_cfg.scaler = scaler;
 		}
-		// The fill mode / scaler affect quality only; the layer is centred on
-		// screen at the game's scale. Default the fill mode to a centred box.
 		string centre_default;
 		Image_window::fillmode_to_string(Image_window::Centre, centre_default);
 		string fm;
 		config->value("config/video/ui/fill_mode", fm, centre_default.c_str());
-		ui_fillmode = Image_window::string_to_fillmode(fm.c_str());
-		if (ui_fillmode == 0) {
-			ui_fillmode = Image_window::Centre;
+		global_cfg.fillmode = Image_window::string_to_fillmode(fm.c_str());
+		if (global_cfg.fillmode == 0) {
+			global_cfg.fillmode = Image_window::Centre;
 		}
 		string fs;
 		config->value("config/video/ui/fill_scaler", fs, Image_window::get_name_for_scaler(fill_scaler));
-		ui_fill_scaler = Image_window::get_scaler_for_name(fs.c_str());
-		if (ui_fill_scaler == Image_window::NoScaler) {
-			ui_fill_scaler = fill_scaler;
-		}
-	}
-	config->set("config/video/ui/universal", ui_universal ? "yes" : "no", false);
-	config->set("config/video/ui/size", ui_size, false);
-	if (!use_game_scaling) {
-		config->set("config/video/ui/scale_method", Image_window::get_name_for_scaler(ui_scaler), false);
-		string ui_fmode_str;
-		Image_window::fillmode_to_string(ui_fillmode, ui_fmode_str);
-		config->set("config/video/ui/fill_mode", ui_fmode_str, false);
-		config->set("config/video/ui/fill_scaler", Image_window::get_name_for_scaler(ui_fill_scaler), false);
-	} else {
-		if (!config->key_exists("config/video/ui/scale_method")) {
-			config->set("config/video/ui/scale_method", Image_window::get_name_for_scaler(scaler), false);
-		}
-		if (!config->key_exists("config/video/ui/fill_mode")) {
-			string gm;
-			Image_window::fillmode_to_string(fillmode, gm);
-			config->set("config/video/ui/fill_mode", gm, false);
-		}
-		if (!config->key_exists("config/video/ui/fill_scaler")) {
-			config->set("config/video/ui/fill_scaler", Image_window::get_name_for_scaler(fill_scaler), false);
+		global_cfg.fill_scaler = Image_window::get_scaler_for_name(fs.c_str());
+		if (global_cfg.fill_scaler == Image_window::NoScaler) {
+			global_cfg.fill_scaler = fill_scaler;
 		}
 	}
 
-	gwin->set_ui_config(size_mode, use_game_scaling, ui_scaler, ui_fillmode, ui_fill_scaler);
+	config->set("config/video/ui/universal", ui_universal ? "yes" : "no", false);
+	write_layer_cfg("config/video/ui", global_cfg, !global_cfg.use_game_scaling);
+
+	gwin->set_ui_config(
+			global_cfg.size_mode, global_cfg.use_game_scaling, global_cfg.scaler, global_cfg.fillmode, global_cfg.fill_scaler);
+
+	auto apply_named_layer = [&](Image_window::UiLayerKind kind, const string& key) {
+		const string base = "config/video/ui/" + key;
+		LayerUiCfg   cfg  = ui_universal ? global_cfg : read_layer_cfg(base, global_cfg);
+		gwin->set_ui_layer_config(kind, cfg.size_mode, cfg.use_game_scaling, cfg.scaler, cfg.fillmode, cfg.fill_scaler);
+		write_layer_cfg(base, cfg, !ui_universal && !cfg.use_game_scaling);
+	};
+
+	apply_named_layer(Image_window::UiLayerConversations, "conversations");
+	apply_named_layer(Image_window::UiLayerMousePointer, "mouse_pointer");
+	apply_named_layer(Image_window::UiLayerGumps, "gumps");
+	apply_named_layer(Image_window::UiLayerOnscreenText, "onscreen_text");
 }
 
 /*

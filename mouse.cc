@@ -206,6 +206,7 @@ bool Mouse::ensure_mouse_layer() {
 	if (mouse_layer < 0) {
 		return false;
 	}
+	gwin->layer_set_ui_kind(mouse_layer, Image_window::UiLayerMousePointer);
 	last_layer_frame = -1;    // Force a redraw.
 	return true;
 }
@@ -236,7 +237,7 @@ void Mouse::position_mouse_layer() {
 	// Per-axis on-screen scale of the 320x200 overlay (from the UI size + fill
 	// mode); the cursor uses the same scale so it matches the conversation.
 	SDL_FRect fr;
-	iwin->compute_ui_layer_dest(320, 200, fr);
+	iwin->compute_ui_layer_dest(320, 200, fr, Image_window::UiLayerMousePointer);
 	const float sx = fr.w / 320.0f;
 	const float sy = fr.h / 200.0f;
 	// Map the cursor hotspot (game coords) to the display, then place the
