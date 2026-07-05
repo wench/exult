@@ -116,6 +116,67 @@ public:
 		~ScalerVector();
 	};
 
+	// A compositing overlay layer. It owns its own 8-bit paletted buffer
+	// that game code paints into using the normal shape/text routines. The
+	// window converts the buffer to a texture and draws it on top of the main
+	// game image at its own size, decoupled from the world scaling (so its
+	// contents keep a constant on-screen size regardless of the game
+	// resolution or scaler). A single palette index is treated as
+	// transparent so layers can overlap the scene.
+	class Layer {
+		friend class Image_window;
+		friend class Image_window8;
+		std::unique_ptr<Image_buffer> buf;                  // 8-bit drawing buffer.
+		struct SDL_Texture*           texture = nullptr;    // GPU cache (rebuilt on resize).
+		int                           logw;                 // Logical (game-pixel) width.
+		int                           logh;                 // Logical (game-pixel) height.
+		int                           fixed_scale;          // >0 forces integer scale, 0 = auto-fit.
+		unsigned char                 transparent;          // Palette index drawn as transparent.
+		bool                          visible  = true;
+		bool                          dirty    = true;     // Buffer changed => re-upload.
+		int                           z        = 0;        // Composite order (higher = on top).
+		bool                          has_dest = false;    // Explicit destination override?
+		SDL_FRect                     dest{};              // Destination rect (display coords).
+		int                           render_scale = 1;    // 1 = 1:1 upload; >1 = pre-scaled by
+														   // the game's scaler at this factor.
+		// Optional 256-entry ARGB override, one per palette index. A non-zero
+		// entry is used verbatim (with its own alpha) instead of the opaque
+		// palette colour, letting a layer draw translucent pixels.
+		std::vector<uint32> index_argb;
+
+	public:
+		Layer(std::unique_ptr<Image_buffer> b, int w, int h, unsigned char transp, int fscale, int zorder)
+				: buf(std::move(b)), logw(w), logh(h), fixed_scale(fscale), transparent(transp), z(zorder) {}
+
+		Image_buffer* get_ibuf() const {
+			return buf.get();
+		}
+
+		int get_width() const {
+			return logw;
+		}
+
+		int get_height() const {
+			return logh;
+		}
+
+		unsigned char get_transparent() const {
+			return transparent;
+		}
+
+		void set_dirty() {
+			dirty = true;
+		}
+
+		void set_visible(bool v) {
+			visible = v;
+		}
+
+		bool is_visible() const {
+			return visible;
+		}
+	};
+
 private:
 	static ScalerVector                               p_scalers;
 	static std::map<uint32, Image_window::Resolution> p_resolutions;
@@ -202,6 +263,38 @@ protected:
 	FillMode fill_mode;
 	int      fill_scaler;
 
+	// Overlay-layer ("UI") scaling configuration, mirroring the game area's
+	// resolution/scale/fill settings but applied to the layers. The layer
+	// resolution is derived from ui_size_mode and the current game area (like
+	// game/width sets the render size); it is presented at the game's scale.
+	// Scaler/fill settings (unless ui_use_game_scaling) come from ui_scaler /
+	// ui_fill_mode / ui_fill_scaler.
+	int      ui_size_mode        = 0;       // 0=Full(320x200),1=1/4,2=1/2,3=3/4,4=Auto.
+	bool     ui_use_game_scaling = true;    // Use the game's scaler/fill settings.
+	int      ui_scaler           = 0;       // Defaults to the first (point) scaler.
+	FillMode ui_fill_mode        = Fit;
+	int      ui_fill_scaler      = 0;
+
+	// Effective UI scaling values (the game's when ui_use_game_scaling).
+	int eff_ui_scaler() const {
+		return ui_use_game_scaling ? scaler : ui_scaler;
+	}
+
+	int eff_ui_scale() const {
+		// Layers render at the UI size and are presented at the game's scale;
+		// there is no separate UI scale factor (mirroring how game/width sets
+		// the render size while the display scale drives presentation).
+		return scale;
+	}
+
+	FillMode eff_ui_fill_mode() const {
+		return ui_use_game_scaling ? fill_mode : ui_fill_mode;
+	}
+
+	int eff_ui_fill_scaler() const {
+		return ui_use_game_scaling ? fill_scaler : ui_fill_scaler;
+	}
+
 	static SDL_DisplayMode desktop_displaymode;
 	struct SDL_Window*     screen_window;
 	struct SDL_Renderer*   screen_renderer;
@@ -213,6 +306,42 @@ protected:
 	SDL_Surface* display_surface;     // Final surface that is displayed  (1024x1024)
 	SDL_Surface* inter_surface;       // Post scaled/pre stretch surface  (960x600)
 	SDL_Surface* draw_surface;        // Pre scaled surface               (320x200)
+
+	// Overlay layers composited on top of the main image (see class Layer).
+	std::vector<std::unique_ptr<Layer>> layers;
+
+	// Compute a layer's on-screen destination rect (in display coords, which
+	// match the renderer's logical presentation).
+	void get_layer_dest(const Layer& layer, struct SDL_FRect& dst);
+	// Place a logw x logh layer on the display using the UI fill mode / scale.
+	void compute_layer_fill_dest(int logw, int logh, struct SDL_FRect& dst) const;
+	// Place a logw x logh area on the display using an explicit fill mode /
+	// scale (used to size a hypothetical game area, e.g. 320x200 for "Full").
+	void compute_fill_dest(int logw, int logh, FillMode fmode, int escl, struct SDL_FRect& dst) const;
+	// Per-pixel scale a 320x200 game area would get on this display (the "Full"
+	// overlay scale), used to turn get_ui_scale_factor() into a size ratio.
+	float ui_full_pixel_scale() const;
+	// Composite all visible layers onto the renderer (after the main image,
+	// before presenting).
+	void composite_layers();
+
+	// (Re)upload a layer's 8-bit pixels into its texture, using the palette.
+	// Overridden by the palettized 8-bit window.
+	virtual void refresh_layer(Layer& layer) {
+		ignore_unused_variable_warning(layer);
+	}
+
+	// Scale factor the current game scaler would apply to overlay layers, or
+	// 1 if the layers should just be uploaded 1:1 (arb / GPU scalers).
+	int layer_render_scale() const;
+	// Run the current (member) scaler on a guard-banded 8-bit source surface
+	// into a 32-bit destination surface, by temporarily repointing the
+	// scaling state.  Returns false if the current scaler can't be used this
+	// way (arb or SDL scaler).  Used to apply the game scaler to layers.
+	bool scale_layer_color(struct SDL_Surface* src8, int logw, int logh, struct SDL_Surface* dst32);
+	// Free any GPU textures owned by layers (e.g. before the renderer is
+	// destroyed).  The layers and their buffers are kept.
+	void free_layer_textures();
 
 	/*
 	 *   Scaled blits:
@@ -453,6 +582,63 @@ public:
 
 	void toggle_fullscreen();
 
+	// -------- Overlay layers --------
+	// Create an overlay layer with a logical (game-pixel) size of w x h.
+	// Returns a non-negative handle, or -1 on failure.  Paint into the
+	// buffer returned by get_layer_ibuf(handle) using the normal routines.
+	// 'transparent' is the palette index treated as see-through; when
+	// 'fixed_scale' is 0 the layer is scaled to fit and centred (keeping a
+	// constant on-screen size independent of the world scaling), otherwise it
+	// is drawn at the given integer scale.  'z' orders layers: higher values
+	// are composited on top.
+	int           create_layer(int w, int h, unsigned char transparent = 255, int fixed_scale = 0, int z = 0);
+	void          destroy_layer(int handle);
+	Image_buffer* get_layer_ibuf(int handle);
+	// Mark a layer's buffer as changed so it is re-uploaded before the next
+	// composite.  Call after painting into it.
+	void layer_set_dirty(int handle);
+	void layer_set_visible(int handle, bool visible);
+	bool layer_is_visible(int handle);
+	// Set a layer's composite order (higher is on top).
+	void layer_set_z(int handle, int z);
+	// Give a layer an explicit destination rectangle (in display coords),
+	// overriding the centred auto-fit placement.  Used to position a layer
+	// (e.g. the mouse cursor) freely. layer_clear_dest() restores auto-fit.
+	void layer_set_dest(int handle, int x, int y, int w, int h);
+	void layer_clear_dest(int handle);
+	// Set (or clear, with nullptr) a layer's 256-entry ARGB override table.
+	// Non-zero entries replace the opaque palette colour for that index,
+	// carrying their own alpha (used for translucent pixels).
+	void layer_set_index_argb(int handle, const uint32* argb256);
+
+	// -------- Overlay-layer ("UI") scaling config --------
+	// Configure how overlay layers (conversation, mouse cursor) are scaled and
+	// placed.  size_mode: 0=Full(320x200), 1=1/4, 2=1/2, 3=3/4, 4=Auto of the
+	// game area.  The layers render at that size and are presented at the
+	// game's scale.  When use_game_scaling is true the game's scaler/fill
+	// settings are used; otherwise the given ones are.
+	void set_ui_config(int size_mode, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
+
+	int get_ui_width() const;
+	int get_ui_height() const;
+
+	// Uniform scale factor applied to the fixed 320x200 overlay layout
+	// (conversation, pointer) to place it on screen. Full = the size a
+	// 320x200 game area would get (independent of the real game area); Auto =
+	// the real game area size; 1/2/3 = 1/4, 1/2, 3/4 of Auto.
+	float get_ui_scale_factor() const;
+	// Compute an overlay layer's on-screen destination for a logw x logh
+	// layout: shaped by the UI fill mode (Fill stretches, Fit keeps 1:1 pixels,
+	// AspectCorrect* uses 1:1.2, Centre a fixed scale) and scaled by the UI
+	// size, centred in display coords.
+	void compute_ui_layer_dest(int logw, int logh, struct SDL_FRect& dst) const;
+	// Mark every layer's texture stale so it is re-converted (e.g. after a
+	// palette change, since a layer texture is a snapshot of the palette).
+	void mark_all_layers_dirty();
+	// Map a point in display/window coords to a layer's logical coords.
+	// Returns false if the layer is invalid or the point falls outside it.
+	bool screen_to_layer(int handle, int sx, int sy, int& lx, int& ly);
+
 	// Set palette.
 	virtual void set_palette(const unsigned char* rgbs, int maxval, int brightness = 100) {
 		ignore_unused_variable_warning(rgbs, maxval, brightness);
@@ -465,7 +651,7 @@ public:
 
 	// This method adjusts buffer dimensions so gamewin can draw into the
 	// guard band on the right and bottom in order to prevent fine black lines
-	// when scalers read from the guardband Must call EndPaintIntoGuardBand
+	// when scalers read from the guardband. Must call EndPaintIntoGuardBand
 	// after calling this Parmeters are the region to be painted. This will be
 	// clipped against buffer dimension and enlarged into the guardband. If
 	// Parameters are nullptr they are treated as if they are zero when

@@ -426,6 +426,72 @@ public:
 		return win;
 	}
 
+	int create_layer(int w, int h, unsigned char transparent = 255, int fixed_scale = 0, int z = 0) {
+		return win->create_layer(w, h, transparent, fixed_scale, z);
+	}
+
+	void destroy_layer(int handle) {
+		win->destroy_layer(handle);
+	}
+
+	Image_buffer8* get_layer_ibuf(int handle) {
+		return static_cast<Image_buffer8*>(win->get_layer_ibuf(handle));
+	}
+
+	void layer_set_dirty(int handle) {
+		win->layer_set_dirty(handle);
+	}
+
+	void layer_set_visible(int handle, bool visible) {
+		win->layer_set_visible(handle, visible);
+	}
+
+	bool layer_is_visible(int handle) {
+		return win->layer_is_visible(handle);
+	}
+
+	void layer_set_z(int handle, int z) {
+		win->layer_set_z(handle, z);
+	}
+
+	void layer_set_dest(int handle, int x, int y, int w, int h) {
+		win->layer_set_dest(handle, x, y, w, h);
+	}
+
+	void layer_clear_dest(int handle) {
+		win->layer_clear_dest(handle);
+	}
+
+	void layer_set_index_argb(int handle, const uint32* argb256) {
+		win->layer_set_index_argb(handle, argb256);
+	}
+
+	// Overlay-layer ("UI") scaling config (see Image_window::set_ui_config).
+	void set_ui_config(int size_mode, bool use_game_scaling, int scaler, Image_window::FillMode fmode, int fill_scaler) {
+		win->set_ui_config(size_mode, use_game_scaling, scaler, fmode, fill_scaler);
+	}
+
+	int get_ui_width() const {
+		return win->get_ui_width();
+	}
+
+	int get_ui_height() const {
+		return win->get_ui_height();
+	}
+
+	float get_ui_scale_factor() const {
+		return win->get_ui_scale_factor();
+	}
+
+	bool screen_to_layer(int handle, int sx, int sy, int& lx, int& ly) {
+		return win->screen_to_layer(handle, sx, sy, lx, ly);
+	}
+
+	// Redirect all shape/text drawing to buf (e.g. a layer's buffer).
+	// Returns the previous render target; restore it with pop_render_target.
+	Image_buffer8* push_render_target(Image_buffer8* buf);
+	void           pop_render_target(Image_buffer8* prev);
+
 	inline Time_queue* get_tqueue() const {
 		return tqueue;
 	}

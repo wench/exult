@@ -42,6 +42,17 @@
 using std::size_t;
 using std::string;
 
+// The conversation faces and text are drawn into an overlay layer that is
+// composited on top of the scene. The layer is always laid out at a fixed
+// 320x200 (the classic conversation size); that whole layout is then scaled
+// onto an on-screen rectangle whose size comes from config/video/ui/size, so
+// the faces, text and rectangle all scale together.
+namespace {
+	constexpr unsigned char conv_transparent = 255;    // See-through palette index.
+	constexpr int           conv_width       = 320;    // Fixed layout resolution.
+	constexpr int           conv_height      = 200;
+}    // namespace
+
 // TODO: show_face & show_avatar_choices seem to share code?
 // TODO: show_avatar_choices shouldn't first convert to char**, probably
 
@@ -151,24 +162,112 @@ void Conversation::init_faces() {
 	}
 	num_faces       = 0;
 	last_face_shown = -1;
+	choices_active  = false;
+	if (conv_layer >= 0) {    // Hide any leftover faces/text.
+		gwin->layer_set_visible(conv_layer, false);
+		gwin->layer_set_dirty(conv_layer);
+	}
 }
 
 /*
- * Get the rectangle within the game area used for conversation faces
- * and text.  A fixed 320x200 rectangle, centered in the game area.
+ * Get the rectangle within the overlay layer used for conversation faces
+ * and text. The layer is a fixed 320x200 with its own coordinate space
+ * starting at (0, 0).
  */
 TileRect Conversation::get_conv_rect() const {
-	const int convw = 320;
-	const int convh = 200;
-	return TileRect((gwin->get_width() - convw) / 2, (gwin->get_height() - convh) / 2, convw, convh);
+	return TileRect(0, 0, conv_width, conv_height);
 }
 
-void Conversation::set_face_rect(Npc_face_info* info, Npc_face_info* prev, const TileRect& conv) {
+/*
+ *  Create the fixed 320x200 overlay layer that holds the conversation
+ *  faces and text.  Returns the layer handle, or -1 if it could not be
+ *  created.
+ */
+int Conversation::get_conv_layer() {
+	if (conv_layer < 0) {
+		conv_layer = gwin->create_layer(conv_width, conv_height, conv_transparent);
+		if (conv_layer >= 0) {
+			// Let the layer render translucent (Guardian/serpent) pixels with
+			// real texture alpha. The original engine applied this
+			// translucency twice for large faces - a full-screen tint plus the
+			// face drawn on top - so the face body appeared stronger. There
+			// is no full-screen tint here; drawing once looks too transparent
+			// but the full double application looks too strong, so use the
+			// midpoint between them.
+			const uint32* base = sman->get_translucency_argb();
+			if (base) {
+				uint32 boosted[256];
+				for (int i = 0; i < 256; i++) {
+					const uint32 argb = base[i];
+					if (argb == 0) {
+						boosted[i] = 0;
+						continue;
+					}
+					const uint32 a = (argb >> 24) & 0xff;
+					// a2 = opacity if the slot were applied twice.
+					const uint32 a2 = 255 - ((255 - a) * (255 - a)) / 255;
+					const uint32 af = (a + a2) / 2;    // Halfway boost.
+					boosted[i]      = (af << 24) | (argb & 0x00ffffffu);
+				}
+				gwin->layer_set_index_argb(conv_layer, boosted);
+			}
+		}
+	}
+	return conv_layer;
+}
+
+/*
+ *  Place the conversation layer on screen. The fixed 320x200 layout is shaped
+ *  by the UI fill mode and scaled by the UI size (see compute_ui_layer_dest).
+ */
+void Conversation::position_conv_layer(int layer) {
+	SDL_FRect fr;
+	gwin->get_win()->compute_ui_layer_dest(conv_width, conv_height, fr);
+	gwin->layer_set_dest(
+			layer, static_cast<int>(fr.x), static_cast<int>(fr.y), static_cast<int>(fr.w), static_cast<int>(fr.h));
+}
+
+/*
+ *  Repaint the conversation into the overlay layer.
+ */
+void Conversation::repaint_conversation() {
+	render_conv_layer();
+}
+
+/*
+ *  Rebuild the overlay layer from the current faces, text and (if active)
+ *  Avatar choices. The layer is composited on top of the scene, so this
+ *  does not need to repaint the world.
+ */
+void Conversation::render_conv_layer() {
+	const int cl = get_conv_layer();
+	if (cl < 0) {
+		return;
+	}
+	Image_buffer8* lbuf = gwin->get_layer_ibuf(cl);
+	if (!lbuf) {
+		return;
+	}
+	position_conv_layer(cl);
+	Image_buffer8* prev = gwin->push_render_target(lbuf);
+	lbuf->set_clip(0, 0, static_cast<int>(lbuf->get_width()), static_cast<int>(lbuf->get_height()));
+	lbuf->fill8(conv_transparent);    // Clear to fully transparent.
+	paint_faces(true);
+	if (choices_active) {
+		build_avatar_choices();
+	}
+	lbuf->clear_clip();
+	gwin->pop_render_target(prev);
+	gwin->layer_set_dirty(cl);
+	gwin->layer_set_visible(cl, num_faces > 0 || choices_active);
+}
+
+/*
+ *  Compute where the given face and its text go on the overlay layer.
+ */
+
+void Conversation::set_face_rect(Npc_face_info* info, Npc_face_info* prev) {
 	const int text_height = sman->get_text_line_height(0);
-	const int offx        = conv.x;
-	const int offy        = conv.y;
-	const int screenw     = conv.w;
-	const int screenh     = conv.h;
 	// Figure starting y-coord.
 	// Get character's portrait.
 	Shape_frame* face   = info->shape.get_shapenum() >= 0 ? info->shape.get_shape() : nullptr;
@@ -178,20 +277,26 @@ void Conversation::set_face_rect(Npc_face_info* info, Npc_face_info* prev, const
 		face_w = face->get_width();
 		face_h = face->get_height();
 	}
-	int startx;
-	int extraw;
-	if (face_w >= 119) {
-		startx           = offx + (screenw - face_w) / 2;
-		extraw           = 0;
-		info->large_face = true;
+	info->large_face = face_w >= 119;
+	// Faces are laid out in the overlay layer's own coordinate space (starting
+	// at 0,0), a fixed 320x200. Large (Guardian/serpent) faces render their
+	// translucent pixels with real texture alpha, so they can stay on the
+	// layer too.
+	const int screenw = conv_width;
+	const int screenh = conv_height;
+	int       startx;
+	int       extraw;
+	if (info->large_face) {
+		startx = (screenw - face_w) / 2;
+		extraw = 0;
 	} else {
-		startx = offx + 8;
+		startx = 8;
 		extraw = 4;
 	}
 	int starty;
 	int extrah;
 	if (face_h >= 142) {
-		starty = offy + (screenh - face_h) / 2;
+		starty = (screenh - face_h) / 2;
 		extrah = 0;
 	} else if (prev) {
 		starty = prev->text_rect.y + prev->last_text_height;
@@ -199,25 +304,24 @@ void Conversation::set_face_rect(Npc_face_info* info, Npc_face_info* prev, const
 			starty = prev->face_rect.y + prev->face_rect.h;
 		}
 		starty += 2 * text_height;
-		if (starty + face_h > offy + screenh - 1) {
-			starty = offy + screenh - face_h - 1;
+		if (starty + face_h > screenh - 1) {
+			starty = screenh - face_h - 1;
 		}
 		extrah = 4;
 	} else {
-		starty = offy + 1;
+		starty = 1;
 		extrah = 4;
 	}
 	info->face_rect      = gwin->clip_to_win(TileRect(startx, starty, face_w + extraw, face_h + extrah));
 	const TileRect& fbox = info->face_rect;
 	// This is where NPC text will go.
-	info->text_rect
-			= gwin->clip_to_win(TileRect(fbox.x + fbox.w + 3, fbox.y + 3, offx + screenw - fbox.x - fbox.w - 6, 4 * text_height));
+	info->text_rect = gwin->clip_to_win(TileRect(fbox.x + fbox.w + 3, fbox.y + 3, screenw - fbox.x - fbox.w - 6, 4 * text_height));
 	// No room?  (Serpent?)
 	if (info->large_face) {
 		// Show in lower center.
 		const int lx    = screenw / 5;
 		const int ly    = 3 * (screenh / 4);
-		info->text_rect = TileRect(offx + lx, offy + ly, screenw - (2 * lx), screenh - ly - 4);
+		info->text_rect = TileRect(lx, ly, screenw - (2 * lx), screenh - ly - 4);
 	}
 	info->last_text_height = info->text_rect.h;
 }
@@ -236,10 +340,7 @@ void Conversation::show_face(int shape, int frame, int slot) {
 		pal->set(-1, 100);
 	}
 
-	// Get screen dims.
-	const int      screenw = gwin->get_width();
-	const int      screenh = gwin->get_height();
-	Npc_face_info* info    = nullptr;
+	Npc_face_info* info = nullptr;
 	// See if already on screen.
 	for (size_t i = 0; i < face_info.size(); i++) {
 		if (face_info[i] && face_info[i]->face_num == shape) {
@@ -269,10 +370,9 @@ void Conversation::show_face(int shape, int frame, int slot) {
 			delete face_info[slot];
 		}
 		face_info[slot] = info;
-		set_face_rect(info, prev, get_conv_rect());
+		set_face_rect(info, prev);
 	}
-	gwin->get_win()->set_clip(0, 0, screenw, screenh);
-	paint_faces();    // Paint all faces.
+	repaint_conversation();    // Paint all faces.
 	if (touchui != nullptr) {
 		touchui->hideGameControls();
 	}
@@ -282,7 +382,6 @@ void Conversation::show_face(int shape, int frame, int slot) {
 	if (ShortcutBar_gump::Visible()) {
 		ShortcutBar_gump::HideGump();
 	}
-	gwin->get_win()->clear_clip();
 }
 
 /*
@@ -312,15 +411,9 @@ void Conversation::change_face_frame(int frame, int slot) {
 	}
 
 	info->shape.set_frame(frame);
-	// Get screen dims.
-	const int      screenw = gwin->get_width();
-	const int      screenh = gwin->get_height();
-	Npc_face_info* prev    = slot ? face_info[slot - 1] : nullptr;
-	set_face_rect(info, prev, get_conv_rect());
-
-	gwin->get_win()->set_clip(0, 0, screenw, screenh);
-	paint_faces();    // Paint all faces.
-	gwin->get_win()->clear_clip();
+	Npc_face_info* prev = slot ? face_info[slot - 1] : nullptr;
+	set_face_rect(info, prev);
+	repaint_conversation();    // Repaint all faces.
 }
 
 /*
@@ -375,6 +468,13 @@ void Conversation::remove_slot_face(int slot) {
 			}
 		}
 	}
+	// Repaint the remaining faces, or hide the overlay layer if empty.
+	if (num_faces > 0 || choices_active) {
+		repaint_conversation();
+	} else if (conv_layer >= 0) {
+		gwin->layer_set_visible(conv_layer, false);
+		gwin->layer_set_dirty(conv_layer);
+	}
 }
 
 /*
@@ -410,19 +510,40 @@ void Conversation::show_npc_message(const char* msg) {
 	const int      font = info->large_face ? 7 : 0;    // Use red for Guardian, snake.
 	info->cur_text      = "";
 	const TileRect& box = info->text_rect;
-	//	gwin->paint(box);        // Clear what was there before.
-	//	paint_faces();
-	gwin->paint();
-	int height;    // Break at punctuation.
 	/* NOTE:  The original centers text for Guardian, snake.    */
-	while ((height = sman->paint_text_box(font, msg, box.x, box.y, box.w, box.h, -1, true, info->large_face, gwin->get_text_bg()))
-		   < 0) {
-		// More to do?
+	// Draw the text into the overlay layer (with paging).
+	gwin->paint();    // Repaint world beneath (the layer composites on top).
+	const int      cl   = get_conv_layer();
+	Image_buffer8* lbuf = cl >= 0 ? gwin->get_layer_ibuf(cl) : nullptr;
+	int            height;    // Break at punctuation.
+	for (;;) {
+		// Draw the faces and this page of text into the overlay layer.  The
+		// current face's text is (re)drawn here, so keep its stored text
+		// empty while paint_faces() runs to avoid drawing it twice.
+		info->cur_text      = "";
+		Image_buffer8* prev = lbuf ? gwin->push_render_target(lbuf) : nullptr;
+		if (lbuf) {
+			lbuf->set_clip(0, 0, static_cast<int>(lbuf->get_width()), static_cast<int>(lbuf->get_height()));
+			lbuf->fill8(conv_transparent);
+			paint_faces(true);
+		}
+		height = sman->paint_text_box(font, msg, box.x, box.y, box.w, box.h, -1, true, info->large_face, -1);
+		if (lbuf) {
+			lbuf->clear_clip();
+			gwin->pop_render_target(prev);
+			gwin->layer_set_dirty(cl);
+			gwin->layer_set_visible(cl, true);
+		}
+		if (height >= 0) {
+			break;    // All of the text fit.
+		}
+		// More to show: display this page, wait for a click, then continue.
 		info->cur_text = string(msg, -height);
 		int  x;
 		int  y;
 		char c;
-		gwin->paint();    // Paint scenery beneath
+		gwin->paint();
+		gwin->set_painted();
 		Get_click(x, y, Mouse::hand, &c, false, this, true);
 		gwin->paint();
 		msg += -height;
@@ -467,7 +588,7 @@ void Conversation::clear_text_pending() {
 void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	const bool  SI         = Game::get_game_type() == SERPENT_ISLE;
 	Main_actor* main_actor = gwin->get_main_actor();
-	// Get rectangle for face and text.
+	// Everything is laid out in the overlay layer's own coordinate space.
 	const TileRect sbox        = get_conv_rect();
 	int            x           = 0;
 	int            y           = 0;    // Keep track of coords. in box.
@@ -527,8 +648,10 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	// Draw portrait.
 	sman->paint_shape(mbox.x + face->get_xleft(), mbox.y + face->get_yabove(), face);
 	delete[] conv_choices;    // Set up new list of choices.
-	conv_choices        = new TileRect[num_choices + 1];
-	const int text_bg   = gwin->get_text_bg();
+	conv_choices = new TileRect[num_choices + 1];
+	// The choices are drawn on the overlay layer, which has no scene behind
+	// it, so the translucent text background is disabled.
+	const int text_bg   = -1;
 	const int bg_offset = (sman->get_text_height(0) - line_height) / 2;
 	// First pass: determine positions and draw all backgrounds.
 	for (int i = 0; i < num_choices; i++) {
@@ -567,7 +690,7 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	gwin->set_painted();
 }
 
-void Conversation::show_avatar_choices() {
+void Conversation::build_avatar_choices() {
 	char** result;
 	size_t i;    // Blame MSVC
 
@@ -583,27 +706,48 @@ void Conversation::show_avatar_choices() {
 	delete[] result;
 }
 
+/*
+ *  Show the Avatar's conversation choices.
+ */
+
+void Conversation::show_avatar_choices() {
+	choices_active = true;
+	repaint_conversation();
+}
+
 void Conversation::clear_avatar_choices() {
-	//	gwin->paint(avatar_face);    // Paint over face and answers.
-	gwin->add_dirty(avatar_face);
-	avatar_face.w = 0;
+	choices_active = false;
+	avatar_face.w  = 0;
+	repaint_conversation();    // Repaint the faces without the choices.
 }
 
 /*
  *  User clicked during a conversation.
  *
+ *  Input: x, y are in game-buffer coordinates.
  *  Output: Index (0-n) of choice, or -1 if not on a choice.
  */
 
 int Conversation::conversation_choice(int x, int y) {
-	int i;
-	for (i = 0; conv_choices[i].w != 0 && !conv_choices[i].has_point(x, y); i++)
-		;
-	if (conv_choices[i].w != 0) {    // Found one?
-		return i;
-	} else {
+	if (conv_layer < 0) {
 		return -1;
 	}
+	// The choices live on the overlay layer, which is scaled independently of
+	// the world, so map the click through the layer's placement.
+	int sx;
+	int sy;
+	gwin->get_win()->game_to_screen(x, y, gwin->get_fastmouse(), sx, sy);
+	int lx;
+	int ly;
+	if (!gwin->screen_to_layer(conv_layer, sx, sy, lx, ly)) {
+		return -1;
+	}
+	for (int i = 0; conv_choices[i].w != 0; i++) {
+		if (conv_choices[i].has_point(lx, ly)) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 /*
@@ -611,18 +755,16 @@ int Conversation::conversation_choice(int x, int y) {
  */
 
 void Conversation::paint() {
-	paint_faces(true);
-	if (avatar_face.w) {    // Choices?
-		show_avatar_choices();
-	}
+	repaint_conversation();
 }
 
 /*
- *  Repaint the faces.   Assumes clip has already been set to screen.
+ *  Repaint the faces into the overlay layer.  Faces are drawn without the
+ *  8-bit translucency blend so translucent (Guardian/serpent) pixels keep
+ *  their palette index and become real texture alpha on upload.
  */
 
-void Conversation::paint_faces(bool text    // Show text too.
-) {
+void Conversation::paint_faces(bool text) {
 	if (!num_faces) {
 		return;
 	}
@@ -637,35 +779,18 @@ void Conversation::paint_faces(bool text    // Show text too.
 			const int face_yabove = face->get_yabove();
 			const int fx          = finfo->face_rect.x + face_xleft;
 			const int fy          = finfo->face_rect.y + face_yabove;
-			if (finfo->large_face) {
-				// Guardian, serpents: fill whole screen with the
-				// background pixel.
-				const unsigned char px      = face->get_topleft_pix();
-				const int           xfstart = 0xff - sman->get_xforms_cnt();
-				const int           fw      = finfo->face_rect.w;
-				const int           fh      = finfo->face_rect.h;
-				Image_window8*      win     = gwin->get_win();
-				const int           gw      = win->get_game_width();
-				const int           gh      = win->get_game_height();
-				// Fill only if (a) not transparent, (b) is a translucent
-				// color and (c) the face is not covering the entire screen.
-				if (px >= xfstart && px <= 0xfe && (gw > fw || gh > fh)) {
-					const Xform_palette& xform = sman->get_xform(px - xfstart);
-					const int            gx    = win->get_start_x();
-					const int            gy    = win->get_start_y();
-					// Another option: 4 fills outside the face area.
-					win->fill_translucent8(0, gw, gh, gx, gy, xform);
-				}
-			}
-			// Use translucency.
-			sman->paint_shape(fx, fy, face, true);
+			// Draw the raw shape (no 8-bit translucency blend): translucent
+			// pixels keep their palette index and are turned into real
+			// texture alpha when the layer is uploaded, so Guardian/serpent
+			// faces blend correctly with the scene at a constant size.
+			sman->paint_shape(fx, fy, face, false);
 		}
 		if (text) {    // Show text too?
 			const TileRect& box = finfo->text_rect;
-			// Use red for Guardian, snake.
+			// Use red for Guardian, snake.  On the overlay layer the
+			// translucent text background is omitted (no scene behind it).
 			const int font = finfo->large_face ? 7 : 0;
-			sman->paint_text_box(
-					font, finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, finfo->large_face, gwin->get_text_bg());
+			sman->paint_text_box(font, finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, finfo->large_face, -1);
 		}
 	}
 }

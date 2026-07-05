@@ -39,6 +39,7 @@ Boston, MA  02111-1307, USA.
 #include "manip.h"
 #include "mouse.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -894,6 +895,7 @@ void Image_window::free_surface() {
 	draw_surface     = nullptr;
 	display_surface  = nullptr;
 	ibuf->bits       = nullptr;
+	free_layer_textures();
 	if (screen_renderer != nullptr) {
 		SDL_DestroyRenderer(screen_renderer);
 	}
@@ -1503,6 +1505,435 @@ bool Image_window::fillmode_to_string(FillMode fmode, std::string& str) {
 	return false;
 }
 
+/*
+ *  Layers.
+ */
+
+int Image_window::create_layer(int w, int h, unsigned char transparent, int fixed_scale, int z) {
+	if (w <= 0 || h <= 0) {
+		return -1;
+	}
+	std::unique_ptr<Image_buffer> buf = create_buffer(w, h);
+	if (!buf) {
+		return -1;
+	}
+	buf->fill8(transparent);    // Start fully transparent.
+	auto layer = std::make_unique<Layer>(std::move(buf), w, h, transparent, fixed_scale, z);
+	// Reuse a freed slot if there is one, so handles stay stable.
+	for (size_t i = 0; i < layers.size(); i++) {
+		if (!layers[i]) {
+			layers[i] = std::move(layer);
+			return static_cast<int>(i);
+		}
+	}
+	layers.push_back(std::move(layer));
+	return static_cast<int>(layers.size() - 1);
+}
+
+void Image_window::destroy_layer(int handle) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	if (layers[handle]->texture) {
+		SDL_DestroyTexture(layers[handle]->texture);
+	}
+	layers[handle].reset();
+}
+
+Image_buffer* Image_window::get_layer_ibuf(int handle) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return nullptr;
+	}
+	return layers[handle]->get_ibuf();
+}
+
+void Image_window::layer_set_dirty(int handle) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	layers[handle]->set_dirty();
+}
+
+void Image_window::layer_set_visible(int handle, bool visible) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	layers[handle]->set_visible(visible);
+}
+
+bool Image_window::layer_is_visible(int handle) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return false;
+	}
+	return layers[handle]->is_visible();
+}
+
+void Image_window::layer_set_index_argb(int handle, const uint32* argb256) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	Layer& layer = *layers[handle];
+	if (argb256 == nullptr) {
+		layer.index_argb.clear();
+	} else {
+		layer.index_argb.assign(argb256, argb256 + 256);
+	}
+	layer.set_dirty();
+}
+
+void Image_window::layer_set_z(int handle, int z) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	layers[handle]->z = z;
+}
+
+void Image_window::layer_set_dest(int handle, int x, int y, int w, int h) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	Layer& layer   = *layers[handle];
+	layer.has_dest = true;
+	layer.dest.x   = static_cast<float>(x);
+	layer.dest.y   = static_cast<float>(y);
+	layer.dest.w   = static_cast<float>(w);
+	layer.dest.h   = static_cast<float>(h);
+}
+
+void Image_window::layer_clear_dest(int handle) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	layers[handle]->has_dest = false;
+}
+
+void Image_window::mark_all_layers_dirty() {
+	for (auto& lp : layers) {
+		if (lp) {
+			lp->set_dirty();
+		}
+	}
+}
+
+int Image_window::layer_render_scale() const {
+	const int uscaler = eff_ui_scaler();
+	if (uscaler < 0 || static_cast<size_t>(uscaler) >= Scalers.size()) {
+		return 1;
+	}
+	const ScalerInfo& si = Scalers[uscaler];
+	// arb scalers (Point/Bilinear) and the SDL scaler are handled by the GPU
+	// path (uploaded 1:1 and scaled by SDL), so there is no pre-scaling.
+	if (si.arb != nullptr || si.fun8to32 == nullptr) {
+		return 1;
+	}
+	const uint32 mask = si.size_mask;
+	for (int f = 2; f <= 4; ++f) {
+		if (mask == (1u << (f - 1))) {
+			return f;
+		}
+	}
+	const int uscale = eff_ui_scale();
+	if (uscale >= 2 && (mask & (1u << (uscale - 1))) != 0) {
+		return uscale;
+	}
+	return 1;
+}
+
+bool Image_window::scale_layer_color(SDL_Surface* src8, int logw, int logh, SDL_Surface* dst32) {
+	if (src8 == nullptr || dst32 == nullptr || ibuf == nullptr) {
+		return false;
+	}
+	const int uscaler = eff_ui_scaler();
+	if (uscaler < 0 || static_cast<size_t>(uscaler) >= Scalers.size()) {
+		return false;
+	}
+	const ScalerInfo& si = Scalers[uscaler];
+	if (si.arb != nullptr || si.fun8to32 == nullptr) {
+		return false;
+	}
+	// The destination is sized by layer_render_scale(); the scaler must run at
+	// that same factor so it does not write past the destination.
+	const int factor = layer_render_scale();
+	// Temporarily repoint the scaling state at the layer's surfaces (and the
+	// UI scaler's scale factor), run the scaler, then restore. The source
+	// must be guard-banded (guard_band padding on every side) with its content
+	// at (guard_band, guard_band).
+	SDL_Surface* save_draw   = draw_surface;
+	SDL_Surface* save_inter  = inter_surface;
+	SDL_Surface* save_pal    = paletted_surface;
+	const auto   save_lwidth = ibuf->line_width;
+	const auto   save_height = ibuf->height;
+	const int    save_scale  = scale;
+
+	draw_surface     = src8;
+	paletted_surface = src8;
+	inter_surface    = dst32;
+	ibuf->line_width = src8->pitch;    // 8-bit: pitch (bytes) == pixels/line.
+	ibuf->height     = logh;
+	scale            = factor;    // Interlace/point scalers read this.
+
+	(this->*(si.fun8to32))(0, 0, logw, logh);
+
+	draw_surface     = save_draw;
+	inter_surface    = save_inter;
+	paletted_surface = save_pal;
+	ibuf->line_width = save_lwidth;
+	ibuf->height     = save_height;
+	scale            = save_scale;
+	return true;
+}
+
+void Image_window::get_layer_dest(const Layer& layer, SDL_FRect& dst) {
+	if (layer.has_dest) {    // Explicit placement (e.g. the mouse cursor).
+		dst = layer.dest;
+		return;
+	}
+	compute_layer_fill_dest(layer.logw, layer.logh, dst);
+}
+
+void Image_window::set_ui_config(int size_mode, bool use_game_scaling, int scaler_, FillMode fmode, int fill_scaler_) {
+	ui_size_mode        = size_mode;
+	ui_use_game_scaling = use_game_scaling;
+	ui_scaler           = scaler_;
+	ui_fill_mode        = fmode;
+	ui_fill_scaler      = fill_scaler_;
+	// Sizes/scale may have changed; force layer textures to rebuild.
+	mark_all_layers_dirty();
+}
+
+int Image_window::get_ui_width() const {
+	switch (ui_size_mode) {
+	case 1:
+		return game_width / 4;
+	case 2:
+		return game_width / 2;
+	case 3:
+		return (game_width * 3) / 4;
+	case 4:
+		return game_width;
+	default:
+		return 320;    // Full.
+	}
+}
+
+int Image_window::get_ui_height() const {
+	switch (ui_size_mode) {
+	case 1:
+		return game_height / 4;
+	case 2:
+		return game_height / 2;
+	case 3:
+		return (game_height * 3) / 4;
+	case 4:
+		return game_height;
+	default:
+		return 200;    // Full.
+	}
+}
+
+void Image_window::compute_fill_dest(int logw, int logh, FillMode fmode, int escl, SDL_FRect& dst) const {
+	const int dw = display_surface ? display_surface->w : logw;
+	const int dh = display_surface ? display_surface->h : logh;
+	double    cw;
+	double    ch;
+	if (logw <= 0 || logh <= 0) {
+		cw = dw;
+		ch = dh;
+	} else {
+		// Aspect-correct modes give pixels a 1:1.2 aspect (taller).
+		const bool aspect = (fmode == AspectCorrectFit) || (fmode == AspectCorrectCentre)
+							|| (fmode > Centre && fmode < (1 << 16) && (fmode & 1));
+		const double eff_h = logh * (aspect ? 1.2 : 1.0);
+		if (fmode == Fill) {
+			cw = dw;
+			ch = dh;
+		} else if (fmode >= Centre && fmode < (1 << 16)) {
+			// Centre family: a fixed scale (ui scale, plus .5 increments).
+			const int    base = fmode & ~1;    // Even = non-aspect variant.
+			const double mult = 1.0 + (base - Centre) / 4.0;
+			const double f    = escl * mult;
+			cw                = logw * f;
+			ch                = eff_h * f;
+		} else {
+			// Fit / AspectCorrectFit (and any fallback): scale to fit, keeping
+			// the pixel aspect, centred.
+			const double sx = dw / static_cast<double>(logw);
+			const double sy = dh / eff_h;
+			const double s  = sx < sy ? sx : sy;
+			cw              = logw * s;
+			ch              = eff_h * s;
+		}
+	}
+	dst.x = static_cast<float>((dw - cw) / 2.0);
+	dst.y = static_cast<float>((dh - ch) / 2.0);
+	dst.w = static_cast<float>(cw);
+	dst.h = static_cast<float>(ch);
+}
+
+void Image_window::compute_layer_fill_dest(int logw, int logh, SDL_FRect& dst) const {
+	compute_fill_dest(logw, logh, eff_ui_fill_mode(), eff_ui_scale(), dst);
+}
+
+float Image_window::get_ui_scale_factor() const {
+	// The 320x200 overlay layout (conversation, pointer) is scaled uniformly
+	// onto the display by this per-pixel factor.
+	//   Full  = the per-pixel scale a 320x200 game area would get on this
+	//           display (biggest; the "unchanged" 1:1 conversation).
+	//   Auto  = the real game area's native per-pixel scale, i.e. the size the
+	//           layers would have if drawn straight into the game area
+	//           (smallest on a high-resolution game area; == Full when the game
+	//           area actually is 320x200).
+	//   1/2/3 = interpolate from the AUTOMATIC game-area scale up to Full at
+	//           1/4, 1/2, 3/4.  The automatic scale is the game `scale` (the
+	//           per-pixel scale of a display/scale-sized game area, i.e. what
+	//           the game area would be if it were Auto). Using that instead of
+	//           Auto keeps the sizes meaningful even when the game area is
+	//           explicitly set to 320x200 (where Auto == Full).
+	SDL_FRect r;
+	compute_fill_dest(320, 200, fill_mode, scale, r);
+	const float ffw   = r.w / 320.0f;
+	const float ffh   = r.h / 200.0f;
+	const float sFull = ffw < ffh ? ffw : ffh;
+
+	if (ui_size_mode == 0) {
+		return sFull > 0.0f ? sFull : 1.0f;    // Full.
+	}
+	if (ui_size_mode == 4) {                   // Auto: the real game area scale.
+		compute_fill_dest(game_width, game_height, fill_mode, scale, r);
+		const float faw = game_width > 0 ? r.w / static_cast<float>(game_width) : sFull;
+		const float fah = game_height > 0 ? r.h / static_cast<float>(game_height) : sFull;
+		const float f   = faw < fah ? faw : fah;
+		return f > 0.0f ? f : 1.0f;
+	}
+
+	// 1/2/3: interpolate from the automatic (display/scale) game-area scale.
+	const float sAuto = static_cast<float>(scale);
+	float       t     = 0.5f;
+	switch (ui_size_mode) {
+	case 1:
+		t = 0.25f;
+		break;
+	case 2:
+		t = 0.5f;
+		break;
+	case 3:
+		t = 0.75f;
+		break;
+	default:
+		break;
+	}
+	const float f = sAuto + t * (sFull - sAuto);
+	return f > 0.0f ? f : 1.0f;
+}
+
+float Image_window::ui_full_pixel_scale() const {
+	SDL_FRect   r;
+	compute_fill_dest(320, 200, fill_mode, scale, r);
+	const float fw = r.w / 320.0f;
+	const float fh = r.h / 200.0f;
+	const float s  = fw < fh ? fw : fh;
+	return s > 0.0f ? s : 1.0f;
+}
+
+void Image_window::compute_ui_layer_dest(int logw, int logh, SDL_FRect& dst) const {
+	// Shape the layout with the UI fill mode (Fill stretches to the display,
+	// Fit keeps 1:1 pixels, AspectCorrect* uses 1:1.2, Centre a fixed scale).
+	compute_fill_dest(logw, logh, eff_ui_fill_mode(), eff_ui_scale(), dst);
+	// Scale by the UI size (get_ui_scale_factor relative to Full), then centre.
+	const float sFull = ui_full_pixel_scale();
+	const float ratio = sFull > 0.0f ? get_ui_scale_factor() / sFull : 1.0f;
+	const float dw    = display_surface ? static_cast<float>(display_surface->w) : dst.w;
+	const float dh    = display_surface ? static_cast<float>(display_surface->h) : dst.h;
+	dst.w *= ratio;
+	dst.h *= ratio;
+	dst.x = (dw - dst.w) / 2.0f;
+	dst.y = (dh - dst.h) / 2.0f;
+}
+
+bool Image_window::screen_to_layer(int handle, int sx, int sy, int& lx, int& ly) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return false;
+	}
+	const Layer& layer = *layers[handle];
+	SDL_FRect    dst;
+	get_layer_dest(layer, dst);
+	if (dst.w <= 0 || dst.h <= 0) {
+		return false;
+	}
+	lx = static_cast<int>((static_cast<float>(sx) - dst.x) * layer.logw / dst.w);
+	ly = static_cast<int>((static_cast<float>(sy) - dst.y) * layer.logh / dst.h);
+	return static_cast<float>(sx) >= dst.x && static_cast<float>(sy) >= dst.y && lx >= 0 && ly >= 0 && lx < layer.logw
+		   && ly < layer.logh;
+}
+
+void Image_window::free_layer_textures() {
+	for (auto& lp : layers) {
+		if (lp && lp->texture) {
+			SDL_DestroyTexture(lp->texture);
+			lp->texture = nullptr;
+			lp->dirty   = true;
+		}
+	}
+}
+
+void Image_window::composite_layers() {
+	if (layers.empty() || screen_renderer == nullptr) {
+		return;
+	}
+	// Match the layers' scaling to the game's: a smooth (bilinear / SDL)
+	// scaler uses linear filtering, everything else uses crisp nearest. This
+	// keeps overlay layers consistent with the main image while preserving
+	// their fixed logical size.
+	const bool smooth = (eff_ui_scaler() == bilinear) || (eff_ui_scaler() == SDLScaler) || (eff_ui_fill_scaler() == bilinear)
+						|| (eff_ui_fill_scaler() == SDLScaler);
+	const SDL_ScaleMode smode = smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
+	// Gather the visible layers and composite them from lowest to highest z.
+	std::vector<Layer*> ordered;
+	ordered.reserve(layers.size());
+	for (auto& lp : layers) {
+		if (lp && lp->visible && lp->buf) {
+			ordered.push_back(lp.get());
+		}
+	}
+	if (ordered.empty()) {
+		return;
+	}
+	std::stable_sort(ordered.begin(), ordered.end(), [](const Layer* a, const Layer* b) {
+		return a->z < b->z;
+	});
+	// If a software (member) scaler is active, layers are pre-scaled by it to
+	// this factor; otherwise they are uploaded 1:1 and scaled on the GPU.
+	const int render_scale = layer_render_scale();
+	for (Layer* lptr : ordered) {
+		Layer& layer = *lptr;
+		// Recreate the texture if the render scale changed (its size depends
+		// on it) or it was dropped.
+		if (layer.render_scale != render_scale && layer.texture != nullptr) {
+			SDL_DestroyTexture(layer.texture);
+			layer.texture = nullptr;
+		}
+		layer.render_scale = render_scale;
+		if (layer.texture == nullptr) {    // Lazily (re)create the GPU texture.
+			layer.texture = SDL_CreateTexture(
+					screen_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, layer.logw * render_scale,
+					layer.logh * render_scale);
+			if (layer.texture == nullptr) {
+				continue;
+			}
+			SDL_SetTextureBlendMode(layer.texture, SDL_BLENDMODE_BLEND);
+			layer.dirty = true;
+		}
+		SDL_SetTextureScaleMode(layer.texture, smode);
+		if (layer.dirty) {
+			refresh_layer(layer);
+			layer.dirty = false;
+		}
+		SDL_FRect dst;
+		get_layer_dest(layer, dst);
+		SDL_RenderTexture(screen_renderer, layer.texture, nullptr, &dst);
+	}
+}
+
 void Image_window::UpdateRect(SDL_Surface* surf) {
 	// TODO: Only update the necessary portion of the screen.
 	// Seem to get flicker like crazy or some other ill effect no matter
@@ -1514,6 +1945,8 @@ void Image_window::UpdateRect(SDL_Surface* surf) {
 												 + guard_band * scale * surf->pitch);
 	SDL_UpdateTexture(screen_texture, nullptr, pixels, surf->pitch);
 	SDL_RenderTexture(screen_renderer, screen_texture, nullptr, nullptr);
+	// Draw overlay layers on top of the main image, before presenting.
+	composite_layers();
 	SDL_RenderPresent(screen_renderer);
 }
 

@@ -86,9 +86,13 @@ private:
 	std::unique_ptr<Fonts_vga_file> fonts = nullptr;                      // "fonts.vga" file.
 	std::vector<Xform_palette>      xforms;                               // Transforms translucent colors
 	//   0xf4 through 0xfe.
-	Xform_palette* invis_xform;                    // For showing invisible NPC's.
-	unsigned char  special_pixels[NPIXCOLORS];     // Special colors.
-	bool           can_have_paperdolls = false;    // Set true if the SI paperdoll file
+	// ARGB (straight alpha) for each palette index that is a translucent
+	// colour, and 0 for every other index.  Lets overlay layers reproduce
+	// translucency with real texture alpha.  Sized 256 once loaded.
+	std::vector<uint32> translucency_argb;
+	Xform_palette*      invis_xform;                    // For showing invisible NPC's.
+	unsigned char       special_pixels[NPIXCOLORS];     // Special colors.
+	bool                can_have_paperdolls = false;    // Set true if the SI paperdoll file
 	//   is found when playing BG
 	bool paperdolls_enabled = false;    // True if paperdolls are on.
 	bool got_si_shapes      = false;    // Set true if the SI shapes file
@@ -137,6 +141,13 @@ public:
 
 	inline Xform_palette& get_xform(int i) {
 		return xforms[i];
+	}
+
+	// ARGB (straight alpha) table, one entry per palette index: non-zero for
+	// translucent colours (blend colour + opacity), 0 otherwise.  256 entries,
+	// or nullptr if not built yet.
+	const uint32* get_translucency_argb() const {
+		return translucency_argb.empty() ? nullptr : translucency_argb.data();
 	}
 
 	// BG Only

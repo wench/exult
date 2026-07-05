@@ -42,6 +42,8 @@ private:
 	int                           last_face_shown = 0;               // Index of last npc face shown.
 	TileRect                      avatar_face     = {0, 0, 0, 0};    // Area take by Avatar in conversation.
 	TileRect*                     conv_choices    = nullptr;         // Choices during a conversation.
+	int                           conv_layer      = -1;              // Overlay layer with faces/text.
+	bool                          choices_active  = false;           // Avatar choices are being shown.
 
 	std::vector<std::string>             answers;
 	std::deque<std::vector<std::string>> answer_stack;
@@ -94,11 +96,21 @@ public:
 	static bool noface;
 
 private:
-	void     set_face_rect(Npc_face_info* info, Npc_face_info* prev, const TileRect& conv);
+	void     set_face_rect(Npc_face_info* info, Npc_face_info* prev);
 	TileRect get_conv_rect() const;
-	void     show_avatar_choices(int num_choices, char** choices);
-	void     add_answer(const char* str);
-	void     remove_answer(const char* str);
+	// Create the overlay layer for faces/text; -1 if unavailable.
+	int get_conv_layer();
+	// Place the layer over a fixed 320x200 rectangle centered in the game area.
+	void position_conv_layer(int layer);
+	// Repaint the conversation into the overlay layer.
+	void repaint_conversation();
+	// Rebuild the overlay layer from the current faces, text and choices.
+	void render_conv_layer();
+	// Draw the Avatar's face and answer choices into the current target.
+	void build_avatar_choices();
+	void show_avatar_choices(int num_choices, char** choices);
+	void add_answer(const char* str);
+	void remove_answer(const char* str);
 };
 
 #endif

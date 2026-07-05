@@ -131,6 +131,13 @@ Mouse::Mouse(
 }
 
 Mouse::~Mouse() {
+	// Free the cursor's layer, but only if the game window still exists. At
+	// program exit gwin may already have been deleted (Play() deletes it), so
+	// guard against touching a dangling pointer.
+	if (mouse_layer >= 0 && Game_window::get_instance() == gwin) {
+		gwin->destroy_layer(mouse_layer);
+	}
+	mouse_layer = -1;
 	// remove this from the current list if it is in it
 	for (Mouse** list = &current_mouse; *list; list = &(*list)->previous) {
 		if (this == *list) {
@@ -170,8 +177,76 @@ void Mouse::Init() {
 	backup = iwin->create_buffer(maxw, maxh);
 	box.w  = maxw;
 	box.h  = maxh;
+	// Geometry for the cursor's overlay layer.
+	layer_w          = maxw;
+	layer_h          = maxh;
+	hot_x            = maxleft;
+	hot_y            = maxabove;
+	last_layer_frame = -1;
 
 	onscreen = false;    // initially offscreen
+}
+
+/*
+ *  Overlay-layer helpers. The cursor is drawn onto its own layer, which is
+ *  composited on top of every other layer (e.g. the conversation faces).
+ */
+
+// A very high z so the cursor is always composited last (on top).
+static const int mouse_layer_z = 1 << 20;
+
+bool Mouse::ensure_mouse_layer() {
+	if (mouse_layer >= 0) {
+		return true;
+	}
+	if (layer_w <= 0 || layer_h <= 0) {
+		return false;
+	}
+	mouse_layer = gwin->create_layer(layer_w, layer_h, 255, 0, mouse_layer_z);
+	if (mouse_layer < 0) {
+		return false;
+	}
+	last_layer_frame = -1;    // Force a redraw.
+	return true;
+}
+
+void Mouse::draw_cursor_to_layer(unsigned char* trans) {
+	if (mouse_layer < 0 || !cur) {
+		return;
+	}
+	Image_buffer8* lb = gwin->get_layer_ibuf(mouse_layer);
+	if (!lb) {
+		return;
+	}
+	lb->fill8(255);    // Clear to transparent.
+	if (trans) {
+		cur->paint_rle_remapped(lb, hot_x, hot_y, trans);
+	} else {
+		cur->paint_rle(lb, hot_x, hot_y);
+	}
+	gwin->layer_set_dirty(mouse_layer);
+	last_layer_frame = cur_framenum;
+	last_layer_trans = trans;
+}
+
+void Mouse::position_mouse_layer() {
+	if (mouse_layer < 0) {
+		return;
+	}
+	// Per-axis on-screen scale of the 320x200 overlay (from the UI size + fill
+	// mode); the cursor uses the same scale so it matches the conversation.
+	SDL_FRect fr;
+	iwin->compute_ui_layer_dest(320, 200, fr);
+	const float sx = fr.w / 320.0f;
+	const float sy = fr.h / 200.0f;
+	// Map the cursor hotspot (game coords) to the display, then place the
+	// layer so its local hotspot lands there.
+	int cx;
+	int cy;
+	iwin->game_to_screen(mousex, mousey, false, cx, cy);
+	const int dx = cx - static_cast<int>(hot_x * sx);
+	const int dy = cy - static_cast<int>(hot_y * sy);
+	gwin->layer_set_dest(mouse_layer, dx, dy, static_cast<int>(layer_w * sx), static_cast<int>(layer_h * sy));
 }
 
 /*
@@ -183,17 +258,29 @@ void Mouse::show(unsigned char* trans) {
 		hide();
 		return;
 	}
-	if (!onscreen) {
-		onscreen = true;
-		// Save background.
-		iwin->get(backup.get(), box.x, box.y);
-		// Paint new location.
-		//		cur->paint_rle(iwin->get_ib8(), mousex, mousey);
-		if (trans) {
-			cur->paint_rle_remapped(mousex, mousey, trans);
-		} else {
-			cur->paint_rle(mousex, mousey);
+	if (!ensure_mouse_layer()) {
+		return;    // No layer available: cursor not shown.
+	}
+	// (Re)draw the shape only when it (or its remap) changed.
+	if (cur_framenum != last_layer_frame || trans != last_layer_trans) {
+		draw_cursor_to_layer(trans);
+	}
+	position_mouse_layer();
+	gwin->layer_set_visible(mouse_layer, true);
+	onscreen = true;
+}
+
+/*
+ *  Stop showing the cursor.
+ */
+
+void Mouse::hide() {
+	if (onscreen) {
+		onscreen = false;
+		if (mouse_layer >= 0) {
+			gwin->layer_set_visible(mouse_layer, false);
 		}
+		dirty = box;    // Init. dirty to box.
 	}
 }
 
@@ -253,6 +340,7 @@ void Mouse::move(int& x, int& y) {
 	dirty  = dirty.add(box);    // Enlarge dirty area.
 	mousex = x;
 	mousey = y;
+	position_mouse_layer();    // Keep the cursor layer at the new spot.
 }
 
 /*

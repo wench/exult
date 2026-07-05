@@ -346,6 +346,25 @@ void Shape_manager::load() {
 	}
 
 	invis_xform = &xforms[nxforms - 1 - 0];    // ->entry 0.
+
+	// Build the ARGB translucency table used by overlay layers. A translucent
+	// pixel value 'pix' (in [xfstart, 0xfe]) blends the colour blends[pix -
+	// xfstart] with the destination using its opacity; store that colour and
+	// opacity as straight-alpha ARGB so a layer can reproduce it with real
+	// texture alpha.
+	translucency_argb.assign(256, 0);
+	const int xfstart = 0xff - static_cast<int>(nxforms);
+	for (size_t i = 0; i < nblends; i++) {
+		const int idx = xfstart + static_cast<int>(i);
+		if (idx < 0 || idx > 0xfe) {
+			continue;
+		}
+		const uint32 r         = blends[4 * i + 0];
+		const uint32 g         = blends[4 * i + 1];
+		const uint32 b         = blends[4 * i + 2];
+		const uint32 a         = blends[4 * i + 3];
+		translucency_argb[idx] = (a << 24) | (r << 16) | (g << 8) | b;
+	}
 }
 
 // Read in files needed to display gumps.

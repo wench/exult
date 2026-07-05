@@ -522,6 +522,26 @@ Game_window::~Game_window() {
 	delete npc_prox;
 	delete effects;
 	delete render;
+	// The single instance is gone; clear the static so get_instance() returns
+	// null (e.g. Mouse's destructor checks this before touching the window).
+	game_window = nullptr;
+}
+
+/*
+ *  Redirect all shape/text drawing to a buffer (e.g. an overlay layer),
+ *  returning the previous target. Both the window's active buffer and the
+ *  static shape render target are switched so every drawing path follows.
+ */
+
+Image_buffer8* Game_window::push_render_target(Image_buffer8* buf) {
+	Image_buffer8* prev = win->set_render_buffer(buf);
+	Shape_frame::set_to_render(buf);
+	return prev;
+}
+
+void Game_window::pop_render_target(Image_buffer8* prev) {
+	win->set_render_buffer(prev);
+	Shape_frame::set_to_render(prev);
 }
 
 /*
