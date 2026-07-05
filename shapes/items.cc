@@ -52,6 +52,9 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
+// This is incremented whenever text strings are loaded or freed as a way  for users of strings to invalidate any caches
+int text_load_counter = 0;
+
 // Names of U7 items.
 vector<string> item_names;
 // Msgs. (0x400 - in text.flx).
@@ -342,6 +345,7 @@ static void Setup_text(
 
 void Setup_text(bool si, bool expansion, bool sibeta, Game_Language language, bool use_special_chars) {
 	Free_text();
+	text_load_counter++;
 	const bool             is_patch = is_system_path_defined("<PATCH>");
 	std::vector<File_spec> exultmsgs;
 	exultmsgs.reserve(4);
@@ -417,9 +421,15 @@ static void Free_text_list(vector<string>& items) {
 }
 
 void Free_text() {
+	text_load_counter++;
+
 	Free_text_list(item_names);
 	Free_text_list(text_msgs);
 	Free_text_list(misc_names);
+}
+
+int get_text_load_counter() {
+	return text_load_counter;
 }
 
 /*

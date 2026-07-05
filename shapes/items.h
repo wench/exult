@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "exult_constants.h"
 
+#include <array>
 #include <iosfwd>
 #include <string>
 #include <string_view>
@@ -41,7 +42,6 @@ void        Set_item_name(unsigned num, const char* name);
 int         get_num_text_msgs();
 const char* get_text_msg(unsigned num);
 void        Set_text_msg(unsigned num, const char* msg);
-
 // Frames, etc (0x500 - 0x5ff/0x685 (BG/SI)).
 int         get_num_misc_names();
 const char* get_misc_name(unsigned num);
@@ -50,6 +50,9 @@ void        Set_misc_name(unsigned num, const char* name);
 void Setup_text(bool si, bool expansion, bool sibeta, Game_Language language, bool use_special_chars = false);
 void Free_text();
 void Write_text_file();
+// Load counter is used to track when strings have been cleared or reloaded.
+// If this changes any strings previously loaded have been invalidated
+int get_text_load_counter();
 
 // This is the offset messages start at in txt.flx and exultmsg.txt
 // Subtract by this to get the message number used with get_text_msg()
@@ -193,11 +196,16 @@ struct StringsBase {
 	// This class is intended to be used to declare const inline static fields in a class that inherits StringsBase
 	// see class GumpStrings below for an example
 	//
+	// String Lifetime should not be expected to last longer than the current game.
 	template <unsigned INDEX, unsigned COUNT = 1, typename TReturn = const char*>
 	struct String {
 	public:
 		const char* def_string;
-		String(const char* def_string = "\0\0\0\0\0\0\0\0"):def_string(def_string) {}
+
+		// the default string is returned when the string is empty. it is set to a string containing  2 null chars so str+1 is
+		// always a valid string even if str[0] == 0
+		String(const char* def_string = "\0\0") : def_string(def_string) {}
+
 		virtual ~String() {}
 
 		TReturn get(unsigned offset = 0) const {
@@ -216,7 +224,7 @@ struct StringsBase {
 			return get(offset);
 		}
 
-		// conversion opersion to TReturn
+		// conversion operator to TReturn
 		// This is only allowed if the string is not a string group
 		operator TReturn() const {
 			static_assert(COUNT == 1);
@@ -226,27 +234,37 @@ struct StringsBase {
 		virtual TReturn operator()(unsigned offset = 0) const {
 			return operator[](offset);
 		}
-		static bool isempty(const char*str) {
-			return !str || !*str;
-		}
-		static bool isempty(const std::string &str) {
-			return str.empty();
-		}
-		static bool isempty(const std::string_view &str) {
-			return str.empty();
-		}
 
+	private:
+		mutable std::array<TReturn, COUNT>* cached_array = nullptr;
+		mutable int                         lc           = 0;
 
-		TReturn GetNotEmpty(unsigned offset, TReturn def = "") const
-		{
-			TReturn result = operator[](offset);
+	public:
+		// Get strings in a group as an array
+		// If get_text_load_counter() changes, any string arrays can be considered invalidated and calling this method again will
+		// delete previously returned arrays and will return a new array
+		// Don't keep returned arrays around long term.
+		const std::array<TReturn, COUNT>& ToArray() const {
+			int current_lc = get_text_load_counter();
 
-			return isempty(result) ? def : result;
-		}
+			// Create the cached string array as needed
+			// If the load counter is different to when the array was created, we recreate the array because the strings have
+			// been invalidated
+			if (!cached_array || lc != current_lc) {
+				delete cached_array;
+				lc = current_lc;
+				if constexpr (COUNT == 2) {
+					// Simple easy optimization for the common case where the array is size 2
+					cached_array = new std::array<TReturn, COUNT>{(*this)[0], (*this)[1]};
 
-		TReturn GetNotEmpty(TReturn def = "",unsigned offset=0) const{
-			return GetNotEmpty(offset, def);
-
+				} else {
+					cached_array = new std::array<TReturn, COUNT>();
+					for (size_t i = 0; i < COUNT; i++) {
+						(*cached_array)[i] = (*this)[i];
+					}
+				}
+			}
+			return *cached_array;
 		}
 	};
 
