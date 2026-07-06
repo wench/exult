@@ -74,6 +74,7 @@ public:
 		UiLayerGumps,
 		UiLayerHudGumps,
 		UiLayerModalGumps,
+		UiLayerDisplayMap,
 		UiLayerOnscreenText,
 		NumUiLayerKinds
 	};

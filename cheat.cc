@@ -1210,10 +1210,13 @@ const int worldsize = c_tiles_per_chunk * c_num_chunks;
  */
 class Cheat_map : public Game_singletons, public Paintable {
 public:
-	int          x, y;    // Where it's painted.
 	int          w, h;
+	int          layer = -1;
 	Shape_frame* map  = nullptr;
 	Vga_file*    mini = nullptr;    // If "minimaps.vga" is found.
+
+	// Above gump/hud/modal layers, below mouse cursor.
+	static constexpr int display_map_layer_z = (1 << 19) + 1;
 
 	Cheat_map(int mapnum = 0) {
 		if (U7exists(PATCH_MINIMAPS)) {
@@ -1228,16 +1231,48 @@ public:
 		// Get coords. for centered view.
 		w = map->get_width();
 		h = map->get_height();
-		x = (gwin->get_width() - w) / 2 + map->get_xleft();
-		y = (gwin->get_height() - h) / 2 + map->get_yabove();
 	}
 
 	~Cheat_map() override {
+		if (layer >= 0) {
+			gwin->destroy_layer(layer);
+			layer = -1;
+		}
 		delete mini;
 	}
 
+	bool to_local_from_game_click(int gx, int gy, int& lx, int& ly) const {
+		if (layer < 0 || !gwin->layer_is_visible(layer)) {
+			return false;
+		}
+		int sx;
+		int sy;
+		gwin->get_win()->game_to_screen(gx, gy, gwin->get_fastmouse(), sx, sy);
+		return gwin->screen_to_layer(layer, sx, sy, lx, ly);
+	}
+
 	void paint() override {
-		sman->paint_shape(x, y, map, true);
+		if (!map || w <= 0 || h <= 0) {
+			return;
+		}
+		if (layer < 0) {
+			layer = gwin->create_layer(w, h, 255, 0, display_map_layer_z);
+			if (layer < 0) {
+				return;
+			}
+			gwin->layer_set_ui_kind(layer, Image_window::UiLayerDisplayMap);
+		}
+
+		Image_buffer8* lbuf = gwin->get_layer_ibuf(layer);
+		if (!lbuf) {
+			return;
+		}
+
+		lbuf->clear_clip();
+		lbuf->fill8(255);    // fully transparent
+		Image_buffer8* prev = gwin->push_render_target(lbuf);
+		// Paint 0-based into the layer.
+		sman->paint_shape(map->get_xleft(), map->get_yabove(), map, true);
 
 		// mark current location
 		int              xx;
@@ -1247,10 +1282,21 @@ public:
 		xx = ((t.tx * (w - border * 2)) / worldsize);
 		yy = ((t.ty * (h - border * 2)) / worldsize);
 
-		xx += x - map->get_xleft() + border;
-		yy += y - map->get_yabove() + border;
+		xx += border;
+		yy += border;
 		gwin->get_win()->fill8(50, 1, 5, xx, yy - 2);
 		gwin->get_win()->fill8(50, 5, 1, xx - 2, yy);
+		gwin->pop_render_target(prev);
+
+		Image_window* iwin = gwin->get_win();
+		const float   f    = iwin->get_ui_scale_factor(Image_window::UiLayerDisplayMap);
+		const float   dw   = static_cast<float>(w) * f;
+		const float   dh   = static_cast<float>(h) * f;
+		const float   dx   = (static_cast<float>(iwin->get_display_width()) - dw) / 2.0f;
+		const float   dy   = (static_cast<float>(iwin->get_display_height()) - dh) / 2.0f;
+		gwin->layer_set_dest(layer, static_cast<int>(dx), static_cast<int>(dy), static_cast<int>(dw), static_cast<int>(dh));
+		gwin->layer_set_visible(layer, true);
+		gwin->layer_set_dirty(layer);
 	}
 };
 
@@ -1273,11 +1319,21 @@ void Cheat::map_teleport() const {
 		return;
 	}
 
-	xx -= map.x - map.map->get_xleft() + border;
-	yy -= map.y - map.map->get_yabove() + border;
+	int lx;
+	int ly;
+	if (!map.to_local_from_game_click(xx, yy, lx, ly)) {
+		gwin->paint();
+		if (touchui != nullptr && !gumpman->gump_mode()) {
+			touchui->showGameControls();
+		}
+		return;
+	}
+
+	lx -= border;
+	ly -= border;
 	Tile_coord t;
-	t.tx = static_cast<int>(((xx + 0.5) * worldsize) / (map.w - 2 * border));
-	t.ty = static_cast<int>(((yy + 0.5) * worldsize) / (map.h - 2 * border));
+	t.tx = static_cast<int>(((lx + 0.5) * worldsize) / (map.w - 2 * border));
+	t.ty = static_cast<int>(((ly + 0.5) * worldsize) / (map.h - 2 * border));
 
 	// World-wrapping.
 	t.tx = (t.tx + c_num_tiles) % c_num_tiles;
