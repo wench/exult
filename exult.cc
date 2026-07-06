@@ -3039,6 +3039,8 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 	apply_named_layer(Image_window::UiLayerConversations, "conversations");
 	apply_named_layer(Image_window::UiLayerMousePointer, "mouse_pointer");
 	apply_named_layer(Image_window::UiLayerGumps, "gumps");
+	apply_named_layer(Image_window::UiLayerHudGumps, "hud_gumps");
+	apply_named_layer(Image_window::UiLayerModalGumps, "modal_gumps");
 	apply_named_layer(Image_window::UiLayerOnscreenText, "onscreen_text");
 }
 

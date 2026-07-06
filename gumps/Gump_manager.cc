@@ -86,6 +86,19 @@ namespace {
 	// Extra margin around a gump's reported bounds so outlines/badges are not
 	// clipped by its layer buffer.
 	constexpr int gump_layer_margin = 4;
+
+	// Pick the UI layer kind (and thus the config/video/ui/* size + scaler
+	// override) for a gump's overlay layer: HUD gumps (shortcut bar,
+	// face-stats), modal gumps, and ordinary gumps each get their own.
+	Image_window::UiLayerKind ui_kind_for(Gump* g, bool is_hud) {
+		if (is_hud) {
+			return Image_window::UiLayerHudGumps;
+		}
+		if (g->is_modal()) {
+			return Image_window::UiLayerModalGumps;
+		}
+		return Image_window::UiLayerGumps;
+	}
 }    // namespace
 
 void Gump_manager::render_gump_to_layer(Gump* g, int z) {
@@ -128,7 +141,7 @@ void Gump_manager::render_gump_part_to_layer(Gump* g, int z, int part, bool is_h
 		if (layer < 0) {
 			return;
 		}
-		gwin->layer_set_ui_kind(layer, Image_window::UiLayerGumps);
+		gwin->layer_set_ui_kind(layer, ui_kind_for(g, is_hud));
 	}
 	bounds = b;
 	gwin->layer_set_z(layer, z);
@@ -147,7 +160,7 @@ void Gump_manager::render_gump_part_to_layer(Gump* g, int z, int part, bool is_h
 	gwin->pop_render_target(prev);
 
 	Image_window* iwin = gwin->get_win();
-	const float   f    = iwin->get_ui_scale_factor(Image_window::UiLayerGumps);
+	const float   f    = iwin->get_ui_scale_factor(ui_kind_for(g, is_hud));
 	int           csx;
 	int           csy;
 	iwin->game_to_screen(b.x + b.w / 2, b.y + b.h / 2, gwin->get_fastmouse(), csx, csy);

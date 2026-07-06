@@ -72,6 +72,8 @@ public:
 		UiLayerConversations,
 		UiLayerMousePointer,
 		UiLayerGumps,
+		UiLayerHudGumps,
+		UiLayerModalGumps,
 		UiLayerOnscreenText,
 		NumUiLayerKinds
 	};
