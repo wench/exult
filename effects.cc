@@ -66,12 +66,54 @@ using std::vector;
 int Cloud::randcnt           = 0;
 int Lightning_effect::active = 0;
 
+namespace {
+	// Above normal and HUD gumps, below modal gumps.
+	constexpr int text_effect_layer_z = (1 << 18) + (1 << 16);
+}
+
 /**
  *  Clean up.
  */
 
 Effects_manager::~Effects_manager() {
 	remove_all_effects(false);
+	destroy_text_layer();
+}
+
+int Effects_manager::get_text_layer() {
+	const int w = gwin ? gwin->get_width() : 0;
+	const int h = gwin ? gwin->get_height() : 0;
+	if (w <= 0 || h <= 0) {
+		return -1;
+	}
+	if (text_layer < 0 || text_layer_w != w || text_layer_h != h) {
+		destroy_text_layer();
+		text_layer = gwin->create_layer(w, h, 255, 0, text_effect_layer_z);
+		if (text_layer < 0) {
+			return -1;
+		}
+		text_layer_w = w;
+		text_layer_h = h;
+		gwin->layer_set_ui_kind(text_layer, Image_window::UiLayerTextEffects);
+		gwin->layer_set_z(text_layer, text_effect_layer_z);
+	}
+	return text_layer;
+}
+
+void Effects_manager::hide_text_layer() {
+	if (text_layer >= 0) {
+		gwin->layer_set_visible(text_layer, false);
+		gwin->layer_set_dirty(text_layer);
+	}
+}
+
+void Effects_manager::destroy_text_layer() {
+	if (text_layer >= 0) {
+		gwin->destroy_layer(text_layer);
+		text_layer = -1;
+	}
+	text_layer_w = 0;
+	text_layer_h = 0;
 }
 
 /**
@@ -142,6 +184,9 @@ void Effects_manager::remove_text_effect(Game_object* item    // Item text was a
 		return;
 	} else {
 		texts.erase(effectToDelete);
+		if (texts.empty()) {
+			hide_text_layer();
+		}
 		gwin->paint();
 	}
 }
@@ -170,6 +215,9 @@ void Effects_manager::remove_text_effect(Text_effect* txt) {
 	texts.remove_if([txt](const auto& el) {
 		return el.get() == txt;
 	});
+	if (texts.empty()) {
+		hide_text_layer();
+	}
 }
 
 /**
@@ -182,6 +230,7 @@ void Effects_manager::remove_all_effects(bool repaint) {
 	}
 	effects.clear();
 	texts.clear();
+	hide_text_layer();
 	if (repaint) {
 		gwin->paint();    // Just paint whole screen.
 	}
@@ -193,6 +242,7 @@ void Effects_manager::remove_all_effects(bool repaint) {
 
 void Effects_manager::remove_text_effects() {
 	texts.clear();
+	hide_text_layer();
 	gwin->set_all_dirty();
 }
 
@@ -289,9 +339,33 @@ void Effects_manager::paint() {
  */
 
 void Effects_manager::paint_text() {
+	if (texts.empty()) {
+		hide_text_layer();
+		return;
+	}
+	const int layer = get_text_layer();
+	if (layer < 0) {
+		for (auto& txt : texts) {
+			txt->paint();
+		}
+		return;
+	}
+	Image_buffer8* lbuf = gwin->get_layer_ibuf(layer);
+	if (!lbuf) {
+		for (auto& txt : texts) {
+			txt->paint();
+		}
+		return;
+	}
+	lbuf->clear_clip();
+	lbuf->fill8(255);
+	Image_buffer8* prev = gwin->push_render_target(lbuf);
 	for (auto& txt : texts) {
 		txt->paint();
 	}
+	gwin->pop_render_target(prev);
+	gwin->layer_set_dirty(layer);
+	gwin->layer_set_visible(layer, true);
 }
 
 /**

@@ -50,6 +50,12 @@ class Effects_manager {
 	Game_window*                               gwin;       // Handy pointer.
 	std::list<std::unique_ptr<Special_effect>> effects;    // Sprite effects, projectiles, etc.
 	std::list<std::unique_ptr<Text_effect>>    texts;      // Text snippets.
+	int                                       text_layer    = -1;
+	int                                       text_layer_w  = 0;
+	int                                       text_layer_h  = 0;
+	int get_text_layer();
+	void hide_text_layer();
+	void destroy_text_layer();
 public:
 	Effects_manager(Game_window* g) : gwin(g) {}
 
