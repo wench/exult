@@ -218,6 +218,7 @@ struct Strings : public StringsBase {
 		static inline const String<0xA0B> orig;
 		static inline const String<0xA0C> Polymorphedfrom;
 		static inline const String<0xA0D> InvalidNPC;
+		static inline const String<0xA0E> NoLocNotonMap;
 	};
 
 	struct NPCStatsMenu {
@@ -268,55 +269,56 @@ struct Strings : public StringsBase {
 		static inline const String<0xA50>       Of;
 		static inline const String<0xA51>       OnMap;
 		static inline const String<0xA52>       Coords;
+		static inline const stringString<0xA53> CantTeleporttoNPCnotonmap;
 	};
 
 	struct PaletteEffect {
 		struct MenuItems {
-			static inline const String<0xA53> RampRemap;
-			static inline const String<0xA54> Xform;
-			static inline const String<0xA55> Shift;
-			static inline const String<0xA56> Clear;
+			static inline const String<0xA54> RampRemap;
+			static inline const String<0xA55> Xform;
+			static inline const String<0xA56> Shift;
+			static inline const String<0xA57> Clear;
 		};
 
 		struct Display {
-			static inline const String<0xA57> PaletteEffect;
-			static inline const String<0xA58> None;
-			static inline const String<0xA59> RampRemapAllTo;
-			static inline const String<0xA5A> RampRemap;
-			static inline const String<0xA5B> To;
-			static inline const String<0xA5C> Xform;
-			static inline const String<0xA5D> ShiftBy;
-			static inline const String<0xA5E> FromRampall;
-			static inline const String<0xA5F> FromRamp;
+			static inline const String<0xA58> PaletteEffect;
+			static inline const String<0xA59> None;
+			static inline const String<0xA5A> RampRemapAllTo;
+			static inline const String<0xA5B> RampRemap;
+			static inline const String<0xA5C> To;
+			static inline const String<0xA5D> Xform;
+			static inline const String<0xA5E> ShiftBy;
+			static inline const String<0xA5F> FromRampall;
+			static inline const String<0xA60> FromRamp;
 		};
 
 		struct Prompts {
-			static inline const stringString<0xA60> enterFromRamp;
-			static inline const stringString<0xA61> or255forall;
-			static inline const stringString<0xA62> enterXFORMIndex;
-			static inline const stringString<0xA63> entershiftamount;
-			static inline const stringString<0xA64> enterToRampnumberIndex;
+			static inline const stringString<0xA61> enterFromRamp;
+			static inline const stringString<0xA62> or255forall;
+			static inline const stringString<0xA63> enterXFORMIndex;
+			static inline const stringString<0xA64> entershiftamount;
+			static inline const stringString<0xA65> enterToRampnumberIndex;
 		};
 	};
 
 	struct UsecodeMenu {
 		struct Prompts {
-			static inline const stringString<0xA65> Enterusecodenumber;
-			static inline const stringString<0xA66> InvalidUsecodeNumber;
-			static inline const stringString<0xA67> EnterUsecodeEventid;
-			static inline const stringString<0xA68> InvalidUsecodeEventNumber;
+			static inline const stringString<0xA66> Enterusecodenumber;
+			static inline const stringString<0xA67> InvalidUsecodeNumber;
+			static inline const stringString<0xA68> EnterUsecodeEventid;
+			static inline const stringString<0xA69> InvalidUsecodeEventNumber;
 		};
 
 		struct Display {
-			static inline const String<0xA69> UsecodeMenu;
-			static inline const String<0xA6A> Dangerous;
-			static inline const String<0xA6B> usewithcare;
+			static inline const String<0xA6A> UsecodeMenu;
+			static inline const String<0xA6B> Dangerous;
+			static inline const String<0xA6C> usewithcare;
 		};
 
 		struct MenuItems {
-			static inline const String<0xA6C> CallUsecode;
-			static inline const String<0xA6D> ReloadUsecode;
-			static inline const String<0xA6E> FlagEditor;
+			static inline const String<0xA6D> CallUsecode;
+			static inline const String<0xA6E> ReloadUsecode;
+			static inline const String<0xA6F> FlagEditor;
 		};
 	};
 };

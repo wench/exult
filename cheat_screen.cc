@@ -352,11 +352,14 @@ void CheatScreen::InputHandlers::KeyOnly::Parse() {
 }
 
 void CheatScreen::InputHandlers::PressAKey::GetPromptMessage(char* buf, size_t buf_size) {
+	const char* pressmsg = Strings::PressAKey();
 	if (promptmsg.empty()) {
-		snprintf(buf, buf_size, "%s", Strings::PressAKey());
-
+		snprintf(buf, buf_size, "%s", pressmsg);
+		// If buf is too small to fit entire press message, don't append it
+	} else if ((promptmsg.size() + strlen(pressmsg)) >= buf_size) {
+		snprintf(buf, buf_size, "%s", promptmsg.c_str());
 	} else {
-		snprintf(buf, buf_size, "%s %s", promptmsg.c_str(), Strings::PressAKey());
+		snprintf(buf, buf_size, "%s %s", promptmsg.c_str(), pressmsg);
 	}
 }
 
@@ -944,11 +947,13 @@ void CheatScreen::RunMenu(std::shared_ptr<Menu> menu) {
 					// Add Escape hotspot
 					hotspots.push_back(&EscapeHotspot);
 
-					// 64 is big enough as the screen res is only big enough for 40x25 text
-					char buf[64];
+					// 41 is big enough as the screen res is only big enough for 40x25 text
+					char buf[41];
 
 					ih->GetPromptMessage(buf, std::size(buf));
-					int promptmsgwidth = font->paint_text_fixedwidth(ibuf, buf, promptx, prompty + 9, 8, fontcolor.colors);
+					// Null terminate it just to be sure
+					buf[std::size(buf) - 1] = 0;
+					int promptmsgwidth      = font->paint_text_fixedwidth(ibuf, buf, promptx, prompty + 9, 8, fontcolor.colors);
 
 					int cursor_offset = ih->PaintPrompt(promptx, prompty, last_key);
 					// Paint flashing cursor
@@ -1035,7 +1040,7 @@ void CheatScreen::RunMenu(std::shared_ptr<Menu> menu) {
 				input_stack.pop();
 			}
 		} catch (MenuCommandException& ex) {
-			if (ex.return_to_menu) {
+			if (ex.return_to_menu || current->NumPhases() == 0) {
 				// pop till we reach a menu or nothing
 				do {
 					input_stack.top()->cancelled();
@@ -1722,7 +1727,12 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::TeleportMenu() {
 	command->inputs.push_back(std::make_shared<InputHandlers::Actor>(false));
 	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
 		if (Actor* actor = static_cast<InputHandlers::Actor*>(self->inputs[0].get())->actor) {
-			gwin->teleport_party(actor->get_tile(), false, actor->get_map_num());
+			if (!actor->get_chunk()) {
+				// No teleporting to NPC not on map
+				throw MenuCommandException{Strings::TeleportMenu::CantTeleporttoNPCnotonmap, false};
+			} else {
+				gwin->teleport_party(actor->get_tile(), false, actor->get_map_num());
+			}
 		}
 
 		return {};

@@ -995,6 +995,7 @@
 0xA0B:orig: 
 0xA0C:Polymorphed from 
 0xA0D:Invalid NPC!
+0xA0E:No Loc. Not on Map
 
 0xA10:Dexterity....
 0xA11:Food Level...
@@ -1067,42 +1068,44 @@
 0xA50:of
 0xA51:OnMap #
 0xA52:Coords 
+0xA53:Can't Teleport to NPC not on map
 
 #palette effect Menu
 #menu items
-0xA53:Ramp Remap
-0xA54:Xform
-0xA55:shift
-0xA56:Clear
+0xA54:Ramp Remap
+0xA55:Xform
+0xA56:shift
+0xA57:Clear
 #display Strings
-0xA57:Palette effect: 
-0xA58:None
-0xA59:Ramp Remap All To 
-0xA5A:Ramp Remap 
-0xA5B: To 
-0xA5C:Xform 
-0xA5D:Shift by 
-0xA5E:From Ramp: All
-0xA5F:From Ramp: 
+0xA58:Palette effect: 
+0xA59:None
+0xA5A:Ramp Remap All To 
+0xA5B:Ramp Remap 
+0xA5C: To 
+0xA5D:Xform 
+0xA5E:Shift by 
+0xA5F:From Ramp: All
+0xA60:From Ramp: 
 
 #prompts
-0xA60: enter From Ramp 
-0xA61: or 255 for all 
-0xA62: enter XFORM Index
-0xA63: enter shift amount
-0xA64: enter To Ramp
+0xA61: enter From Ramp 
+0xA62: or 255 for all 
+0xA63: enter XFORM Index
+0xA64: enter shift amount
+0xA65: enter To Ramp
 
 #usecode Menu
 #prompts
-0xA65:Enter usecode number
-0xA66:Invalid Usecode Number
-0xA67:Enter Usecode Event id
-0xA68:Invalid Usecode Event Number
+0xA66:Enter usecode number
+0xA67:Invalid Usecode Number
+0xA68:Enter Usecode Event id
+0xA69:Invalid Usecode Event Number
 #display
-0xA69:Usecode Menu
-0xA6A:Dangerous
-0xA6B:use with care!
+0xA6A:Usecode Menu
+0xA6B:Dangerous
+0xA6C:use with care!
 #menu items
-0xA6C:Call Usecode
-0xA6D:Reload Usecode
-0xA6E:Flag Editor
+0xA6D:Call Usecode
+0xA6E:Reload Usecode
+0xA6F:Flag Editor
+

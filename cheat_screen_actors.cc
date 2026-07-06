@@ -233,12 +233,24 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
 	command->events.Activate = [](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
 		auto menu = self->GetMyMenu();
 		if (Actor* actor = MenuCommand::getDataOrDefault<Actor*>(menu)) {
-			Game_window::get_instance()->teleport_party(actor->get_tile(), false, actor->get_map_num());
+			if (!actor->get_chunk()) {
+				// Should not get here if NPC not on map but just in case don't allow it
+				throw MenuCommandException{Strings::TeleportMenu::CantTeleporttoNPCnotonmap, false};
+			} else {
+				Game_window::get_instance()->teleport_party(actor->get_tile(), false, actor->get_map_num());
+			}
 		}
 		return {};
 	};
-	command->events.run = hideifnoactor;
-	label               = Strings::NPCMenu::TeleporttoNPC;
+	command->events.run = [](MenuCommand* self) {
+		Actor* actor = MenuCommand::getDataOrDefault<Actor*>(self->GetMyMenu());
+		// If the actor is not on the map hide teleport to NPC hotspot
+		bool hide = !actor || !actor->get_chunk();
+		if (auto hotspot = self->getHotspot()) {
+			hotspot->setHidden(0, hide);
+		}
+	};
+	label = Strings::NPCMenu::TeleporttoNPC;
 	items.emplace_front(Hotspot(offsetx + 160, maxy - offsety1 - 81, label[0], label + 1), command);
 
 	// Palette Effect
@@ -317,13 +329,12 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
 #endif
 
 		if (Actor* actor = self->getDataOrDefault<Actor*>()) {
-			num                = actor->get_npc_num();
-			const Tile_coord t = actor->get_tile();
+			num = actor->get_npc_num();
 
 			// Paint the actors shape
 			Shape_frame* shape = actor->get_shape();
 			if (shape) {
-				actor->paint_shape(shape->get_xright() + 240, shape->get_yabove(), true);
+				actor->paint_shape(shape->get_xright() + 280, shape->get_yabove(), true);
 			}
 
 			// Now the info
@@ -333,8 +344,15 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
 					actor->is_unused() ? Strings::NPCMenu::unused() : "");
 			font->paint_text_fixedwidth(ibuf, buf, offsetx, 0, 8, fontcolor.colors);
 
-			snprintf(buf, sizeof(buf), "%s(%04i, %04i, %02i)", Strings::NPCMenu::Loc_(), t.tx, t.ty, t.tz);
-			font->paint_text_fixedwidth(ibuf, buf, offsetx, 9, 8, fontcolor.colors);
+			if (actor->get_chunk()) {
+				const Tile_coord t = actor->get_tile();
+				snprintf(
+						buf, sizeof(buf), "%s(%04i, %04i, %02i) %s%i", Strings::NPCMenu::Loc_(), t.tx, t.ty, t.tz,
+						Strings::TeleportMenu::OnMap(), actor->get_map_num());
+				font->paint_text_fixedwidth(ibuf, buf, offsetx, 9, 8, fontcolor.colors);
+			} else {
+				font->paint_text_fixedwidth(ibuf, Strings::NPCMenu::NoLocNotonMap, offsetx, 9, 8, fontcolor.colors);
+			}
 
 			snprintf(
 					buf, sizeof(buf), "%s%04i:%02i  %s", Strings::NPCMenu::Shape_(), actor->get_shapenum(), actor->get_framenum(),
