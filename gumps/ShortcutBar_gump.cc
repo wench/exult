@@ -92,6 +92,9 @@ void ShortcutBar_gump::update_gump() {
 void ShortcutBar_gump::HideGump() {
 	if (g_shortcutBar) {
 		gumpman->remove_gump(g_shortcutBar);
+		// remove_gump() alone does not guarantee already composited layers are
+		// gone this frame; release them explicitly when hiding.
+		g_shortcutBar->free_render_layer();
 	}
 }
 

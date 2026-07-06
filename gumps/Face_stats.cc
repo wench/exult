@@ -641,6 +641,9 @@ Face_stats* Face_stats::self = nullptr;
 void Face_stats::HideGump() {
 	if (self) {
 		gumpman->remove_gump(self);
+		// remove_gump() detaches from gump manager, but a previously rendered
+		// overlay layer can still remain visible until explicitly released.
+		self->free_render_layer();
 	}
 }
 

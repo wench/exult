@@ -276,11 +276,11 @@ void Mouse::show(unsigned char* trans) {
  */
 
 void Mouse::hide() {
+	if (mouse_layer >= 0) {
+		gwin->layer_set_visible(mouse_layer, false);
+	}
 	if (onscreen) {
 		onscreen = false;
-		if (mouse_layer >= 0) {
-			gwin->layer_set_visible(mouse_layer, false);
-		}
 		dirty = box;    // Init. dirty to box.
 	}
 }
