@@ -2924,8 +2924,8 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 		if (size == "3") {
 			return 3;
 		}
-		size = "Full";
-		return 0;
+		size = "3";
+		return 3;
 	};
 
 	struct LayerUiCfg {
@@ -2992,8 +2992,8 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 	};
 
 	LayerUiCfg global_cfg;
-	global_cfg.size = "Full";
-	config->value("config/video/ui/size", global_cfg.size, "Full");
+	global_cfg.size = "3";
+	config->value("config/video/ui/size", global_cfg.size, "3");
 	global_cfg.size_mode        = parse_size_mode(global_cfg.size);
 	global_cfg.use_game_scaling = (global_cfg.size == "Auto");
 	if (global_cfg.use_game_scaling) {
@@ -3002,24 +3002,24 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 		global_cfg.fill_scaler = fill_scaler;
 	} else {
 		string s;
-		config->value("config/video/ui/scale_method", s, Image_window::get_name_for_scaler(scaler));
+		config->value("config/video/ui/scale_method", s, Image_window::get_name_for_scaler(Image_window::point));
 		global_cfg.scaler = Image_window::get_scaler_for_name(s.c_str());
 		if (global_cfg.scaler == Image_window::NoScaler) {
-			global_cfg.scaler = scaler;
+			global_cfg.scaler = Image_window::point;
 		}
-		string centre_default;
-		Image_window::fillmode_to_string(Image_window::Centre, centre_default);
+		string fill_default;
+		Image_window::fillmode_to_string(Image_window::Fill, fill_default);
 		string fm;
-		config->value("config/video/ui/fill_mode", fm, centre_default.c_str());
+		config->value("config/video/ui/fill_mode", fm, fill_default.c_str());
 		global_cfg.fillmode = Image_window::string_to_fillmode(fm.c_str());
 		if (global_cfg.fillmode == 0) {
-			global_cfg.fillmode = Image_window::Centre;
+			global_cfg.fillmode = Image_window::Fill;
 		}
 		string fs;
-		config->value("config/video/ui/fill_scaler", fs, Image_window::get_name_for_scaler(fill_scaler));
+		config->value("config/video/ui/fill_scaler", fs, Image_window::get_name_for_scaler(Image_window::point));
 		global_cfg.fill_scaler = Image_window::get_scaler_for_name(fs.c_str());
 		if (global_cfg.fill_scaler == Image_window::NoScaler) {
-			global_cfg.fill_scaler = fill_scaler;
+			global_cfg.fill_scaler = Image_window::point;
 		}
 	}
 
