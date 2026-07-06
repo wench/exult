@@ -470,6 +470,10 @@ public:
 		win->layer_set_index_argb(handle, argb256);
 	}
 
+	void layer_set_alpha(int handle, unsigned char a) {
+		win->layer_set_alpha(handle, a);
+	}
+
 	// Overlay-layer ("UI") scaling config (see Image_window::set_ui_config).
 	void set_ui_config(int size_mode, bool use_game_scaling, int scaler, Image_window::FillMode fmode, int fill_scaler) {
 		win->set_ui_config(size_mode, use_game_scaling, scaler, fmode, fill_scaler);

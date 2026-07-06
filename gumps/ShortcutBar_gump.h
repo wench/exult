@@ -61,6 +61,8 @@ public:
 	~ShortcutBar_gump() override;
 	int  handle_event(SDL_Event* event);
 	void paint() override;
+	TileRect get_rect() const override;
+	bool     has_point(int x, int y) const override;
 
 	// Don't close on end_gump_mode
 	bool is_persistent() const override {
@@ -77,10 +79,10 @@ public:
 		return true;
 	}
 
-	// HUD gump: anchored to the full window at native scale, not drawn into a
-	// scaled overlay layer.
+	// HUD gump: drawn via its own overlay layer so it follows the UI size
+	// setting (fixed on-screen size, translucency preserved via index_argb).
 	bool uses_render_layer() const override {
-		return false;
+		return true;
 	}
 
 	static uint32 eventType;
@@ -105,6 +107,9 @@ public:
 	}
 
 	void        check_for_updates(int shnum);
+	// True when the bar is drawn in the translucent style (config + on-screen).
+	// Used by the layer renderer to composite the whole bar semi-transparently.
+	bool        wants_translucent() const;
 	static void HideGump();
 	static void ShowGump();
 	static bool Visible();

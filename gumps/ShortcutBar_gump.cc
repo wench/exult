@@ -305,18 +305,43 @@ ShortcutBar_gump::~ShortcutBar_gump() {
 	gwin->set_all_dirty();
 }
 
+TileRect ShortcutBar_gump::get_rect() const {
+	if (numButtons <= 0) {
+		return TileRect(startx, starty, 320, height);
+	}
+	TileRect r = buttonItems[0].rect;
+	for (int i = 1; i < numButtons; i++) {
+		r = r.add(buttonItems[i].rect);
+	}
+	return r;
+}
+
+bool ShortcutBar_gump::has_point(int x, int y) const {
+	return get_rect().has_point(x, y);
+}
+
+bool ShortcutBar_gump::wants_translucent() const {
+	return gwin->get_shortcutbar_type() == 1 && starty >= 0;
+}
+
 void ShortcutBar_gump::paint() {
 	Game_window*   gwin = Game_window::get_instance();
 	Shape_manager* sman = Shape_manager::get_instance();
 
 	Gump::paint();
 
+	// When drawn into an overlay layer, paint icons OPAQUE: the xform
+	// translucency blends against the scene, which is not present in the empty
+	// layer buffer. The layer is instead composited at a reduced alpha.
+	const bool layered = uses_render_layer();
+
 	for (int i = 0; i < numButtons; i++) {
 		const ShortcutBarButtonItem& item  = buttonItems[i];
-		const int                    x     = locx + item.mx;
-		const int                    y     = locy + item.my;
+		int                          x     = locx + item.mx;
+		int                          y     = locy + item.my;
+		local_to_screen(x, y);
 		Shape_frame*                 frame = item.shapeId->get_shape();
-		sman->paint_shape(x, y, frame, item.translucent);
+		sman->paint_shape(x, y, frame, item.translucent && !layered);
 		// when the bar is on the game screen it may need an outline
 		if (frame && frame->is_rle() && gwin->get_outline_color() < NPIXCOLORS && starty >= 0) {
 			sman->paint_outline(x, y, frame, gwin->get_outline_color());
@@ -347,20 +372,25 @@ int ShortcutBar_gump::handle_event(SDL_Event* event) {
 		Gump*        on_gump = gumpman->find_gump(x, y);
 		Gump_button* button;
 		gumpman->map_game_to_gump(on_gump, x, y, gx, gy);
-		if (x >= startx && x <= (locx + width) && y >= starty && y <= (starty + height)) {
+		int barx = x;
+		int bary = y;
+		if (render_layer >= 0 && gwin->layer_is_visible(render_layer)) {
+			gumpman->map_game_to_gump(this, x, y, barx, bary);
+		}
+		if (barx >= startx && barx <= (locx + width) && bary >= starty && bary <= (starty + height)) {
 			// do not register a mouse up event when closing a gump via
 			// checkmark over the bar
-			if (on_gump && (button = on_gump->on_button(gx, gy)) && button->is_checkmark()) {
+			if (on_gump && on_gump != this && (button = on_gump->on_button(gx, gy)) && button->is_checkmark()) {
 				handle_events = false;
 				return 0;
-			} else if (on_gump) {
+			} else if (on_gump && on_gump != this) {
 				// do not click "through" a gump
 				return 0;
 			}
 			if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-				sdl_mouse_down(event, x, y);
+				sdl_mouse_down(event, barx, bary);
 			} else if (event->type == SDL_EVENT_MOUSE_BUTTON_UP) {
-				sdl_mouse_up(event, x, y);
+				sdl_mouse_up(event, barx, bary);
 			}
 			return 1;
 		}

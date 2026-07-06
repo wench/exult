@@ -29,6 +29,7 @@
 #include "CombatStats_gump.h"
 #include "Configuration.h"
 #include "Dynamic_container_gump.h"
+#include "Face_stats.h"
 #include "Gump.h"
 #include "Jawbone_gump.h"
 #include "Paperdoll_gump.h"
@@ -91,39 +92,54 @@ void Gump_manager::render_gump_to_layer(Gump* g, int z) {
 	if (!g) {
 		return;
 	}
-	// Bounds (absolute game coords) covering the gump and its contents.
-	TileRect b = g->get_dirty();
+	const bool is_hud
+			= dynamic_cast<ShortcutBar_gump*>(g) != nullptr || dynamic_cast<Face_stats*>(g) != nullptr;
+	const int parts = is_hud ? g->hud_part_count() : 1;
+	for (int part = 0; part < parts; ++part) {
+		render_gump_part_to_layer(g, z, part, is_hud);
+	}
+	// If a previously-used second layer is no longer needed, hide it.
+	if (parts < 2 && g->render_layer2 >= 0) {
+		gwin->layer_set_visible(g->render_layer2, false);
+	}
+}
+
+void Gump_manager::render_gump_part_to_layer(Gump* g, int z, int part, bool is_hud) {
+	int&      layer  = (part == 0) ? g->render_layer : g->render_layer2;
+	TileRect& bounds = (part == 0) ? g->layer_bounds : g->layer_bounds2;
+
+	// Tight game-coordinate content rect for this part, then the padded buffer.
+	TileRect content = (g->hud_part_count() > 1) ? g->hud_part_rect(part) : g->get_dirty();
+	TileRect b       = content;
 	b.enlarge(gump_layer_margin);
 	if (b.w <= 0 || b.h <= 0) {
-		if (g->render_layer >= 0) {
-			gwin->layer_set_visible(g->render_layer, false);
+		if (layer >= 0) {
+			gwin->layer_set_visible(layer, false);
 		}
 		return;
 	}
 	// (Re)create the layer if missing or the bounds changed size.
-	if (g->render_layer < 0 || g->layer_bounds.w != b.w || g->layer_bounds.h != b.h) {
-		if (g->render_layer >= 0) {
-			gwin->destroy_layer(g->render_layer);
-			g->render_layer = -1;
+	if (layer < 0 || bounds.w != b.w || bounds.h != b.h) {
+		if (layer >= 0) {
+			gwin->destroy_layer(layer);
+			layer = -1;
 		}
-		g->render_layer = gwin->create_layer(b.w, b.h, 255, 0, z);
-		if (g->render_layer < 0) {
+		layer = gwin->create_layer(b.w, b.h, 255, 0, z);
+		if (layer < 0) {
 			return;
 		}
-		gwin->layer_set_ui_kind(g->render_layer, Image_window::UiLayerGumps);
+		gwin->layer_set_ui_kind(layer, Image_window::UiLayerGumps);
 	}
-	g->layer_bounds = b;
-	gwin->layer_set_z(g->render_layer, z);
+	bounds = b;
+	gwin->layer_set_z(layer, z);
 
-	Image_buffer8* lbuf = gwin->get_layer_ibuf(g->render_layer);
+	Image_buffer8* lbuf = gwin->get_layer_ibuf(layer);
 	if (!lbuf) {
 		return;
 	}
-	// Clear the buffer to transparent and paint the gump into it 0-based: the
-	// buffer origin is the gump's bounding box, so shift the gump by
-	// (-b.x,-b.y) while painting (see Gump::paint_shifted). We must NOT use a
-	// negative draw offset here - fill8()/the RLE writers key off `bits` as the
-	// logical origin, so a negative offset writes out of bounds.
+	// Clear the buffer to transparent and paint the gump 0-based (shifted by
+	// -b.x,-b.y). Content outside this part's bounds is clipped away by the
+	// buffer, so the two mode-3 groups each land in their own layer.
 	lbuf->clear_clip();
 	lbuf->fill8(255);    // Fully transparent.
 	Image_buffer8* prev = gwin->push_render_target(lbuf);
@@ -135,10 +151,53 @@ void Gump_manager::render_gump_to_layer(Gump* g, int z) {
 	int           csx;
 	int           csy;
 	iwin->game_to_screen(b.x + b.w / 2, b.y + b.h / 2, gwin->get_fastmouse(), csx, csy);
-	const float dw = static_cast<float>(b.w) * f;
-	const float dh = static_cast<float>(b.h) * f;
-	float       dx = static_cast<float>(csx) - dw / 2.0f;
-	float       dy = static_cast<float>(csy) - dh / 2.0f;
+	float dw = static_cast<float>(b.w) * f;
+	float dh = static_cast<float>(b.h) * f;
+	float dx = static_cast<float>(csx) - dw / 2.0f;
+	float dy = static_cast<float>(csy) - dh / 2.0f;
+	// HUD gumps (shortcut bar, face-stats) follow the gumps size setting via
+	// get_ui_scale_factor: Full = a fixed display size, Auto = the game area's
+	// native size (matches the main game layer), 1/2/3 interpolate.
+	if (is_hud) {
+		const float dispw = static_cast<float>(iwin->get_display_width());
+		const float disph = static_cast<float>(iwin->get_display_height());
+		// Anchor detection in GAME coordinates (content vs the game area).
+		const int gsx  = iwin->get_start_x();
+		const int gsy  = iwin->get_start_y();
+		const int gex  = iwin->get_end_x();
+		const int gey  = iwin->get_end_y();
+		const int lmg  = content.x - gsx;
+		const int rmg  = gex - (content.x + content.w);
+		const int tmg  = content.y - gsy;
+		const int bmg  = gey - (content.y + content.h);
+		const int tolg = 8;    // game pixels
+		const int xanc_forced = g->hud_part_xanchor(part);
+		const int yanc_forced = g->hud_part_yanchor(part);
+		int       xanc        = xanc_forced;
+		int       yanc        = yanc_forced;
+		if (xanc < 0) {
+			const int d = lmg > rmg ? lmg - rmg : rmg - lmg;
+			xanc        = (d <= tolg) ? 1 : (lmg < rmg ? 0 : 2);
+		}
+		if (yanc < 0) {
+			const int d = tmg > bmg ? tmg - bmg : bmg - tmg;
+			yanc        = (d <= tolg) ? 1 : (tmg < bmg ? 0 : 2);
+		}
+		if (xanc == 1) {
+			dx = (dispw - dw) / 2.0f;                               // centered on the display
+		} else if (xanc == 0) {
+			dx = static_cast<float>(b.x - gsx) * f;                 // game-area left edge
+		} else {
+			dx = dispw - static_cast<float>(gex - b.x) * f;         // game-area right edge
+		}
+		if (yanc == 1) {
+			dy = (disph - dh) / 2.0f;
+		} else if (yanc == 0) {
+			dy = static_cast<float>(b.y - gsy) * f;                 // game-area top edge
+		} else {
+			dy = disph - static_cast<float>(gey - b.y) * f;         // game-area bottom edge
+		}
+	}
 	if (g->is_modal() && !g->is_draggable()) {
 		const float dispw = static_cast<float>(iwin->get_display_width());
 		const float disph = static_cast<float>(iwin->get_display_height());
@@ -153,10 +212,22 @@ void Gump_manager::render_gump_to_layer(Gump* g, int z) {
 			dy = (disph - dh) / 2.0f;
 		}
 	}
-	gwin->layer_set_dest(
-			g->render_layer, static_cast<int>(dx), static_cast<int>(dy), static_cast<int>(dw), static_cast<int>(dh));
-	gwin->layer_set_visible(g->render_layer, true);
-	gwin->layer_set_dirty(g->render_layer);
+	gwin->layer_set_dest(layer, static_cast<int>(dx), static_cast<int>(dy), static_cast<int>(dw), static_cast<int>(dh));
+	gwin->layer_set_visible(layer, true);
+	// The shortcut bar always gets the translucency index table. It only
+	// affects pixels whose palette index is in the translucent/xform range
+	// (the entry is non-zero there): those render with a FIXED alpha/colour
+	// instead of the live, colour-cycling palette. This covers the fully
+	// translucent bar as well as a single missing-item icon shown dimmed in
+	// an otherwise solid bar. Normal opaque icon pixels have a zero table
+	// entry and stay fully opaque, so the solid bar looks unchanged.
+	ShortcutBar_gump* sb = dynamic_cast<ShortcutBar_gump*>(g);
+	if (sb) {
+		gwin->layer_set_index_argb(layer, Shape_manager::get_instance()->get_translucency_argb());
+	} else {
+		gwin->layer_set_index_argb(layer, nullptr);
+	}
+	gwin->layer_set_dirty(layer);
 }
 
 bool Gump_manager::map_game_to_gump(const Gump* g, int gx, int gy, int& lx, int& ly) const {
@@ -171,11 +242,25 @@ bool Gump_manager::map_game_to_gump(const Gump* g, int gx, int gy, int& lx, int&
 	int        llx;
 	int        lly;
 	const bool inside = gwin->screen_to_layer(g->render_layer, sx, sy, llx, lly);
+	const int  lx0    = llx + g->layer_bounds.x;
+	const int  ly0    = lly + g->layer_bounds.y;
+	// Two-part HUD gump (Face_stats mode 3): if the point is not inside the
+	// first part's layer, try the second part's layer before giving up.
+	if (!inside && g->render_layer2 >= 0 && gwin->layer_is_visible(g->render_layer2)) {
+		int        llx2;
+		int        lly2;
+		const bool inside2 = gwin->screen_to_layer(g->render_layer2, sx, sy, llx2, lly2);
+		if (inside2) {
+			lx = llx2 + g->layer_bounds2.x;
+			ly = lly2 + g->layer_bounds2.y;
+			return true;
+		}
+	}
 	// Always output the (possibly extrapolated) gump-local coordinate so a
 	// drag can continue past the gump's edge; the bool only reports whether
 	// the point is actually within the gump's layer (used for hit-testing).
-	lx = llx + g->layer_bounds.x;
-	ly = lly + g->layer_bounds.y;
+	lx = lx0;
+	ly = ly0;
 	return inside;
 }
 
@@ -194,8 +279,6 @@ void Gump_manager::render_gumps_to_layer(bool modal) {
 		if (g->uses_render_layer()) {
 			render_gump_to_layer(g, gump_layer_z_base + idx);
 		} else {
-			// HUD gump (shortcut bar, face-stats): drawn directly into the
-			// window at native scale, anchored to the full window.
 			g->paint();
 		}
 	}

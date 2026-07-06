@@ -67,7 +67,18 @@ public:
 	}
 
 	bool uses_render_layer() const override {
-		return false;
+		return true;
+	}
+
+	// Mode 3 (portraits split to the left and right screen edges) renders as
+	// two independently anchored parts; the other modes are a single part.
+	int      hud_part_count() const override;
+	TileRect hud_part_rect(int part) override;
+
+	// Mode 3 is vertically CENTERED as a reserved four-head column on each side.
+	int hud_part_yanchor(int part) const override {
+		ignore_unused_variable_warning(part);
+		return mode == 3 ? 1 : -1;
 	}
 
 	TileRect get_rect() const override {

@@ -116,6 +116,11 @@ void Gump::free_render_layer() {
 	}
 	render_layer = -1;
 	layer_bounds = TileRect(0, 0, 0, 0);
+	if (render_layer2 >= 0 && Game_window::get_instance() == gwin) {
+		gwin->destroy_layer(render_layer2);
+	}
+	render_layer2 = -1;
+	layer_bounds2 = TileRect(0, 0, 0, 0);
 }
 
 /*

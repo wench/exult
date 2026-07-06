@@ -157,6 +157,7 @@ public:
 		UiLayerKind                   ui_kind = UiLayerDefault;
 		int                           render_scale = 1;    // 1 = 1:1 upload; >1 = pre-scaled by
 														   // the game's scaler at this factor.
+		unsigned char                 alpha    = 255;      // Whole-layer opacity (255 = opaque).
 		// Optional 256-entry ARGB override, one per palette index. A non-zero
 		// entry is used verbatim (with its own alpha) instead of the opaque
 		// palette colour, letting a layer draw translucent pixels.
@@ -631,6 +632,9 @@ public:
 	// Non-zero entries replace the opaque palette colour for that index,
 	// carrying their own alpha (used for translucent pixels).
 	void layer_set_index_argb(int handle, const uint32* argb256);
+	// Whole-layer opacity (255 = opaque). Lets an opaque-painted layer be
+	// composited semi-transparently (e.g. the translucent shortcut bar).
+	void layer_set_alpha(int handle, unsigned char a);
 
 	// -------- Overlay-layer ("UI") scaling config --------
 	// Configure how overlay layers (conversation, mouse cursor) are scaled and
@@ -652,6 +656,7 @@ public:
 	// the real game area size; 1/2/3 = 1/4, 1/2, 3/4 of Auto.
 	float get_ui_scale_factor() const;
 	float get_ui_scale_factor(UiLayerKind kind) const;
+	float get_ui_hud_scale(UiLayerKind kind) const;
 	// Compute an overlay layer's on-screen destination for a logw x logh
 	// layout: shaped by the UI fill mode (Fill stretches, Fit keeps 1:1 pixels,
 	// AspectCorrect* uses 1:1.2, Centre a fixed scale) and scaled by the UI

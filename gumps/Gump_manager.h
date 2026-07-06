@@ -102,6 +102,9 @@ public:
 	// Render a single gump into its own overlay layer (used for the gump
 	// currently being dragged, which lives outside the open-gump list).
 	void render_gump_to_layer(Gump* g, int z);
+	// Render one part of a gump (part 0 uses render_layer, part 1 uses
+	// render_layer2). HUD gumps with >1 part anchor each part to its own edge.
+	void render_gump_part_to_layer(Gump* g, int z, int part, bool is_hud);
 
 	bool double_clicked(int x, int y, Game_object*& obj);
 	bool handle_kbd_event(void* ev);

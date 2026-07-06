@@ -1588,6 +1588,13 @@ void Image_window::layer_set_z(int handle, int z) {
 	layers[handle]->z = z;
 }
 
+void Image_window::layer_set_alpha(int handle, unsigned char a) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	layers[handle]->alpha = a;
+}
+
 void Image_window::layer_set_dest(int handle, int x, int y, int w, int h) {
 	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
 		return;
@@ -1876,6 +1883,28 @@ float Image_window::get_ui_scale_factor(UiLayerKind kind) const {
 	return f > 0.0f ? f : 1.0f;
 }
 
+float Image_window::get_ui_hud_scale(UiLayerKind kind) const {
+	const UiLayerConfig& cfg   = get_ui_cfg(kind);
+	const float          sFull = ui_full_pixel_scale(kind);    // Display-based, constant.
+	float                shrink;
+	switch (cfg.size_mode) {
+	case 1:
+		shrink = 0.25f;
+		break;
+	case 2:
+		shrink = 0.5f;
+		break;
+	case 3:
+		shrink = 0.75f;
+		break;
+	default:    // Full (0), Auto (4).
+		shrink = 1.0f;
+		break;
+	}
+	const float s = sFull * shrink;
+	return s > 0.0f ? s : 1.0f;
+}
+
 float Image_window::ui_full_pixel_scale(UiLayerKind kind) const {
 	const UiLayerConfig& cfg = get_ui_cfg(kind);
 	SDL_FRect   r;
@@ -1982,6 +2011,7 @@ void Image_window::composite_layers() {
 			refresh_layer(layer);
 			layer.dirty = false;
 		}
+		SDL_SetTextureAlphaMod(layer.texture, layer.alpha);
 		SDL_FRect dst;
 		get_layer_dest(layer, dst);
 		SDL_RenderTexture(screen_renderer, layer.texture, nullptr, &dst);
