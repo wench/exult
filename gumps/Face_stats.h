@@ -66,6 +66,10 @@ public:
 		return true;
 	}
 
+	bool uses_render_layer() const override {
+		return false;
+	}
+
 	TileRect get_rect() const override {
 		return region;
 	}

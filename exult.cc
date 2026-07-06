@@ -1796,13 +1796,16 @@ static void Handle_event(SDL_Event& event) {
 		}
 		int x;
 		int y;
+		int gx;
+		int gy;
 		gwin->get_win()->screen_to_game(event.button.x, event.button.y, gwin->get_fastmouse(), x, y);
 		if (event.button.button == 1) {
 			Gump_button* button;
 			// Allow dragging only either if the avatar can act or if map edit
 			// or hackmove is on.
 			if (avatar_can_act || cheat.in_hack_mover()
-				|| ((gump = gump_man->find_gump(x, y, false)) && (button = gump->on_button(x, y))
+				|| ((gump = gump_man->find_gump(x, y, false))
+					&& (gump_man->map_game_to_gump(gump, x, y, gx, gy), (button = gump->on_button(gx, gy)))
 					&& button->is_checkmark())) {    // also allow closing
 													 // parent gump when
 													 // clicking on checkmark

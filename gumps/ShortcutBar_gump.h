@@ -77,6 +77,12 @@ public:
 		return true;
 	}
 
+	// HUD gump: anchored to the full window at native scale, not drawn into a
+	// scaled overlay layer.
+	bool uses_render_layer() const override {
+		return false;
+	}
+
 	static uint32 eventType;
 
 	enum {

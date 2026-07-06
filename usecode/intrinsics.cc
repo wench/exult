@@ -1131,9 +1131,12 @@ USECODE_INTRINSIC(click_on_item) {
 		// Look for obj. in open gump.
 		Gump* gump = gumpman->find_gump(x, y);
 		if (gump) {
-			obj = gump->find_object(x, y);
+			int gx;
+			int gy;
+			gumpman->map_game_to_gump(gump, x, y, gx, gy);
+			obj = gump->find_object(gx, gy);
 			if (!obj) {
-				obj = gump->find_actor(x, y);
+				obj = gump->find_actor(gx, gy);
 			}
 		} else {    // Search rest of world.
 			obj = gwin->find_object(x, y);

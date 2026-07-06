@@ -256,12 +256,41 @@ public:
 		return false;
 	}
 
+	virtual bool uses_render_layer() const {
+		return true;
+	}
+
 	virtual bool     has_point(int x, int y) const;
 	virtual TileRect get_rect() const;
 
 	// Is the gump partially or completely off screen
 	// Only check shape rectangle, not against the actual shape
 	bool isOffscreen(bool partially = true) const;
+
+	// Each open gump is drawn into its own overlay layer so it can be scaled
+	// (like the mouse pointer) independently of the game area. The handle and
+	// the game-coordinate bounds the layer buffer was built for are cached
+	// here; Gump_manager owns the create/render/destroy lifecycle.
+	int      render_layer  = -1;
+	TileRect layer_bounds{0, 0, 0, 0};
+
+	int get_render_layer() const {
+		return render_layer;
+	}
+
+	// Release this gump's overlay layer (safe if none). Called on destruction.
+	void free_render_layer();
+
+	// Paint the gump with its top-left temporarily shifted by (dx,dy).
+	void paint_shifted(int dx, int dy) {
+		const int ox = x;
+		const int oy = y;
+		x += dx;
+		y += dy;
+		paint();
+		x = ox;
+		y = oy;
+	}
 
 	void screen_to_local(int& sx, int& sy) const override {
 		sx -= x;

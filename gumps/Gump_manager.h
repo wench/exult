@@ -94,6 +94,14 @@ public:
 
 	void update_gumps();
 	void paint(bool modal);
+	// Map a game-coordinate point into a specific gump's (scaled) overlay
+	// layer, giving the gump-local coordinate used for hit-testing. Returns
+	// false if the point is outside the gump's layer. If the gump has no
+	// layer yet, the point is returned unchanged (native coordinates).
+	bool map_game_to_gump(const Gump* g, int gx, int gy, int& lx, int& ly) const;
+	// Render a single gump into its own overlay layer (used for the gump
+	// currently being dragged, which lives outside the open-gump list).
+	void render_gump_to_layer(Gump* g, int z);
 
 	bool double_clicked(int x, int y, Game_object*& obj);
 	bool handle_kbd_event(void* ev);
@@ -126,6 +134,7 @@ public:
 
 private:
 	bool handle_modal_gump_event(Modal_gump* gump, SDL_Event& event);
+	void render_gumps_to_layer(bool modal);
 
 	BackgroundPaintable* background = nullptr;
 

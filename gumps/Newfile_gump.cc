@@ -614,13 +614,11 @@ bool Newfile_gump::mouse_down(
 		// Pressed above it
 		if (gy < pos + scrolly) {
 			scroll_page(-1);
-			paint();
 			return true;
 		}
 		// Pressed below it
 		else if (gy >= pos + scrolly + sliderh) {
 			scroll_page(1);
-			paint();
 			return true;
 		}
 		// Pressed on it
@@ -723,8 +721,6 @@ bool Newfile_gump::mouse_down(
 		}
 	}
 
-	paint();    // Repaint.
-	gwin->set_painted();
 	return true;
 	// See if on text field.
 }
@@ -834,7 +830,6 @@ bool Newfile_gump::mouse_drag(
 
 	if (new_pos != list_position) {
 		list_position = new_pos;
-		paint();
 	}
 	return true;
 }

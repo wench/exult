@@ -96,6 +96,7 @@ Gump::Gump(Container_game_object* cont, int initx, int inity, Gump* from)
  */
 
 Gump::~Gump() {
+	free_render_layer();
 	for (auto* elem : elems) {
 		delete elem;
 	}
@@ -103,6 +104,18 @@ Gump::~Gump() {
 						// game if it was NULL.
 		container->setGumpXY(x, y);
 	}
+}
+
+/*
+ *  Release this gump's overlay layer, if any. Guard against gwin having
+ *  already been torn down at program exit.
+ */
+void Gump::free_render_layer() {
+	if (render_layer >= 0 && Game_window::get_instance() == gwin) {
+		gwin->destroy_layer(render_layer);
+	}
+	render_layer = -1;
+	layer_bounds = TileRect(0, 0, 0, 0);
 }
 
 /*

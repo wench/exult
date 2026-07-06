@@ -2179,13 +2179,16 @@ void Game_window::show_items(
 ) {
 	// Look for obj. in open gump.
 	Gump*        gump = gump_man->find_gump(x, y);
+	int          gx;
+	int          gy;
+	gump_man->map_game_to_gump(gump, x, y, gx, gy);
 	Game_object* obj;    // What we find.
 	bool         found_in_gump = false;
 	if (gump) {
-		obj           = gump->find_object(x, y);
+		obj           = gump->find_object(gx, gy);
 		found_in_gump = (obj != nullptr);
 		if (!obj) {
-			obj = gump->get_cont_or_actor(x, y);
+			obj = gump->get_cont_or_actor(gx, gy);
 		}
 	} else {    // Search rest of world.
 		obj = find_object(x, y);

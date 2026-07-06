@@ -1359,10 +1359,13 @@ void Cheat::delete_object() {
 
 	int          x = Mouse::mouse()->get_mousex();
 	int          y = Mouse::mouse()->get_mousey();
+	int          gx;
+	int          gy;
 	Game_object* obj;
 	Gump*        gump = gwin->get_gump_man()->find_gump(x, y);
+	gwin->get_gump_man()->map_game_to_gump(gump, x, y, gx, gy);
 	if (gump) {
-		obj = gump->find_object(x, y);
+		obj = gump->find_object(gx, gy);
 	} else {    // Search rest of world.
 		obj = gwin->find_object(x, y);
 	}

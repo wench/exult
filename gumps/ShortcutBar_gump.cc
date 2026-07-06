@@ -341,13 +341,16 @@ int ShortcutBar_gump::handle_event(SDL_Event* event) {
 	if ((event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP) && handle_events) {
 		int x;
 		int y;
+		int gx;
+		int gy;
 		gwin->get_win()->screen_to_game(event->button.x, event->button.y, gwin->get_fastmouse(), x, y);
 		Gump*        on_gump = gumpman->find_gump(x, y);
 		Gump_button* button;
+		gumpman->map_game_to_gump(on_gump, x, y, gx, gy);
 		if (x >= startx && x <= (locx + width) && y >= starty && y <= (starty + height)) {
 			// do not register a mouse up event when closing a gump via
 			// checkmark over the bar
-			if (on_gump && (button = on_gump->on_button(x, y)) && button->is_checkmark()) {
+			if (on_gump && (button = on_gump->on_button(gx, gy)) && button->is_checkmark()) {
 				handle_events = false;
 				return 0;
 			} else if (on_gump) {
