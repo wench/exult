@@ -43,6 +43,7 @@ private:
 	TileRect                      avatar_face     = {0, 0, 0, 0};    // Area take by Avatar in conversation.
 	TileRect*                     conv_choices    = nullptr;         // Choices during a conversation.
 	int                           conv_layer      = -1;              // Overlay layer with faces/text.
+	int                           conv_bg_layer   = -1;              // Overlay layer with translucent text backgrounds.
 	bool                          choices_active  = false;           // Avatar choices are being shown.
 
 	std::vector<std::string>             answers;
@@ -100,6 +101,8 @@ private:
 	TileRect get_conv_rect() const;
 	// Create the overlay layer for faces/text; -1 if unavailable.
 	int get_conv_layer();
+	// Create the overlay layer for conversation text backgrounds; -1 if unavailable.
+	int get_conv_bg_layer();
 	// Place the layer over a fixed 320x200 rectangle centered in the game area.
 	void position_conv_layer(int layer);
 	// Repaint the conversation into the overlay layer.

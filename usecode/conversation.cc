@@ -51,6 +51,26 @@ namespace {
 	constexpr unsigned char conv_transparent = 255;    // See-through palette index.
 	constexpr int           conv_width       = 320;    // Fixed layout resolution.
 	constexpr int           conv_height      = 200;
+	constexpr unsigned char conv_bg_alpha    = 176;    // Text background translucency.
+
+	// On a transparent layer, translucent fills need a non-transparent base
+	// pixel to transform; seed with 0 first, then apply the selected xform.
+	void paint_conv_text_bg(int x, int y, int w, int h, int shading) {
+		if (shading < 0 || w <= 0 || h <= 0) {
+			return;
+		}
+		Game_window*   local_gwin = Game_window::get_instance();
+		Shape_manager* local_sman = Shape_manager::get_instance();
+		if (!local_gwin || !local_sman) {
+			return;
+		}
+		Image_window8* win = local_gwin->get_win();
+		if (!win || !win->get_ib8()) {
+			return;
+		}
+		win->get_ib8()->fill8(0, w, h, x, y);
+		win->get_ib8()->fill_translucent8(0, w, h, x, y, local_sman->get_xform(shading));
+	}
 }    // namespace
 
 // TODO: show_face & show_avatar_choices seem to share code?
@@ -80,6 +100,14 @@ public:
 };
 
 Conversation::~Conversation() {
+	if (conv_layer >= 0) {
+		gwin->destroy_layer(conv_layer);
+		conv_layer = -1;
+	}
+	if (conv_bg_layer >= 0) {
+		gwin->destroy_layer(conv_bg_layer);
+		conv_bg_layer = -1;
+	}
 	delete[] conv_choices;
 }
 
@@ -167,6 +195,10 @@ void Conversation::init_faces() {
 		gwin->layer_set_visible(conv_layer, false);
 		gwin->layer_set_dirty(conv_layer);
 	}
+	if (conv_bg_layer >= 0) {
+		gwin->layer_set_visible(conv_bg_layer, false);
+		gwin->layer_set_dirty(conv_bg_layer);
+	}
 }
 
 /*
@@ -217,6 +249,17 @@ int Conversation::get_conv_layer() {
 	return conv_layer;
 }
 
+int Conversation::get_conv_bg_layer() {
+	if (conv_bg_layer < 0) {
+		conv_bg_layer = gwin->create_layer(conv_width, conv_height, conv_transparent, 0, -1);
+		if (conv_bg_layer >= 0) {
+			gwin->layer_set_ui_kind(conv_bg_layer, Image_window::UiLayerConversations);
+			gwin->layer_set_alpha(conv_bg_layer, conv_bg_alpha);
+		}
+	}
+	return conv_bg_layer;
+}
+
 /*
  *  Place the conversation layer on screen. The fixed 320x200 layout is shaped
  *  by the UI fill mode and scaled by the UI size (see compute_ui_layer_dest).
@@ -245,11 +288,33 @@ void Conversation::render_conv_layer() {
 	if (cl < 0) {
 		return;
 	}
+	const int bgl = get_conv_bg_layer();
 	Image_buffer8* lbuf = gwin->get_layer_ibuf(cl);
 	if (!lbuf) {
 		return;
 	}
 	position_conv_layer(cl);
+	if (bgl >= 0) {
+		position_conv_layer(bgl);
+		if (Image_buffer8* bbuf = gwin->get_layer_ibuf(bgl)) {
+			Image_buffer8* prev_bg = gwin->push_render_target(bbuf);
+			bbuf->set_clip(0, 0, static_cast<int>(bbuf->get_width()), static_cast<int>(bbuf->get_height()));
+			bbuf->fill8(conv_transparent);
+			if (gwin->get_text_bg() >= 0) {
+				for (const Npc_face_info* finfo : face_info) {
+					if (!finfo || finfo->cur_text.empty()) {
+						continue;
+					}
+					const TileRect& box = finfo->text_rect;
+					paint_conv_text_bg(box.x, box.y, box.w, box.h, gwin->get_text_bg());
+				}
+			}
+			bbuf->clear_clip();
+			gwin->pop_render_target(prev_bg);
+			gwin->layer_set_dirty(bgl);
+			gwin->layer_set_visible(bgl, (num_faces > 0 || choices_active) && gwin->get_text_bg() >= 0);
+		}
+	}
 	Image_buffer8* prev = gwin->push_render_target(lbuf);
 	lbuf->set_clip(0, 0, static_cast<int>(lbuf->get_width()), static_cast<int>(lbuf->get_height()));
 	lbuf->fill8(conv_transparent);    // Clear to fully transparent.
@@ -475,6 +540,10 @@ void Conversation::remove_slot_face(int slot) {
 	} else if (conv_layer >= 0) {
 		gwin->layer_set_visible(conv_layer, false);
 		gwin->layer_set_dirty(conv_layer);
+		if (conv_bg_layer >= 0) {
+			gwin->layer_set_visible(conv_bg_layer, false);
+			gwin->layer_set_dirty(conv_bg_layer);
+		}
 	}
 }
 
@@ -509,19 +578,47 @@ void Conversation::show_npc_message(const char* msg) {
 	}
 	Npc_face_info* info = face_info[last_face_shown];
 	const int      font = info->large_face ? 7 : 0;    // Use red for Guardian, snake.
+	const int      text_bg = gwin->get_text_bg();
 	info->cur_text      = "";
 	const TileRect& box = info->text_rect;
 	/* NOTE:  The original centers text for Guardian, snake.    */
 	// Draw the text into the overlay layer (with paging).
 	gwin->paint();    // Repaint world beneath (the layer composites on top).
 	const int      cl   = get_conv_layer();
+	const int      bgl  = get_conv_bg_layer();
 	Image_buffer8* lbuf = cl >= 0 ? gwin->get_layer_ibuf(cl) : nullptr;
+	Image_buffer8* bbuf = bgl >= 0 ? gwin->get_layer_ibuf(bgl) : nullptr;
+	if (bgl >= 0) {
+		position_conv_layer(bgl);
+	}
+	if (cl >= 0) {
+		position_conv_layer(cl);
+	}
 	int            height;    // Break at punctuation.
 	for (;;) {
 		// Draw the faces and this page of text into the overlay layer.  The
 		// current face's text is (re)drawn here, so keep its stored text
 		// empty while paint_faces() runs to avoid drawing it twice.
 		info->cur_text      = "";
+		if (bbuf) {
+			Image_buffer8* prev_bg = gwin->push_render_target(bbuf);
+			bbuf->set_clip(0, 0, static_cast<int>(bbuf->get_width()), static_cast<int>(bbuf->get_height()));
+			bbuf->fill8(conv_transparent);
+			if (text_bg >= 0) {
+				for (const Npc_face_info* finfo : face_info) {
+					if (!finfo || finfo == info || finfo->cur_text.empty()) {
+						continue;
+					}
+					const TileRect& fbox = finfo->text_rect;
+					paint_conv_text_bg(fbox.x, fbox.y, fbox.w, fbox.h, text_bg);
+				}
+				paint_conv_text_bg(box.x, box.y, box.w, box.h, text_bg);
+			}
+			bbuf->clear_clip();
+			gwin->pop_render_target(prev_bg);
+			gwin->layer_set_dirty(bgl);
+			gwin->layer_set_visible(bgl, text_bg >= 0);
+		}
 		Image_buffer8* prev = lbuf ? gwin->push_render_target(lbuf) : nullptr;
 		if (lbuf) {
 			lbuf->set_clip(0, 0, static_cast<int>(lbuf->get_width()), static_cast<int>(lbuf->get_height()));
@@ -650,10 +747,18 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	sman->paint_shape(mbox.x + face->get_xleft(), mbox.y + face->get_yabove(), face);
 	delete[] conv_choices;    // Set up new list of choices.
 	conv_choices = new TileRect[num_choices + 1];
-	// The choices are drawn on the overlay layer, which has no scene behind
-	// it, so the translucent text background is disabled.
-	const int text_bg   = -1;
+	const int text_bg   = gwin->get_text_bg();
 	const int bg_offset = (sman->get_text_height(0) - line_height) / 2;
+	Image_buffer8* prev_bg = nullptr;
+	if (text_bg >= 0) {
+		const int bgl = get_conv_bg_layer();
+		if (bgl >= 0) {
+			if (Image_buffer8* bbuf = gwin->get_layer_ibuf(bgl)) {
+				prev_bg = gwin->push_render_target(bbuf);
+				bbuf->set_clip(0, 0, static_cast<int>(bbuf->get_width()), static_cast<int>(bbuf->get_height()));
+			}
+		}
+	}
 	// First pass: determine positions and draw all backgrounds.
 	for (int i = 0; i < num_choices; i++) {
 		char text[256];
@@ -671,10 +776,20 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 		avatar_face     = avatar_face.add(conv_choices[i]);
 		// Draw shading with line_height, shifted down to align with text.
 		if (text_bg >= 0) {
-			gwin->get_win()->fill_translucent8(
-					0, width + space_width, line_height, tbox.x + x, tbox.y + y + bg_offset, sman->get_xform(text_bg));
+			paint_conv_text_bg(tbox.x + x, tbox.y + y + bg_offset, width + space_width, line_height, text_bg);
 		}
 		x += width + space_width;
+	}
+	if (prev_bg) {
+		const int bgl = get_conv_bg_layer();
+		if (bgl >= 0) {
+			if (Image_buffer8* bbuf = gwin->get_layer_ibuf(bgl)) {
+				bbuf->clear_clip();
+			}
+			gwin->pop_render_target(prev_bg);
+			gwin->layer_set_dirty(bgl);
+			gwin->layer_set_visible(bgl, true);
+		}
 	}
 	// Second pass: draw all text on top of backgrounds.
 	for (int i = 0; i < num_choices; i++) {
@@ -788,8 +903,7 @@ void Conversation::paint_faces(bool text) {
 		}
 		if (text) {    // Show text too?
 			const TileRect& box = finfo->text_rect;
-			// Use red for Guardian, snake.  On the overlay layer the
-			// translucent text background is omitted (no scene behind it).
+			// Use red for Guardian, snake.
 			const int font = finfo->large_face ? 7 : 0;
 			sman->paint_text_box(font, finfo->cur_text.c_str(), box.x, box.y, box.w, box.h, -1, true, finfo->large_face, -1);
 		}
