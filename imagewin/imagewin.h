@@ -73,6 +73,7 @@ public:
 		UiLayerMousePointer,
 		UiLayerGumps,
 		UiLayerHudGumps,
+		UiLayerTextGumps,
 		UiLayerModalGumps,
 		UiLayerDisplayMap,
 		UiLayerOnscreenText,

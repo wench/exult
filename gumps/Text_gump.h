@@ -37,9 +37,7 @@ public:
 	Text_gump(int shapenum, int fnt = 4)
 			: Gump(nullptr, shapenum), text(nullptr), textlen(0), curtop(0), curend(0), font(fnt), from_help(false) {}
 
-	~Text_gump() override {
-		delete[] text;
-	}
+	~Text_gump() override;
 
 	void set_from_help(bool val) {
 		from_help = val;

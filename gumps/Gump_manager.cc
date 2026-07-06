@@ -33,10 +33,13 @@
 #include "Gump.h"
 #include "Jawbone_gump.h"
 #include "Paperdoll_gump.h"
+#include "Scroll_gump.h"
+#include "Sign_gump.h"
 #include "ShortcutBar_gump.h"
 #include "Slider_gump.h"
 #include "Spellbook_gump.h"
 #include "Stats_gump.h"
+#include "Book_gump.h"
 #include "Yesno_gump.h"
 #include "actors.h"
 #include "exult.h"
@@ -83,16 +86,37 @@ Gump_manager::Gump_manager() {
 // (see Dragging_info::paint, which uses z 1<<19).
 namespace {
 	constexpr int gump_layer_z_base = 1 << 18;
+	constexpr int gump_layer_text_tier_offset  = 1 << 16;
+	constexpr int gump_layer_modal_tier_offset = 1 << 17;
 	// Extra margin around a gump's reported bounds so outlines/badges are not
 	// clipped by its layer buffer.
 	constexpr int gump_layer_margin = 4;
 
+	bool is_text_gump(const Gump* g) {
+		return dynamic_cast<const Scroll_gump*>(g) != nullptr || dynamic_cast<const Sign_gump*>(g) != nullptr
+			   || dynamic_cast<const Book_gump*>(g) != nullptr;
+	}
+
+	int z_tier_offset_for(const Gump* g) {
+		if (g->is_modal()) {
+			return gump_layer_modal_tier_offset;
+		}
+		if (is_text_gump(g)) {
+			return gump_layer_text_tier_offset;
+		}
+		return 0;
+	}
+
 	// Pick the UI layer kind (and thus the config/video/ui/* size + scaler
 	// override) for a gump's overlay layer: HUD gumps (shortcut bar,
-	// face-stats), modal gumps, and ordinary gumps each get their own.
+	// face-stats), text gumps (scroll/sign/book), modal gumps, and ordinary
+	// gumps each get their own.
 	Image_window::UiLayerKind ui_kind_for(Gump* g, bool is_hud) {
 		if (is_hud) {
 			return Image_window::UiLayerHudGumps;
+		}
+		if (is_text_gump(g)) {
+			return Image_window::UiLayerTextGumps;
 		}
 		if (g->is_modal()) {
 			return Image_window::UiLayerModalGumps;
@@ -290,7 +314,7 @@ void Gump_manager::render_gumps_to_layer(bool modal) {
 			continue;
 		}
 		if (g->uses_render_layer()) {
-			render_gump_to_layer(g, gump_layer_z_base + idx);
+			render_gump_to_layer(g, gump_layer_z_base + z_tier_offset_for(g) + idx);
 		} else {
 			g->paint();
 		}
