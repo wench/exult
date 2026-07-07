@@ -509,10 +509,12 @@ Game_window::~Game_window() {
 	delete background_noise;
 	delete tqueue;
 	tqueue = nullptr;
-	// Free the drag state before the window: it may own an overlay layer that
-	// lives in 'win'.
+	// Free objects that may own layers living in 'win' before the
+	// window itself (the drag state and text effects each own layers).
 	delete dragging;
 	dragging = nullptr;
+	delete effects;
+	effects = nullptr;
 	delete win;
 	delete pal;
 	for (auto* map : maps) {
@@ -523,7 +525,6 @@ Game_window::~Game_window() {
 	delete usecode;
 	delete clock;
 	delete npc_prox;
-	delete effects;
 	delete render;
 	// The single instance is gone; clear the static so get_instance() returns
 	// null (e.g. Mouse's destructor checks this before touching the window).

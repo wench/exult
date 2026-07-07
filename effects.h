@@ -50,12 +50,6 @@ class Effects_manager {
 	Game_window*                               gwin;       // Handy pointer.
 	std::list<std::unique_ptr<Special_effect>> effects;    // Sprite effects, projectiles, etc.
 	std::list<std::unique_ptr<Text_effect>>    texts;      // Text snippets.
-	int                                       text_layer    = -1;
-	int                                       text_layer_w  = 0;
-	int                                       text_layer_h  = 0;
-	int get_text_layer();
-	void hide_text_layer();
-	void destroy_text_layer();
 public:
 	Effects_manager(Game_window* g) : gwin(g) {}
 
@@ -241,8 +235,14 @@ class Text_effect : public Time_sensitive, public Game_singletons {
 	TileRect         pos;
 	short            width, height;    // Dimensions of rectangle.
 	int              num_ticks;        // # ticks passed.
+	// Each text snippet is drawn onto its own layer so it can be scaled
+	// by the text-effect UI size while staying anchored over its object.
+	int              text_layer = -1;
+	int              layer_w    = 0;
+	int              layer_h    = 0;
 	void             add_dirty();
 	void             init();
+	void             free_layer();    // Destroy this text's layer.
 	TileRect         Figure_text_pos();
 
 public:
@@ -250,8 +250,9 @@ public:
 	Text_effect(const std::string& m, int t_x, int t_y, Game_window* gwin_);
 	// At timeout, remove from screen.
 	void handle_event(unsigned long curtime, uintptr udata) override;
-	// Render.
+	// Render (legacy direct paint into the current target).
 	virtual void paint();
+	void paint_to_layer();
 
 	// Check for matching item.
 	bool is_text(Game_object* it) {
