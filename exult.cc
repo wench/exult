@@ -2911,26 +2911,19 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 	bool ui_universal;
 	config->value("config/video/ui/universal", ui_universal, true);
 
-	auto parse_size_mode = [](string& size) {
-		if (size == "Auto") {
-			return 4;
+	auto normalize_dims = [](int& width, int& height) {
+		if (width == 0 && height == 0) {
+			return;
 		}
-		if (size == "1") {
-			return 1;
+		if (width <= 0 || height <= 0) {
+			width  = 400;
+			height = 300;
 		}
-		if (size == "2") {
-			return 2;
-		}
-		if (size == "3") {
-			return 3;
-		}
-		size = "3";
-		return 3;
 	};
 
 	struct LayerUiCfg {
-		string                 size;
-		int                    size_mode;
+		int                    width;
+		int                    height;
 		bool                   use_game_scaling;
 		int                    scaler;
 		Image_window::FillMode fillmode;
@@ -2939,9 +2932,10 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 
 	auto read_layer_cfg = [&](const string& base, const LayerUiCfg& fallback) {
 		LayerUiCfg cfg = fallback;
-		config->value(base + "/size", cfg.size, fallback.size.c_str());
-		cfg.size_mode        = parse_size_mode(cfg.size);
-		cfg.use_game_scaling = (cfg.size == "Auto");
+		config->value(base + "/width", cfg.width, fallback.width);
+		config->value(base + "/height", cfg.height, fallback.height);
+		normalize_dims(cfg.width, cfg.height);
+		cfg.use_game_scaling = (cfg.width == 0 && cfg.height == 0);
 		if (cfg.use_game_scaling) {
 			cfg.scaler      = scaler;
 			cfg.fillmode    = fillmode;
@@ -2975,8 +2969,11 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 	};
 
 	auto write_layer_cfg = [&](const string& base, const LayerUiCfg& cfg, bool overwrite) {
-		if (overwrite || !config->key_exists(base + "/size")) {
-			config->set(base + "/size", cfg.size, false);
+		if (overwrite || !config->key_exists(base + "/width")) {
+			config->set(base + "/width", cfg.width, false);
+		}
+		if (overwrite || !config->key_exists(base + "/height")) {
+			config->set(base + "/height", cfg.height, false);
 		}
 		if (overwrite || !config->key_exists(base + "/scale_method")) {
 			config->set(base + "/scale_method", Image_window::get_name_for_scaler(cfg.scaler), false);
@@ -2992,10 +2989,12 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 	};
 
 	LayerUiCfg global_cfg;
-	global_cfg.size = "3";
-	config->value("config/video/ui/size", global_cfg.size, "3");
-	global_cfg.size_mode        = parse_size_mode(global_cfg.size);
-	global_cfg.use_game_scaling = (global_cfg.size == "Auto");
+	global_cfg.width  = 400;
+	global_cfg.height = 300;
+	config->value("config/video/ui/width", global_cfg.width, 400);
+	config->value("config/video/ui/height", global_cfg.height, 300);
+	normalize_dims(global_cfg.width, global_cfg.height);
+	global_cfg.use_game_scaling = (global_cfg.width == 0 && global_cfg.height == 0);
 	if (global_cfg.use_game_scaling) {
 		global_cfg.scaler      = scaler;
 		global_cfg.fillmode    = fillmode;
@@ -3007,13 +3006,13 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 		if (global_cfg.scaler == Image_window::NoScaler) {
 			global_cfg.scaler = Image_window::point;
 		}
-		string fill_default;
-		Image_window::fillmode_to_string(Image_window::Fill, fill_default);
+		string fit_default;
+		Image_window::fillmode_to_string(Image_window::Fit, fit_default);
 		string fm;
-		config->value("config/video/ui/fill_mode", fm, fill_default.c_str());
+		config->value("config/video/ui/fill_mode", fm, fit_default.c_str());
 		global_cfg.fillmode = Image_window::string_to_fillmode(fm.c_str());
 		if (global_cfg.fillmode == 0) {
-			global_cfg.fillmode = Image_window::Fill;
+			global_cfg.fillmode = Image_window::Fit;
 		}
 		string fs;
 		config->value("config/video/ui/fill_scaler", fs, Image_window::get_name_for_scaler(Image_window::point));
@@ -3027,12 +3026,13 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 	write_layer_cfg("config/video/ui", global_cfg, !global_cfg.use_game_scaling);
 
 	gwin->set_ui_config(
-			global_cfg.size_mode, global_cfg.use_game_scaling, global_cfg.scaler, global_cfg.fillmode, global_cfg.fill_scaler);
+			global_cfg.width, global_cfg.height, global_cfg.use_game_scaling, global_cfg.scaler, global_cfg.fillmode,
+			global_cfg.fill_scaler);
 
 	auto apply_named_layer = [&](Image_window::UiLayerKind kind, const string& key) {
 		const string base = "config/video/ui/" + key;
 		LayerUiCfg   cfg  = ui_universal ? global_cfg : read_layer_cfg(base, global_cfg);
-		gwin->set_ui_layer_config(kind, cfg.size_mode, cfg.use_game_scaling, cfg.scaler, cfg.fillmode, cfg.fill_scaler);
+		gwin->set_ui_layer_config(kind, cfg.width, cfg.height, cfg.use_game_scaling, cfg.scaler, cfg.fillmode, cfg.fill_scaler);
 		write_layer_cfg(base, cfg, !ui_universal && !cfg.use_game_scaling);
 	};
 

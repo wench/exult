@@ -1710,9 +1710,10 @@ void Image_window::get_layer_dest(const Layer& layer, SDL_FRect& dst) {
 	compute_layer_fill_dest(layer.logw, layer.logh, dst, layer.ui_kind);
 }
 
-void Image_window::set_ui_config(int size_mode, bool use_game_scaling, int scaler_, FillMode fmode, int fill_scaler_) {
+void Image_window::set_ui_config(int width, int height, bool use_game_scaling, int scaler_, FillMode fmode, int fill_scaler_) {
 	UiLayerConfig cfg;
-	cfg.size_mode        = size_mode;
+	cfg.width            = width;
+	cfg.height           = height;
 	cfg.use_game_scaling = use_game_scaling;
 	cfg.scaler           = scaler_;
 	cfg.fill_mode        = fmode;
@@ -1725,12 +1726,13 @@ void Image_window::set_ui_config(int size_mode, bool use_game_scaling, int scale
 }
 
 void Image_window::set_ui_layer_config(
-		UiLayerKind kind, int size_mode, bool use_game_scaling, int scaler_, FillMode fmode, int fill_scaler_) {
+		UiLayerKind kind, int width, int height, bool use_game_scaling, int scaler_, FillMode fmode, int fill_scaler_) {
 	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
 		return;
 	}
 	UiLayerConfig& cfg   = ui_cfgs[static_cast<int>(kind)];
-	cfg.size_mode        = size_mode;
+	cfg.width            = width;
+	cfg.height           = height;
 	cfg.use_game_scaling = use_game_scaling;
 	cfg.scaler           = scaler_;
 	cfg.fill_mode        = fmode;
@@ -1744,18 +1746,10 @@ int Image_window::get_ui_width() const {
 
 int Image_window::get_ui_width(UiLayerKind kind) const {
 	const UiLayerConfig& cfg = get_ui_cfg(kind);
-	switch (cfg.size_mode) {
-	case 1:
-		return game_width / 4;
-	case 2:
-		return game_width / 2;
-	case 3:
-		return (game_width * 3) / 4;
-	case 4:
+	if (cfg.width <= 0 || cfg.height <= 0) {
 		return game_width;
-	default:
-		return 320;    // Full.
 	}
+	return cfg.width;
 }
 
 int Image_window::get_ui_height() const {
@@ -1764,18 +1758,10 @@ int Image_window::get_ui_height() const {
 
 int Image_window::get_ui_height(UiLayerKind kind) const {
 	const UiLayerConfig& cfg = get_ui_cfg(kind);
-	switch (cfg.size_mode) {
-	case 1:
-		return game_height / 4;
-	case 2:
-		return game_height / 2;
-	case 3:
-		return (game_height * 3) / 4;
-	case 4:
+	if (cfg.width <= 0 || cfg.height <= 0) {
 		return game_height;
-	default:
-		return 200;    // Full.
 	}
+	return cfg.height;
 }
 
 void Image_window::compute_fill_dest(int logw, int logh, FillMode fmode, int escl, SDL_FRect& dst) const {
@@ -1832,77 +1818,19 @@ float Image_window::get_ui_scale_factor() const {
 
 float Image_window::get_ui_scale_factor(UiLayerKind kind) const {
 	const UiLayerConfig& cfg = get_ui_cfg(kind);
-	// The 320x200 overlay layout (conversation, pointer) is scaled uniformly
-	// onto the display by this per-pixel factor.
-	//   Full  = the per-pixel scale a 320x200 game area would get on this
-	//           display (biggest; the "unchanged" 1:1 conversation).
-	//   Auto  = the real game area's native per-pixel scale, i.e. the size the
-	//           layers would have if drawn straight into the game area
-	//           (smallest on a high-resolution game area; == Full when the game
-	//           area actually is 320x200).
-	//   1/2/3 = interpolate from the AUTOMATIC game-area scale up to Full at
-	//           1/4, 1/2, 3/4.  The automatic scale is the game `scale` (the
-	//           per-pixel scale of a display/scale-sized game area, i.e. what
-	//           the game area would be if it were Auto). Using that instead of
-	//           Auto keeps the sizes meaningful even when the game area is
-	//           explicitly set to 320x200 (where Auto == Full).
+	const int uiw = get_ui_width(kind);
+	const int uih = get_ui_height(kind);
 	SDL_FRect r;
-	compute_fill_dest(320, 200, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), r);
-	const float ffw   = r.w / 320.0f;
-	const float ffh   = r.h / 200.0f;
-	const float sFull = ffw < ffh ? ffw : ffh;
-
-	if (cfg.size_mode == 0) {
-		return sFull > 0.0f ? sFull : 1.0f;    // Full.
-	}
-	if (cfg.size_mode == 4) {    // Auto: the real game area scale.
-		compute_fill_dest(game_width, game_height, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), r);
-		const float faw = game_width > 0 ? r.w / static_cast<float>(game_width) : sFull;
-		const float fah = game_height > 0 ? r.h / static_cast<float>(game_height) : sFull;
-		const float f   = faw < fah ? faw : fah;
-		return f > 0.0f ? f : 1.0f;
-	}
-
-	// 1/2/3: interpolate from the automatic (display/scale) game-area scale.
-	const float sAuto = static_cast<float>(eff_ui_scale(cfg));
-	float       t     = 0.5f;
-	switch (cfg.size_mode) {
-	case 1:
-		t = 0.25f;
-		break;
-	case 2:
-		t = 0.5f;
-		break;
-	case 3:
-		t = 0.75f;
-		break;
-	default:
-		break;
-	}
-	const float f = sAuto + t * (sFull - sAuto);
+	compute_fill_dest(uiw, uih, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), r);
+	const float fw = uiw > 0 ? r.w / static_cast<float>(uiw) : 1.0f;
+	const float fh = uih > 0 ? r.h / static_cast<float>(uih) : 1.0f;
+	const float f  = fw < fh ? fw : fh;
 	return f > 0.0f ? f : 1.0f;
 }
 
 float Image_window::get_ui_hud_scale(UiLayerKind kind) const {
-	const UiLayerConfig& cfg   = get_ui_cfg(kind);
-	const float          sFull = ui_full_pixel_scale(kind);    // Display-based, constant.
-	float                shrink;
-	switch (cfg.size_mode) {
-	case 1:
-		shrink = 0.25f;
-		break;
-	case 2:
-		shrink = 0.5f;
-		break;
-	case 3:
-		shrink = 0.75f;
-		break;
-	default:    // Full (0), Auto (4).
-		shrink = 1.0f;
-		break;
-	}
-	const float s = sFull * shrink;
-	return s > 0.0f ? s : 1.0f;
+	ignore_unused_variable_warning(kind);
+	return get_ui_scale_factor(kind);
 }
 
 float Image_window::ui_full_pixel_scale(UiLayerKind kind) const {
@@ -1921,18 +1849,22 @@ void Image_window::compute_ui_layer_dest(int logw, int logh, SDL_FRect& dst) con
 
 void Image_window::compute_ui_layer_dest(int logw, int logh, SDL_FRect& dst, UiLayerKind kind) const {
 	const UiLayerConfig& cfg = get_ui_cfg(kind);
-	// Shape the layout with the UI fill mode (Fill stretches to the display,
-	// Fit keeps 1:1 pixels, AspectCorrect* uses 1:1.2, Centre a fixed scale).
-	compute_fill_dest(logw, logh, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), dst);
-	// Scale by the UI size (get_ui_scale_factor relative to Full), then centre.
-	const float sFull = ui_full_pixel_scale(kind);
-	const float ratio = sFull > 0.0f ? get_ui_scale_factor(kind) / sFull : 1.0f;
-	const float dw    = display_surface ? static_cast<float>(display_surface->w) : dst.w;
-	const float dh    = display_surface ? static_cast<float>(display_surface->h) : dst.h;
-	dst.w *= ratio;
-	dst.h *= ratio;
-	dst.x = (dw - dst.w) / 2.0f;
-	dst.y = (dh - dst.h) / 2.0f;
+	const int uiw = get_ui_width(kind);
+	const int uih = get_ui_height(kind);
+	// First compute the configured UI frame (fixed width/height or Auto), then
+	// map this layer's logical size into that frame.
+	SDL_FRect frame;
+	compute_fill_dest(uiw, uih, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), frame);
+	if (uiw <= 0 || uih <= 0 || logw <= 0 || logh <= 0) {
+		dst = frame;
+		return;
+	}
+	const float sx = frame.w / static_cast<float>(uiw);
+	const float sy = frame.h / static_cast<float>(uih);
+	dst.w          = static_cast<float>(logw) * sx;
+	dst.h          = static_cast<float>(logh) * sy;
+	dst.x          = frame.x + (frame.w - dst.w) / 2.0f;
+	dst.y          = frame.y + (frame.h - dst.h) / 2.0f;
 }
 
 bool Image_window::screen_to_layer(int handle, int sx, int sy, int& lx, int& ly) {

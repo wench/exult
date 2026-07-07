@@ -120,7 +120,8 @@ public:
 	};
 
 	struct UiLayerConfig {
-		int      size_mode        = 0;       // 0=Full,1=1/4,2=1/2,3=3/4,4=Auto.
+		int      width            = 320;     // 0 with height 0 => Auto (game area size).
+		int      height           = 200;
 		bool     use_game_scaling = true;    // Use game scaler/fill settings.
 		int      scaler           = 0;
 		FillMode fill_mode        = Fit;
@@ -287,9 +288,8 @@ protected:
 	int      fill_scaler;
 
 	// Overlay-layer ("UI") scaling configuration, mirroring the game area's
-	// resolution/scale/fill settings but applied to the layers. The layer
-	// resolution is derived from ui_size_mode and the current game area (like
-	// game/width sets the render size); it is presented at the game's scale.
+	// scaler/fill settings but applied to the layers. Layer sizing is explicit
+	// (width/height), with 0x0 meaning Auto (use game area size).
 	// Scaler/fill settings (unless ui_use_game_scaling) come from ui_scaler /
 	// ui_fill_mode / ui_fill_scaler.
 	UiLayerConfig ui_cfgs[NumUiLayerKinds];
@@ -304,11 +304,8 @@ protected:
 	}
 
 	int eff_ui_scale(const UiLayerConfig& cfg) const {
-		// Layers render at the UI size and are presented at the game's scale;
-		// there is no separate UI scale factor (mirroring how game/width sets
-		// the render size while the display scale drives presentation).
-		ignore_unused_variable_warning(cfg);
-		return scale;
+		// Auto layers follow game scale; fixed-size layers use a stable scale.
+		return cfg.use_game_scaling ? scale : 1;
 	}
 
 	FillMode eff_ui_fill_mode(const UiLayerConfig& cfg) const {
@@ -642,22 +639,20 @@ public:
 
 	// -------- Overlay-layer ("UI") scaling config --------
 	// Configure how overlay layers (conversation, mouse cursor) are scaled and
-	// placed.  size_mode: 0=Full(320x200), 1=1/4, 2=1/2, 3=3/4, 4=Auto of the
-	// game area.  The layers render at that size and are presented at the
-	// game's scale.  When use_game_scaling is true the game's scaler/fill
-	// settings are used; otherwise the given ones are.
-	void set_ui_config(int size_mode, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
-	void set_ui_layer_config(UiLayerKind kind, int size_mode, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
+	// placed. width/height set a fixed UI layout size in game pixels. A value
+	// of 0,0 means Auto (use game area size). When use_game_scaling is true
+	// the game's scaler/fill settings are used; otherwise the given ones are.
+	void set_ui_config(int width, int height, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
+	void set_ui_layer_config(
+			UiLayerKind kind, int width, int height, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
 
 	int get_ui_width() const;
 	int get_ui_height() const;
 	int get_ui_width(UiLayerKind kind) const;
 	int get_ui_height(UiLayerKind kind) const;
 
-	// Uniform scale factor applied to the fixed 320x200 overlay layout
-	// (conversation, pointer) to place it on screen. Full = the size a
-	// 320x200 game area would get (independent of the real game area); Auto =
-	// the real game area size; 1/2/3 = 1/4, 1/2, 3/4 of Auto.
+	// Uniform scale factor from UI logical pixels to display pixels for the
+	// configured UI width/height (or game area when Auto 0x0).
 	float get_ui_scale_factor() const;
 	float get_ui_scale_factor(UiLayerKind kind) const;
 	float get_ui_hud_scale(UiLayerKind kind) const;

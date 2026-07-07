@@ -475,14 +475,14 @@ public:
 	}
 
 	// Overlay-layer ("UI") scaling config (see Image_window::set_ui_config).
-	void set_ui_config(int size_mode, bool use_game_scaling, int scaler, Image_window::FillMode fmode, int fill_scaler) {
-		win->set_ui_config(size_mode, use_game_scaling, scaler, fmode, fill_scaler);
+	void set_ui_config(int width, int height, bool use_game_scaling, int scaler, Image_window::FillMode fmode, int fill_scaler) {
+		win->set_ui_config(width, height, use_game_scaling, scaler, fmode, fill_scaler);
 	}
 
 	void set_ui_layer_config(
-			Image_window::UiLayerKind kind, int size_mode, bool use_game_scaling, int scaler, Image_window::FillMode fmode,
+			Image_window::UiLayerKind kind, int width, int height, bool use_game_scaling, int scaler, Image_window::FillMode fmode,
 			int fill_scaler) {
-		win->set_ui_layer_config(kind, size_mode, use_game_scaling, scaler, fmode, fill_scaler);
+		win->set_ui_layer_config(kind, width, height, use_game_scaling, scaler, fmode, fill_scaler);
 	}
 
 	int get_ui_width() const {
