@@ -2916,8 +2916,8 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 			return;
 		}
 		if (width <= 0 || height <= 0) {
-			width  = 400;
-			height = 300;
+			width  = 420;
+			height = 263;
 		}
 	};
 
@@ -2989,10 +2989,10 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 	};
 
 	LayerUiCfg global_cfg;
-	global_cfg.width  = 400;
-	global_cfg.height = 300;
-	config->value("config/video/ui/width", global_cfg.width, 400);
-	config->value("config/video/ui/height", global_cfg.height, 300);
+	global_cfg.width  = 420;
+	global_cfg.height = 263;
+	config->value("config/video/ui/width", global_cfg.width, 420);
+	config->value("config/video/ui/height", global_cfg.height, 263);
 	normalize_dims(global_cfg.width, global_cfg.height);
 	global_cfg.use_game_scaling = (global_cfg.width == 0 && global_cfg.height == 0);
 	if (global_cfg.use_game_scaling) {

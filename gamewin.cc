@@ -509,8 +509,11 @@ Game_window::~Game_window() {
 	delete background_noise;
 	delete tqueue;
 	tqueue = nullptr;
-	delete win;
+	// Free the drag state before the window: it may own an overlay layer that
+	// lives in 'win'.
 	delete dragging;
+	dragging = nullptr;
+	delete win;
 	delete pal;
 	for (auto* map : maps) {
 		if (map) {
@@ -2178,9 +2181,9 @@ void Game_window::show_items(
 		bool ctrl        // Control key is pressed.
 ) {
 	// Look for obj. in open gump.
-	Gump*        gump = gump_man->find_gump(x, y);
-	int          gx;
-	int          gy;
+	Gump* gump = gump_man->find_gump(x, y);
+	int   gx;
+	int   gy;
 	gump_man->map_game_to_gump(gump, x, y, gx, gy);
 	Game_object* obj;    // What we find.
 	bool         found_in_gump = false;

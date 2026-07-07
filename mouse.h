@@ -216,6 +216,10 @@ public:
 		return onscreen;
 	}
 
+	// Per-axis on-screen scale of the mouse-pointer overlay layer. Dragged
+	// items use this so they match the cursor's size/scale.
+	void get_pointer_scale(float& sx, float& sy) const;
+
 	inline int get_mousex() const {
 		return mousex;
 	}
