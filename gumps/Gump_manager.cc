@@ -26,6 +26,7 @@
 
 #include "Actor_gump.h"
 #include "Audio.h"
+#include "Book_gump.h"
 #include "CombatStats_gump.h"
 #include "Configuration.h"
 #include "Dynamic_container_gump.h"
@@ -34,12 +35,11 @@
 #include "Jawbone_gump.h"
 #include "Paperdoll_gump.h"
 #include "Scroll_gump.h"
-#include "Sign_gump.h"
 #include "ShortcutBar_gump.h"
+#include "Sign_gump.h"
 #include "Slider_gump.h"
 #include "Spellbook_gump.h"
 #include "Stats_gump.h"
-#include "Book_gump.h"
 #include "Yesno_gump.h"
 #include "actors.h"
 #include "exult.h"
@@ -85,7 +85,7 @@ Gump_manager::Gump_manager() {
 // so they stack on top; the dragged gump is bumped above every other gump
 // (see Dragging_info::paint, which uses z 1<<19).
 namespace {
-	constexpr int gump_layer_z_base = 1 << 18;
+	constexpr int gump_layer_z_base            = 1 << 18;
 	constexpr int gump_layer_text_tier_offset  = 1 << 16;
 	constexpr int gump_layer_modal_tier_offset = 1 << 17;
 	// Extra margin around a gump's reported bounds so outlines/badges are not
@@ -129,9 +129,8 @@ void Gump_manager::render_gump_to_layer(Gump* g, int z) {
 	if (!g) {
 		return;
 	}
-	const bool is_hud
-			= dynamic_cast<ShortcutBar_gump*>(g) != nullptr || dynamic_cast<Face_stats*>(g) != nullptr;
-	const int parts = is_hud ? g->hud_part_count() : 1;
+	const bool is_hud = dynamic_cast<ShortcutBar_gump*>(g) != nullptr || dynamic_cast<Face_stats*>(g) != nullptr;
+	const int  parts  = is_hud ? g->hud_part_count() : 1;
 	for (int part = 0; part < parts; ++part) {
 		render_gump_part_to_layer(g, z, part, is_hud);
 	}
@@ -199,15 +198,15 @@ void Gump_manager::render_gump_part_to_layer(Gump* g, int z, int part, bool is_h
 		const float dispw = static_cast<float>(iwin->get_display_width());
 		const float disph = static_cast<float>(iwin->get_display_height());
 		// Anchor detection in GAME coordinates (content vs the game area).
-		const int gsx  = iwin->get_start_x();
-		const int gsy  = iwin->get_start_y();
-		const int gex  = iwin->get_end_x();
-		const int gey  = iwin->get_end_y();
-		const int lmg  = content.x - gsx;
-		const int rmg  = gex - (content.x + content.w);
-		const int tmg  = content.y - gsy;
-		const int bmg  = gey - (content.y + content.h);
-		const int tolg = 8;    // game pixels
+		const int gsx         = iwin->get_start_x();
+		const int gsy         = iwin->get_start_y();
+		const int gex         = iwin->get_end_x();
+		const int gey         = iwin->get_end_y();
+		const int lmg         = content.x - gsx;
+		const int rmg         = gex - (content.x + content.w);
+		const int tmg         = content.y - gsy;
+		const int bmg         = gey - (content.y + content.h);
+		const int tolg        = 8;    // game pixels
 		const int xanc_forced = g->hud_part_xanchor(part);
 		const int yanc_forced = g->hud_part_yanchor(part);
 		int       xanc        = xanc_forced;
@@ -221,18 +220,18 @@ void Gump_manager::render_gump_part_to_layer(Gump* g, int z, int part, bool is_h
 			yanc        = (d <= tolg) ? 1 : (tmg < bmg ? 0 : 2);
 		}
 		if (xanc == 1) {
-			dx = (dispw - dw) / 2.0f;                               // centered on the display
+			dx = (dispw - dw) / 2.0f;    // centered on the display
 		} else if (xanc == 0) {
-			dx = static_cast<float>(b.x - gsx) * f;                 // game-area left edge
+			dx = static_cast<float>(b.x - gsx) * f;    // game-area left edge
 		} else {
-			dx = dispw - static_cast<float>(gex - b.x) * f;         // game-area right edge
+			dx = dispw - static_cast<float>(gex - b.x) * f;    // game-area right edge
 		}
 		if (yanc == 1) {
 			dy = (disph - dh) / 2.0f;
 		} else if (yanc == 0) {
-			dy = static_cast<float>(b.y - gsy) * f;                 // game-area top edge
+			dy = static_cast<float>(b.y - gsy) * f;    // game-area top edge
 		} else {
-			dy = disph - static_cast<float>(gey - b.y) * f;         // game-area bottom edge
+			dy = disph - static_cast<float>(gey - b.y) * f;    // game-area bottom edge
 		}
 	}
 	if (g->is_modal() && !g->is_draggable()) {
@@ -568,10 +567,46 @@ void Gump_manager::add_gump(
 	const ShapeID s_id(shapenum, 0, paperdoll ? SF_PAPERDOL_VGA : SF_GUMPS_VGA);
 	Shape_frame*  shape = s_id.get_shape();
 
-	if (x + shape->get_xright() > gwin->get_width() || y + shape->get_ybelow() > gwin->get_height()) {
-		cnt = 0;
-		x   = gwin->get_width() / 10;
-		y   = gwin->get_width() / 10;
+	// Keep the initial (non-saved) position fully on-screen.
+	{
+		Image_window* iwin  = gwin->get_win();
+		const float   f     = iwin->get_ui_scale_factor(Image_window::UiLayerGumps);
+		const int     gleft = x - shape->get_xleft();
+		const int     gtop  = y - shape->get_yabove();
+		const int     gw    = shape->get_width();
+		const int     gh    = shape->get_height();
+		int           csx;
+		int           csy;
+		iwin->game_to_screen(gleft + gw / 2, gtop + gh / 2, gwin->get_fastmouse(), csx, csy);
+		const float dw    = static_cast<float>(gw) * f;
+		const float dh    = static_cast<float>(gh) * f;
+		const float dispw = static_cast<float>(iwin->get_display_width());
+		const float disph = static_cast<float>(iwin->get_display_height());
+		float       ncsx  = static_cast<float>(csx);
+		float       ncsy  = static_cast<float>(csy);
+		if (dw <= dispw) {
+			ncsx = ncsx < dw / 2.0f ? dw / 2.0f : (ncsx > dispw - dw / 2.0f ? dispw - dw / 2.0f : ncsx);
+		} else {
+			ncsx = dispw / 2.0f;    // Wider than the display: centre it.
+		}
+		if (dh <= disph) {
+			ncsy = ncsy < dh / 2.0f ? dh / 2.0f : (ncsy > disph - dh / 2.0f ? disph - dh / 2.0f : ncsy);
+		} else {
+			ncsy = disph / 2.0f;
+		}
+		if (static_cast<int>(ncsx) != csx || static_cast<int>(ncsy) != csy) {
+			// Convert the clamped centre back to game coords and shift x,y by
+			// that game-space delta so the scaled gump lands on-screen.
+			int ngx;
+			int ngy;
+			int ogx;
+			int ogy;
+			iwin->screen_to_game(static_cast<int>(ncsx), static_cast<int>(ncsy), gwin->get_fastmouse(), ngx, ngy);
+			iwin->screen_to_game(csx, csy, gwin->get_fastmouse(), ogx, ogy);
+			x += ngx - ogx;
+			y += ngy - ogy;
+			cnt = 0;    // Restart the stagger since we wrapped back on-screen.
+		}
 	}
 
 	Gump* new_gump = nullptr;

@@ -55,8 +55,22 @@ Gump::Gump(
 		: Gump_Base(shnum, 0, shfile), container(cont), x(initx), y(inity), handles_kbd(false) {
 	if (container) {
 		if (container->validGumpXY()) {
-			x = container->getGumpX();
-			y = container->getGumpY();
+			if (Game_window::get_instance() == gwin && gwin->get_win()) {
+				int cgx;
+				int cgy;
+				gwin->get_win()->screen_to_game(container->getGumpX(), container->getGumpY(), false, cgx, cgy);
+				Shape_frame* s = get_shape();
+				if (s) {
+					x = cgx - s->get_width() / 2 + s->get_xleft();
+					y = cgy - s->get_height() / 2 + s->get_yabove();
+				} else {
+					x = cgx;
+					y = cgy;
+				}
+			} else {
+				x = container->getGumpX();
+				y = container->getGumpY();
+			}
 		}
 	}
 }
@@ -102,7 +116,22 @@ Gump::~Gump() {
 	}
 	if (container) {    // Probabbly dont need to check.. but would crash the
 						// game if it was NULL.
-		container->setGumpXY(x, y);
+		// Store the display coordinates of the gump's shape centre
+		if (Game_window::get_instance() == gwin && gwin->get_win()) {
+			int          cgx = x;
+			int          cgy = y;
+			Shape_frame* s   = get_shape();
+			if (s) {
+				cgx = x - s->get_xleft() + s->get_width() / 2;
+				cgy = y - s->get_yabove() + s->get_height() / 2;
+			}
+			int dcx;
+			int dcy;
+			gwin->get_win()->game_to_screen(cgx, cgy, false, dcx, dcy);
+			container->setGumpXY(dcx, dcy);
+		} else {
+			container->setGumpXY(x, y);
+		}
 	}
 }
 
