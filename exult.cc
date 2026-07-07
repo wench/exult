@@ -2904,7 +2904,7 @@ void BuildGameMap(BaseGameInfo* game, int mapnum) {
 	}
 }
 
-static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, int fill_scaler) {
+static void apply_ui_layer_config() {
 	if (gwin == nullptr) {
 		return;
 	}
@@ -2935,13 +2935,7 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 		config->value(base + "/width", cfg.width, fallback.width);
 		config->value(base + "/height", cfg.height, fallback.height);
 		normalize_dims(cfg.width, cfg.height);
-		cfg.use_game_scaling = (cfg.width == 0 && cfg.height == 0);
-		if (cfg.use_game_scaling) {
-			cfg.scaler      = scaler;
-			cfg.fillmode    = fillmode;
-			cfg.fill_scaler = fill_scaler;
-			return cfg;
-		}
+		cfg.use_game_scaling = false;
 
 		string s;
 		config->value(base + "/scale_method", s, Image_window::get_name_for_scaler(fallback.scaler));
@@ -2994,12 +2988,8 @@ static void apply_ui_layer_config(int scaler, Image_window::FillMode fillmode, i
 	config->value("config/video/ui/width", global_cfg.width, 420);
 	config->value("config/video/ui/height", global_cfg.height, 263);
 	normalize_dims(global_cfg.width, global_cfg.height);
-	global_cfg.use_game_scaling = (global_cfg.width == 0 && global_cfg.height == 0);
-	if (global_cfg.use_game_scaling) {
-		global_cfg.scaler      = scaler;
-		global_cfg.fillmode    = fillmode;
-		global_cfg.fill_scaler = fill_scaler;
-	} else {
+	global_cfg.use_game_scaling = false;
+	{
 		string s;
 		config->value("config/video/ui/scale_method", s, Image_window::get_name_for_scaler(Image_window::point));
 		global_cfg.scaler = Image_window::get_scaler_for_name(s.c_str());
@@ -3209,7 +3199,7 @@ void setup_video(
 	}
 	if ((video_init || change_gwin) && gwin != nullptr) {
 		// Apply the overlay-layer ("UI") scaling settings.
-		apply_ui_layer_config(scaler, fillmode, fill_scaler);
+		apply_ui_layer_config();
 	}
 	if (menu_init) {
 #ifdef DEBUG
