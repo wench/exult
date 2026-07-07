@@ -241,8 +241,11 @@ void CheatScreen::show_screen() {
 
 	buttons_down.clear();
 	// Start the loop
-	NormalLoop();
-
+	{
+		const uint32                      mouse_only = 1u << static_cast<int>(Image_window::UiLayerMousePointer);
+		Game_window::Scoped_ui_layer_mask scene_layers(gwin, mouse_only);
+		NormalLoop();
+	}
 	Mouse::mouse()->set_shape(saveshape);
 	Mouse::mouse()->hide();
 	gwin->paint();

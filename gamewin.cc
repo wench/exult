@@ -569,6 +569,8 @@ bool Game_window::is_background_track(int num) const {    // ripped out of Backg
 }
 
 void Game_window::init_files(bool cycle) {
+	const uint32                      menu_mouse_only = 1u << static_cast<int>(Image_window::UiLayerMousePointer);
+	Game_window::Scoped_ui_layer_mask load_layers(this, cycle ? 0u : menu_mouse_only);
 	// Display red plasma during load...
 	if (cycle) {
 		setup_load_palette();
@@ -1448,6 +1450,7 @@ void Game_window::write(bool nopaint) {
  */
 
 void Game_window::read() {
+	Game_window::Scoped_ui_layer_mask load_layers(this, 0);
 	Audio::get_ptr()->cancel_streams();
 	// Display red plasma during load...
 	setup_load_palette();

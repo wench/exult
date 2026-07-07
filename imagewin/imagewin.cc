@@ -1740,6 +1740,34 @@ void Image_window::set_ui_layer_config(
 	mark_all_layers_dirty();
 }
 
+void Image_window::set_ui_layer_kind_mask(uint32 mask) {
+	ui_layer_kind_mask = mask;
+}
+
+uint32 Image_window::get_ui_layer_kind_mask() const {
+	return ui_layer_kind_mask;
+}
+
+void Image_window::set_ui_layer_kind_enabled(UiLayerKind kind, bool enabled) {
+	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
+		return;
+	}
+	const uint32 bit = 1u << static_cast<int>(kind);
+	if (enabled) {
+		ui_layer_kind_mask |= bit;
+	} else {
+		ui_layer_kind_mask &= ~bit;
+	}
+}
+
+bool Image_window::is_ui_layer_kind_enabled(UiLayerKind kind) const {
+	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
+		return false;
+	}
+	const uint32 bit = 1u << static_cast<int>(kind);
+	return (ui_layer_kind_mask & bit) != 0;
+}
+
 int Image_window::get_ui_width() const {
 	return get_ui_width(UiLayerDefault);
 }
@@ -1818,9 +1846,9 @@ float Image_window::get_ui_scale_factor() const {
 
 float Image_window::get_ui_scale_factor(UiLayerKind kind) const {
 	const UiLayerConfig& cfg = get_ui_cfg(kind);
-	const int uiw = get_ui_width(kind);
-	const int uih = get_ui_height(kind);
-	SDL_FRect r;
+	const int            uiw = get_ui_width(kind);
+	const int            uih = get_ui_height(kind);
+	SDL_FRect            r;
 	compute_fill_dest(uiw, uih, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), r);
 	const float fw = uiw > 0 ? r.w / static_cast<float>(uiw) : 1.0f;
 	const float fh = uih > 0 ? r.h / static_cast<float>(uih) : 1.0f;
@@ -1835,7 +1863,7 @@ float Image_window::get_ui_hud_scale(UiLayerKind kind) const {
 
 float Image_window::ui_full_pixel_scale(UiLayerKind kind) const {
 	const UiLayerConfig& cfg = get_ui_cfg(kind);
-	SDL_FRect   r;
+	SDL_FRect            r;
 	compute_fill_dest(320, 200, eff_ui_fill_mode(cfg), eff_ui_scale(cfg), r);
 	const float fw = r.w / 320.0f;
 	const float fh = r.h / 200.0f;
@@ -1849,8 +1877,8 @@ void Image_window::compute_ui_layer_dest(int logw, int logh, SDL_FRect& dst) con
 
 void Image_window::compute_ui_layer_dest(int logw, int logh, SDL_FRect& dst, UiLayerKind kind) const {
 	const UiLayerConfig& cfg = get_ui_cfg(kind);
-	const int uiw = get_ui_width(kind);
-	const int uih = get_ui_height(kind);
+	const int            uiw = get_ui_width(kind);
+	const int            uih = get_ui_height(kind);
 	// First compute the configured UI frame (fixed width/height or Auto), then
 	// map this layer's logical size into that frame.
 	SDL_FRect frame;
@@ -1901,9 +1929,18 @@ void Image_window::composite_layers() {
 	std::vector<Layer*> ordered;
 	ordered.reserve(layers.size());
 	for (auto& lp : layers) {
-		if (lp && lp->visible && lp->buf) {
-			ordered.push_back(lp.get());
+		if (!lp || !lp->visible || !lp->buf) {
+			continue;
 		}
+		const UiLayerKind kind = lp->ui_kind;
+		if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
+			continue;
+		}
+		const uint32 bit = 1u << static_cast<int>(kind);
+		if ((ui_layer_kind_mask & bit) == 0) {
+			continue;
+		}
+		ordered.push_back(lp.get());
 	}
 	if (ordered.empty()) {
 		return;
@@ -1912,8 +1949,8 @@ void Image_window::composite_layers() {
 		return a->z < b->z;
 	});
 	for (Layer* lptr : ordered) {
-		Layer& layer = *lptr;
-		const UiLayerConfig& cfg = get_ui_cfg(layer.ui_kind);
+		Layer&               layer = *lptr;
+		const UiLayerConfig& cfg   = get_ui_cfg(layer.ui_kind);
 		// Match filtering to this layer's scaler/fill scaler.
 		const bool smooth = (eff_ui_scaler(cfg) == bilinear) || (eff_ui_scaler(cfg) == SDLScaler)
 							|| (eff_ui_fill_scaler(cfg) == bilinear) || (eff_ui_fill_scaler(cfg) == SDLScaler);

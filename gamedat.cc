@@ -195,6 +195,7 @@ void Game_window::restore_gamedat(const char* fname    // Name of savegame file.
 #endif
 
 	// Display red plasma during load...
+	Game_window::Scoped_ui_layer_mask load_layers(this, 0);
 	setup_load_palette();
 
 	U7mkdir("<GAMEDAT>", 0755);    // Create dir. if not already there. Don't

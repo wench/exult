@@ -485,6 +485,44 @@ public:
 		win->set_ui_layer_config(kind, width, height, use_game_scaling, scaler, fmode, fill_scaler);
 	}
 
+	void set_ui_layer_kind_mask(uint32 mask) {
+		win->set_ui_layer_kind_mask(mask);
+	}
+
+	uint32 get_ui_layer_kind_mask() const {
+		return win->get_ui_layer_kind_mask();
+	}
+
+	void set_ui_layer_kind_enabled(Image_window::UiLayerKind kind, bool enabled) {
+		win->set_ui_layer_kind_enabled(kind, enabled);
+	}
+
+	bool is_ui_layer_kind_enabled(Image_window::UiLayerKind kind) const {
+		return win->is_ui_layer_kind_enabled(kind);
+	}
+
+	class Scoped_ui_layer_mask {
+		Game_window* gw         = nullptr;
+		uint32       saved_mask = 0;
+
+	public:
+		Scoped_ui_layer_mask(Game_window* gwin, uint32 mask) : gw(gwin) {
+			if (gw) {
+				saved_mask = gw->get_ui_layer_kind_mask();
+				gw->set_ui_layer_kind_mask(mask);
+			}
+		}
+
+		~Scoped_ui_layer_mask() {
+			if (gw) {
+				gw->set_ui_layer_kind_mask(saved_mask);
+			}
+		}
+
+		Scoped_ui_layer_mask(const Scoped_ui_layer_mask&)            = delete;
+		Scoped_ui_layer_mask& operator=(const Scoped_ui_layer_mask&) = delete;
+	};
+
 	int get_ui_width() const {
 		return win->get_ui_width();
 	}

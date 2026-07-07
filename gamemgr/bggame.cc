@@ -394,7 +394,8 @@ BG_Game::BG_Game() : shapes(ENDSHAPE_FLX, -1, PATCH_ENDSHAPE) {
 	} while (false)
 
 void BG_Game::play_intro() {
-	Audio* audio = Audio::get_ptr();
+	Game_window::Scoped_ui_layer_mask scene_layers(gwin, 0);
+	Audio*                            audio = Audio::get_ptr();
 	audio->stop_music();
 	MyMidiPlayer* midi = audio->get_midi();
 	if (midi) {
@@ -1493,6 +1494,8 @@ Shape_frame* BG_Game::get_menu_shape() {
 }
 
 void BG_Game::top_menu() {
+	const uint32                      menu_mouse_only = 1u << static_cast<int>(Image_window::UiLayerMousePointer);
+	Game_window::Scoped_ui_layer_mask scene_layers(gwin, menu_mouse_only);
 	Audio::get_ptr()->start_music(menu_midi, true, MyMidiPlayer::Force_None, INTROMUS);
 	sman->paint_shape(topx, topy, get_menu_shape());
 	pal->load(INTROPAL_DAT, PATCH_INTROPAL, 6);
@@ -1500,6 +1503,8 @@ void BG_Game::top_menu() {
 }
 
 void BG_Game::show_journey_failed() {
+	const uint32                      menu_mouse_only = 1u << static_cast<int>(Image_window::UiLayerMousePointer);
+	Game_window::Scoped_ui_layer_mask scene_layers(gwin, menu_mouse_only);
 	pal->fade_out(50);
 	gwin->clear_screen(true);
 	sman->paint_shape(topx, topy, get_menu_shape());
@@ -1546,8 +1551,9 @@ std::vector<unsigned int> BG_Game::get_congratulations_messages() {
 
 void BG_Game::end_game(bool success, bool within_game) {
 	waitforspeech();
-	Audio*                audio = Audio::get_ptr();
-	std::shared_ptr<Font> font  = fontManager.get_font("MENU_FONT");
+	Game_window::Scoped_ui_layer_mask scene_layers(gwin, 0);
+	Audio*                            audio = Audio::get_ptr();
+	std::shared_ptr<Font>             font  = fontManager.get_font("MENU_FONT");
 
 	if (!success) {
 		audio->stop_music();
@@ -1945,12 +1951,16 @@ void BG_Game::end_game(bool success, bool within_game) {
 }
 
 void BG_Game::show_quotes() {
+	const uint32                      menu_mouse_only = 1u << static_cast<int>(Image_window::UiLayerMousePointer);
+	Game_window::Scoped_ui_layer_mask scene_layers(gwin, menu_mouse_only);
 	Audio::get_ptr()->start_music(quotes_midi, false, MyMidiPlayer::Force_None, INTROMUS);
 	TextScroller quotes(MAINSHP_FLX, 0x10, fontManager.get_font("MENU_FONT"), menushapes.extract_shape(0x14), true);
 	quotes.run(gwin);
 }
 
 void BG_Game::show_credits() {
+	const uint32                      menu_mouse_only = 1u << static_cast<int>(Image_window::UiLayerMousePointer);
+	Game_window::Scoped_ui_layer_mask scene_layers(gwin, menu_mouse_only);
 	pal->load(INTROPAL_DAT, PATCH_INTROPAL, 6);
 	Audio::get_ptr()->start_music(credits_midi, false, MyMidiPlayer::Force_None, INTROMUS);
 	TextScroller credits(MAINSHP_FLX, 0x0E, fontManager.get_font("MENU_FONT"), menushapes.extract_shape(0x14), true);
@@ -1960,8 +1970,10 @@ void BG_Game::show_credits() {
 }
 
 bool BG_Game::new_game(Vga_file& shapes) {
-	const int             menuy = topy + 110;
-	std::shared_ptr<Font> font  = fontManager.get_font("MENU_FONT");
+	const uint32                      menu_mouse_only = 1u << static_cast<int>(Image_window::UiLayerMousePointer);
+	Game_window::Scoped_ui_layer_mask scene_layers(gwin, menu_mouse_only);
+	const int                         menuy = topy + 110;
+	std::shared_ptr<Font>             font  = fontManager.get_font("MENU_FONT");
 
 	Vga_file faces_vga;
 	// Need to know if SI is installed

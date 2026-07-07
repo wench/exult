@@ -120,7 +120,7 @@ public:
 	};
 
 	struct UiLayerConfig {
-		int      width            = 320;     // 0 with height 0 => Auto (game area size).
+		int      width            = 320;    // 0 with height 0 => Auto (game area size).
 		int      height           = 200;
 		bool     use_game_scaling = true;    // Use game scaler/fill settings.
 		int      scaler           = 0;
@@ -159,10 +159,10 @@ public:
 		int                           z        = 0;        // Composite order (higher = on top).
 		bool                          has_dest = false;    // Explicit destination override?
 		SDL_FRect                     dest{};              // Destination rect (display coords).
-		UiLayerKind                   ui_kind = UiLayerDefault;
+		UiLayerKind                   ui_kind      = UiLayerDefault;
 		int                           render_scale = 1;    // 1 = 1:1 upload; >1 = pre-scaled by
 														   // the game's scaler at this factor.
-		unsigned char                 alpha    = 255;      // Whole-layer opacity (255 = opaque).
+		unsigned char alpha = 255;                         // Whole-layer opacity (255 = opaque).
 		// Optional 256-entry ARGB override, one per palette index. A non-zero
 		// entry is used verbatim (with its own alpha) instead of the opaque
 		// palette colour, letting a layer draw translucent pixels.
@@ -293,6 +293,7 @@ protected:
 	// Scaler/fill settings (unless ui_use_game_scaling) come from ui_scaler /
 	// ui_fill_mode / ui_fill_scaler.
 	UiLayerConfig ui_cfgs[NumUiLayerKinds];
+	uint32        ui_layer_kind_mask = (1u << NumUiLayerKinds) - 1u;
 
 	const UiLayerConfig& get_ui_cfg(UiLayerKind kind) const {
 		return ui_cfgs[static_cast<int>(kind)];
@@ -645,6 +646,12 @@ public:
 	void set_ui_config(int width, int height, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
 	void set_ui_layer_config(
 			UiLayerKind kind, int width, int height, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
+	// Bitmask of composited layer kinds. Bit i controls UiLayerKind i.
+	// Default enables every kind.
+	void   set_ui_layer_kind_mask(uint32 mask);
+	uint32 get_ui_layer_kind_mask() const;
+	void   set_ui_layer_kind_enabled(UiLayerKind kind, bool enabled);
+	bool   is_ui_layer_kind_enabled(UiLayerKind kind) const;
 
 	int get_ui_width() const;
 	int get_ui_height() const;
