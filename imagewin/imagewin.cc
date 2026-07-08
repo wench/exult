@@ -1710,14 +1710,13 @@ void Image_window::get_layer_dest(const Layer& layer, SDL_FRect& dst) {
 	compute_layer_fill_dest(layer.logw, layer.logh, dst, layer.ui_kind);
 }
 
-void Image_window::set_ui_config(int width, int height, bool use_game_scaling, int scaler_, FillMode fmode, int fill_scaler_) {
+void Image_window::set_ui_config(int width, int height, int scaler_, FillMode fmode, int fill_scaler_) {
 	UiLayerConfig cfg;
-	cfg.width            = width;
-	cfg.height           = height;
-	cfg.use_game_scaling = use_game_scaling;
-	cfg.scaler           = scaler_;
-	cfg.fill_mode        = fmode;
-	cfg.fill_scaler      = fill_scaler_;
+	cfg.width       = width;
+	cfg.height      = height;
+	cfg.scaler      = scaler_;
+	cfg.fill_mode   = fmode;
+	cfg.fill_scaler = fill_scaler_;
 	for (int i = 0; i < NumUiLayerKinds; ++i) {
 		ui_cfgs[i] = cfg;
 	}
@@ -1725,18 +1724,16 @@ void Image_window::set_ui_config(int width, int height, bool use_game_scaling, i
 	mark_all_layers_dirty();
 }
 
-void Image_window::set_ui_layer_config(
-		UiLayerKind kind, int width, int height, bool use_game_scaling, int scaler_, FillMode fmode, int fill_scaler_) {
+void Image_window::set_ui_layer_config(UiLayerKind kind, int width, int height, int scaler_, FillMode fmode, int fill_scaler_) {
 	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
 		return;
 	}
-	UiLayerConfig& cfg   = ui_cfgs[static_cast<int>(kind)];
-	cfg.width            = width;
-	cfg.height           = height;
-	cfg.use_game_scaling = use_game_scaling;
-	cfg.scaler           = scaler_;
-	cfg.fill_mode        = fmode;
-	cfg.fill_scaler      = fill_scaler_;
+	UiLayerConfig& cfg = ui_cfgs[static_cast<int>(kind)];
+	cfg.width          = width;
+	cfg.height         = height;
+	cfg.scaler         = scaler_;
+	cfg.fill_mode      = fmode;
+	cfg.fill_scaler    = fill_scaler_;
 	mark_all_layers_dirty();
 }
 

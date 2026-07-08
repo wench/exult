@@ -128,12 +128,11 @@ public:
 	};
 
 	struct UiLayerConfig {
-		int      width            = 320;    // 0 with height 0 => Auto (game area size).
-		int      height           = 200;
-		bool     use_game_scaling = true;    // Use game scaler/fill settings.
-		int      scaler           = 0;
-		FillMode fill_mode        = Fit;
-		int      fill_scaler      = 0;
+		int      width       = 320;    // 0 with height 0 => Auto (game area size).
+		int      height      = 200;
+		int      scaler      = 0;
+		FillMode fill_mode   = Fit;
+		int      fill_scaler = 0;
 		// Optional fixed palette for the layer (see UiPaletteMode).
 		int                        ui_palette = UiPaletteDisabled;
 		std::vector<unsigned char> ui_palette_colors;    // 768 gamma RGB, empty = none.
@@ -298,11 +297,10 @@ protected:
 	FillMode fill_mode;
 	int      fill_scaler;
 
-	// Layer  scaling configuration, mirroring the game area's
-	// scaler/fill settings but applied to the layers. Layer sizing is explicit
-	// (width/height), with 0x0 meaning Auto (use game area size).
-	// Scaler/fill settings (unless ui_use_game_scaling) come from ui_scaler /
-	// ui_fill_mode / ui_fill_scaler.
+	// Layer  scaling configuration for composited layers. Layer sizing is
+	// explicit (width/height), with 0x0 meaning Auto (use game area size).
+	// Scaler/fill settings come from ui_scaler / ui_fill_mode /
+	// ui_fill_scaler.
 	UiLayerConfig ui_cfgs[NumUiLayerKinds];
 	uint32        ui_layer_kind_mask = (1u << NumUiLayerKinds) - 1u;
 
@@ -310,22 +308,21 @@ protected:
 		return ui_cfgs[static_cast<int>(kind)];
 	}
 
-	// Effective UI scaling values (the game's when use_game_scaling).
+	// Effective UI scaling values.
 	int eff_ui_scaler(const UiLayerConfig& cfg) const {
-		return cfg.use_game_scaling ? scaler : cfg.scaler;
+		return cfg.scaler;
 	}
 
-	int eff_ui_scale(const UiLayerConfig& cfg) const {
-		// Auto layers follow game scale; fixed-size layers use a stable scale.
-		return cfg.use_game_scaling ? scale : 1;
+	int eff_ui_scale(const UiLayerConfig&) const {
+		return 1;
 	}
 
 	FillMode eff_ui_fill_mode(const UiLayerConfig& cfg) const {
-		return cfg.use_game_scaling ? fill_mode : cfg.fill_mode;
+		return cfg.fill_mode;
 	}
 
 	int eff_ui_fill_scaler(const UiLayerConfig& cfg) const {
-		return cfg.use_game_scaling ? fill_scaler : cfg.fill_scaler;
+		return cfg.fill_scaler;
 	}
 
 	static SDL_DisplayMode desktop_displaymode;
@@ -652,11 +649,9 @@ public:
 	// -------- Layer scaling config --------
 	// Configure how layers (conversation, mouse cursor) are scaled and
 	// placed. width/height set a fixed UI layout size in game pixels. A value
-	// of 0,0 means Auto (use game area size). When use_game_scaling is true
-	// the game's scaler/fill settings are used; otherwise the given ones are.
-	void set_ui_config(int width, int height, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
-	void set_ui_layer_config(
-			UiLayerKind kind, int width, int height, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
+	// of 0,0 means Auto (use game area size).
+	void set_ui_config(int width, int height, int scaler, FillMode fmode, int fill_scaler);
+	void set_ui_layer_config(UiLayerKind kind, int width, int height, int scaler, FillMode fmode, int fill_scaler);
 	// -------- Layer fixed palette --------
 	// Which fixed palette (if any) a layer uses when the game's live
 	// palette is not the day palette. Values are UiPaletteMode; the mapping to

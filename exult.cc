@@ -2924,7 +2924,6 @@ static void apply_ui_layer_config() {
 	struct LayerUiCfg {
 		int                    width;
 		int                    height;
-		bool                   use_game_scaling;
 		int                    scaler;
 		Image_window::FillMode fillmode;
 		int                    fill_scaler;
@@ -2964,7 +2963,6 @@ static void apply_ui_layer_config() {
 		config->value(base + "/width", cfg.width, fallback.width);
 		config->value(base + "/height", cfg.height, fallback.height);
 		normalize_dims(cfg.width, cfg.height);
-		cfg.use_game_scaling = false;
 
 		string s;
 		config->value(base + "/scale_method", s, Image_window::get_name_for_scaler(fallback.scaler));
@@ -3024,7 +3022,6 @@ static void apply_ui_layer_config() {
 	config->value("config/video/ui/width", global_cfg.width, 420);
 	config->value("config/video/ui/height", global_cfg.height, 263);
 	normalize_dims(global_cfg.width, global_cfg.height);
-	global_cfg.use_game_scaling = false;
 	{
 		string s;
 		config->value("config/video/ui/scale_method", s, Image_window::get_name_for_scaler(Image_window::point));
@@ -3052,18 +3049,16 @@ static void apply_ui_layer_config() {
 	}
 
 	config->set("config/video/ui/universal", ui_universal ? "yes" : "no", false);
-	write_layer_cfg("config/video/ui", global_cfg, !global_cfg.use_game_scaling);
+	write_layer_cfg("config/video/ui", global_cfg, true);
 
-	gwin->set_ui_config(
-			global_cfg.width, global_cfg.height, global_cfg.use_game_scaling, global_cfg.scaler, global_cfg.fillmode,
-			global_cfg.fill_scaler);
+	gwin->set_ui_config(global_cfg.width, global_cfg.height, global_cfg.scaler, global_cfg.fillmode, global_cfg.fill_scaler);
 
 	auto apply_named_layer = [&](Image_window::UiLayerKind kind, const string& key) {
 		const string base = "config/video/ui/" + key;
 		LayerUiCfg   cfg  = ui_universal ? global_cfg : read_layer_cfg(base, global_cfg);
-		gwin->set_ui_layer_config(kind, cfg.width, cfg.height, cfg.use_game_scaling, cfg.scaler, cfg.fillmode, cfg.fill_scaler);
+		gwin->set_ui_layer_config(kind, cfg.width, cfg.height, cfg.scaler, cfg.fillmode, cfg.fill_scaler);
 		gwin->set_ui_layer_palette(kind, cfg.palette);
-		write_layer_cfg(base, cfg, !ui_universal && !cfg.use_game_scaling);
+		write_layer_cfg(base, cfg, !ui_universal);
 	};
 
 	apply_named_layer(Image_window::UiLayerConversations, "conversations");

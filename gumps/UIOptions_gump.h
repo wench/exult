@@ -30,13 +30,12 @@ class Gump_button;
 class UIOptions_gump : public Modal_gump {
 public:
 	struct UiLayerSettings {
-		int                    width            = 420;
-		int                    height           = 263;
-		bool                   use_game_scaling = false;
-		int                    scaler           = Image_window::point;
-		Image_window::FillMode fill_mode        = Image_window::Fit;
-		int                    fill_scaler      = Image_window::point;
-		int                    palette          = Image_window::UiPaletteDisabled;
+		int                    width       = 420;
+		int                    height      = 263;
+		int                    scaler      = Image_window::point;
+		Image_window::FillMode fill_mode   = Image_window::Fit;
+		int                    fill_scaler = Image_window::point;
+		int                    palette     = Image_window::UiPaletteDisabled;
 	};
 
 	UIOptions_gump();

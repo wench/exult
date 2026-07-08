@@ -236,7 +236,6 @@ namespace {
 			cfg.width  = 420;
 			cfg.height = 263;
 		}
-		cfg.use_game_scaling = false;
 	}
 
 	static int fillmode_to_selection(Image_window::FillMode fmode) {
@@ -632,9 +631,6 @@ void UIOptions_gump::load_settings() {
 		config->value(base + "/width", cfg.width, fallback.width);
 		config->value(base + "/height", cfg.height, fallback.height);
 		normalize_dims(cfg.width, cfg.height);
-		// Size (incl. Auto 0x0) never changes the scaling source: the layer
-		// always uses its own scaler/fill settings.
-		cfg.use_game_scaling = false;
 
 		string scaler_name;
 		config->value(base + "/scale_method", scaler_name, Image_window::get_name_for_scaler(fallback.scaler));
@@ -692,15 +688,12 @@ void UIOptions_gump::save_settings() {
 
 	config->set("config/video/ui/universal", universal ? "yes" : "no", false);
 	write_cfg("config/video/ui", global_cfg);
-	gwin->set_ui_config(
-			global_cfg.width, global_cfg.height, global_cfg.use_game_scaling, global_cfg.scaler, global_cfg.fill_mode,
-			global_cfg.fill_scaler);
+	gwin->set_ui_config(global_cfg.width, global_cfg.height, global_cfg.scaler, global_cfg.fill_mode, global_cfg.fill_scaler);
 
 	for (size_t i = 0; i < layer_cfgs.size(); ++i) {
 		write_cfg(string("config/video/ui/") + kLayerKeys[i], layer_cfgs[i]);
 		const UiLayerSettings& cfg = universal ? global_cfg : layer_cfgs[i];
-		gwin->set_ui_layer_config(
-				kLayerKinds[i], cfg.width, cfg.height, cfg.use_game_scaling, cfg.scaler, cfg.fill_mode, cfg.fill_scaler);
+		gwin->set_ui_layer_config(kLayerKinds[i], cfg.width, cfg.height, cfg.scaler, cfg.fill_mode, cfg.fill_scaler);
 		gwin->set_ui_layer_palette(kLayerKinds[i], cfg.palette);
 	}
 
