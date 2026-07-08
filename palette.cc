@@ -236,7 +236,7 @@ void Palette::update_ui_layer_palettes() {
 	}
 	// Raw reference palettes, loaded once (on demand) from palettes.flx and
 	// cached by palette number.
-	constexpr int        kNumRefPalettes = 13;    // palettes.flx numbers 0..12.
+	constexpr static int kNumRefPalettes = 13;    // palettes.flx numbers 0..12.
 	static bool          ref_loaded[kNumRefPalettes]{};
 	static unsigned char ref_pal[kNumRefPalettes][768];
 	auto                 load_ref = [this](int pal_num) -> const unsigned char* {
