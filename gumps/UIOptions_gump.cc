@@ -128,22 +128,6 @@ namespace {
 			return get_text_msg(0x6D5 - msg_file_start);
 		}
 
-		static auto Spell() {
-			return get_text_msg(0x6D6 - msg_file_start);
-		}
-
-		static auto Overcast() {
-			return get_text_msg(0x6D7 - msg_file_start);
-		}
-
-		static auto DisabledPaletteOption() {
-			return get_text_msg(0x59A - msg_file_start);
-		}
-
-		static auto DayPaletteOption() {
-			return get_text_msg(0x658 - msg_file_start);
-		}
-
 		static auto Fill() {
 			return get_text_msg(0x683 - msg_file_start);
 		}
@@ -278,64 +262,71 @@ namespace {
 		return Image_window::point;
 	}
 
-	// Fixed-palette option. Toggle index 0..3 maps to the
-	// UiPaletteMode values; the config strings are day/spell/overcast/disabled.
+	// Fixed-palette option. The list order below defines the toggle selection
+	// index; each entry maps a UiPaletteMode to its config string and label
+	// message id. Excludes PALETTE_NIGHT and PALETTE_DAWN (same as dusk).
+	struct PaletteOption {
+		int         mode;        // Image_window::UiPaletteMode.
+		const char* cfg_name;    // Config string.
+		int         msg_id;      // exultmsg.txt id for the label.
+	};
+
+	constexpr std::array<PaletteOption, 12> kPaletteOptions = {
+			{
+             {Image_window::UiPaletteDisabled, "disabled", 0x59A},
+             {Image_window::UiPaletteDay, "day", 0x658},
+             {Image_window::UiPaletteDusk, "dusk", 0x6D8},
+             {Image_window::UiPaletteInvisible, "invisible", 0x6D9},
+             {Image_window::UiPaletteOvercast, "overcast", 0x6D7},
+             {Image_window::UiPaletteFog, "fog", 0x6DA},
+             {Image_window::UiPaletteSpell, "spell", 0x6D6},
+             {Image_window::UiPaletteCandle, "candle", 0x6DB},
+             {Image_window::UiPaletteRed, "red", 0x6DC},
+             {Image_window::UiPaletteLightning, "lightning", 0x6DD},
+             {Image_window::UiPaletteSingleLight, "single_light", 0x6DE},
+             {Image_window::UiPaletteManyLights, "many_lights", 0x6DF},
+			 }
+    };
 
 	std::vector<std::string> palette_options() {
-		return {Strings::DisabledPaletteOption(), Strings::DayPaletteOption(), Strings::Spell(), Strings::Overcast()};
+		std::vector<std::string> out;
+		out.reserve(kPaletteOptions.size());
+		for (const auto& opt : kPaletteOptions) {
+			out.emplace_back(get_text_msg(opt.msg_id - msg_file_start));
+		}
+		return out;
 	}
 
 	int palette_to_selection(int mode) {
-		switch (mode) {
-		case Image_window::UiPaletteDay:
-			return 1;
-		case Image_window::UiPaletteSpell:
-			return 2;
-		case Image_window::UiPaletteOvercast:
-			return 3;
-		default:
-			return 0;
+		for (size_t i = 0; i < kPaletteOptions.size(); ++i) {
+			if (kPaletteOptions[i].mode == mode) {
+				return static_cast<int>(i);
+			}
 		}
+		return 0;
 	}
 
 	int selection_to_palette(int state) {
-		switch (state) {
-		case 1:
-			return Image_window::UiPaletteDay;
-		case 2:
-			return Image_window::UiPaletteSpell;
-		case 3:
-			return Image_window::UiPaletteOvercast;
-		default:
-			return Image_window::UiPaletteDisabled;
+		if (state >= 0 && static_cast<size_t>(state) < kPaletteOptions.size()) {
+			return kPaletteOptions[state].mode;
 		}
+		return Image_window::UiPaletteDisabled;
 	}
 
 	const char* palette_name(int mode) {
-		switch (mode) {
-		case Image_window::UiPaletteDay:
-			return "day";
-		case Image_window::UiPaletteSpell:
-			return "spell";
-		case Image_window::UiPaletteOvercast:
-			return "overcast";
-		default:
-			return "disabled";
+		for (const auto& opt : kPaletteOptions) {
+			if (opt.mode == mode) {
+				return opt.cfg_name;
+			}
 		}
+		return "disabled";
 	}
 
 	int palette_from_name(const std::string& s, int fallback) {
-		if (s == "day") {
-			return Image_window::UiPaletteDay;
-		}
-		if (s == "spell") {
-			return Image_window::UiPaletteSpell;
-		}
-		if (s == "overcast") {
-			return Image_window::UiPaletteOvercast;
-		}
-		if (s == "disabled") {
-			return Image_window::UiPaletteDisabled;
+		for (const auto& opt : kPaletteOptions) {
+			if (s == opt.cfg_name) {
+				return opt.mode;
+			}
 		}
 		return fallback;
 	}

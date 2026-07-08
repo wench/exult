@@ -454,6 +454,14 @@
 0x6D5:Palette
 0x6D6:Spell
 0x6D7:Overcast
+0x6D8:Dusk
+0x6D9:Invisible
+0x6DA:Fog
+0x6DB:Candle
+0x6DC:Red
+0x6DD:Lightning
+0x6DE:Single light
+0x6DF:Many lights
 
 #Misc
 # SI copy protection failed

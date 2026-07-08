@@ -2934,11 +2934,35 @@ static void apply_ui_layer_config() {
 		if (s == "day") {
 			return static_cast<int>(Image_window::UiPaletteDay);
 		}
-		if (s == "spell") {
-			return static_cast<int>(Image_window::UiPaletteSpell);
+		if (s == "dusk") {
+			return static_cast<int>(Image_window::UiPaletteDusk);
+		}
+		if (s == "invisible") {
+			return static_cast<int>(Image_window::UiPaletteInvisible);
 		}
 		if (s == "overcast") {
 			return static_cast<int>(Image_window::UiPaletteOvercast);
+		}
+		if (s == "fog") {
+			return static_cast<int>(Image_window::UiPaletteFog);
+		}
+		if (s == "spell") {
+			return static_cast<int>(Image_window::UiPaletteSpell);
+		}
+		if (s == "candle") {
+			return static_cast<int>(Image_window::UiPaletteCandle);
+		}
+		if (s == "red") {
+			return static_cast<int>(Image_window::UiPaletteRed);
+		}
+		if (s == "lightning") {
+			return static_cast<int>(Image_window::UiPaletteLightning);
+		}
+		if (s == "single_light") {
+			return static_cast<int>(Image_window::UiPaletteSingleLight);
+		}
+		if (s == "many_lights") {
+			return static_cast<int>(Image_window::UiPaletteManyLights);
 		}
 		if (s == "disabled") {
 			return static_cast<int>(Image_window::UiPaletteDisabled);
@@ -2949,10 +2973,26 @@ static void apply_ui_layer_config() {
 		switch (mode) {
 		case Image_window::UiPaletteDay:
 			return "day";
-		case Image_window::UiPaletteSpell:
-			return "spell";
+		case Image_window::UiPaletteDusk:
+			return "dusk";
+		case Image_window::UiPaletteInvisible:
+			return "invisible";
 		case Image_window::UiPaletteOvercast:
 			return "overcast";
+		case Image_window::UiPaletteFog:
+			return "fog";
+		case Image_window::UiPaletteSpell:
+			return "spell";
+		case Image_window::UiPaletteCandle:
+			return "candle";
+		case Image_window::UiPaletteRed:
+			return "red";
+		case Image_window::UiPaletteLightning:
+			return "lightning";
+		case Image_window::UiPaletteSingleLight:
+			return "single_light";
+		case Image_window::UiPaletteManyLights:
+			return "many_lights";
 		default:
 			return "disabled";
 		}

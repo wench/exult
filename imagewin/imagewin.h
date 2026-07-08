@@ -84,8 +84,16 @@ public:
 	enum UiPaletteMode {
 		UiPaletteDisabled = 0,    // Follow the live (tinted) palette.
 		UiPaletteDay,             // Force the day palette.
-		UiPaletteSpell,           // Force the spell palette.
+		UiPaletteDusk,            // Force the dusk palette.
+		UiPaletteInvisible,       // Force the invisible palette.
 		UiPaletteOvercast,        // Force the overcast palette.
+		UiPaletteFog,             // Force the fog palette.
+		UiPaletteSpell,           // Force the spell (light) palette.
+		UiPaletteCandle,          // Force the candle palette.
+		UiPaletteRed,             // Force the red (combat) palette.
+		UiPaletteLightning,       // Force the lightning palette.
+		UiPaletteSingleLight,     // Force the single-light palette.
+		UiPaletteManyLights,      // Force the many-lights palette.
 	};
 
 	enum FillMode {
