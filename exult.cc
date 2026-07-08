@@ -2928,6 +2928,35 @@ static void apply_ui_layer_config() {
 		int                    scaler;
 		Image_window::FillMode fillmode;
 		int                    fill_scaler;
+		int                    palette;    // Image_window::UiPaletteMode.
+	};
+
+	auto palette_from_string = [](const string& s, int fallback) {
+		if (s == "day") {
+			return static_cast<int>(Image_window::UiPaletteDay);
+		}
+		if (s == "spell") {
+			return static_cast<int>(Image_window::UiPaletteSpell);
+		}
+		if (s == "overcast") {
+			return static_cast<int>(Image_window::UiPaletteOvercast);
+		}
+		if (s == "disabled") {
+			return static_cast<int>(Image_window::UiPaletteDisabled);
+		}
+		return fallback;
+	};
+	auto palette_to_string = [](int mode) -> const char* {
+		switch (mode) {
+		case Image_window::UiPaletteDay:
+			return "day";
+		case Image_window::UiPaletteSpell:
+			return "spell";
+		case Image_window::UiPaletteOvercast:
+			return "overcast";
+		default:
+			return "disabled";
+		}
 	};
 
 	auto read_layer_cfg = [&](const string& base, const LayerUiCfg& fallback) {
@@ -2959,6 +2988,10 @@ static void apply_ui_layer_config() {
 		if (cfg.fill_scaler == Image_window::NoScaler) {
 			cfg.fill_scaler = fallback.fill_scaler;
 		}
+
+		string pl;
+		config->value(base + "/palette", pl, palette_to_string(fallback.palette));
+		cfg.palette = palette_from_string(pl, fallback.palette);
 		return cfg;
 	};
 
@@ -2979,6 +3012,9 @@ static void apply_ui_layer_config() {
 		}
 		if (overwrite || !config->key_exists(base + "/fill_scaler")) {
 			config->set(base + "/fill_scaler", Image_window::get_name_for_scaler(cfg.fill_scaler), false);
+		}
+		if (overwrite || !config->key_exists(base + "/palette")) {
+			config->set(base + "/palette", palette_to_string(cfg.palette), false);
 		}
 	};
 
@@ -3010,6 +3046,9 @@ static void apply_ui_layer_config() {
 		if (global_cfg.fill_scaler == Image_window::NoScaler) {
 			global_cfg.fill_scaler = Image_window::point;
 		}
+		string pl;
+		config->value("config/video/ui/palette", pl, "disabled");
+		global_cfg.palette = palette_from_string(pl, Image_window::UiPaletteDisabled);
 	}
 
 	config->set("config/video/ui/universal", ui_universal ? "yes" : "no", false);
@@ -3023,6 +3062,7 @@ static void apply_ui_layer_config() {
 		const string base = "config/video/ui/" + key;
 		LayerUiCfg   cfg  = ui_universal ? global_cfg : read_layer_cfg(base, global_cfg);
 		gwin->set_ui_layer_config(kind, cfg.width, cfg.height, cfg.use_game_scaling, cfg.scaler, cfg.fillmode, cfg.fill_scaler);
+		gwin->set_ui_layer_palette(kind, cfg.palette);
 		write_layer_cfg(base, cfg, !ui_universal && !cfg.use_game_scaling);
 	};
 

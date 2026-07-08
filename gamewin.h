@@ -485,6 +485,14 @@ public:
 		win->set_ui_layer_config(kind, width, height, use_game_scaling, scaler, fmode, fill_scaler);
 	}
 
+	void set_ui_layer_palette(Image_window::UiLayerKind kind, int mode) {
+		win->set_ui_layer_palette(kind, mode);
+	}
+
+	int get_ui_layer_palette_mode(Image_window::UiLayerKind kind) const {
+		return win->get_ui_layer_palette_mode(kind);
+	}
+
 	void set_ui_layer_kind_mask(uint32 mask) {
 		win->set_ui_layer_kind_mask(mask);
 	}

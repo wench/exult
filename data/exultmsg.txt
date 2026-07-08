@@ -442,7 +442,7 @@
 0x6C9:Full
 0x6CA:Medium
 0x6CB:Auto
-0x6CC:UI layer settings
+0x6CC:Individual layer settings
 0x6CD:Mouse Pointer
 0x6CE:Conversations
 0x6CF:Gumps
@@ -451,6 +451,9 @@
 0x6D2:Text Effect
 0x6D3:Settings
 0x6D4:UI Options
+0x6D5:Palette
+0x6D6:Spell
+0x6D7:Overcast
 
 #Misc
 # SI copy protection failed

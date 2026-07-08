@@ -114,8 +114,16 @@ void Image_window8::set_palette(
 			SDL_SetPaletteColors(draw_surface_palette, colors2, 0, 256);
 		}
 	}
-	// Overlay-layer textures are palette snapshots; refresh them.
+	// Layer textures are palette snapshots; refresh them.
 	mark_all_layers_dirty();
+}
+
+void Image_window8::apply_gamma_palette(const unsigned char* rgbs, int maxval, int brightness, unsigned char out[768]) const {
+	for (int i = 0; i < 256; i++) {
+		out[3 * i]     = GammaRed[Get_color8(rgbs[3 * i], maxval, brightness)];
+		out[3 * i + 1] = GammaGreen[Get_color8(rgbs[3 * i + 1], maxval, brightness)];
+		out[3 * i + 2] = GammaBlue[Get_color8(rgbs[3 * i + 2], maxval, brightness)];
+	}
 }
 
 /*
@@ -158,7 +166,7 @@ void Image_window8::rotate_colors(
 			}
 		}
 	}
-	// Overlay-layer textures are palette snapshots; refresh them. The dirty
+	// Layer textures are palette snapshots; refresh them. The dirty
 	// flag coalesces, so several rotate calls cost only one re-convert.
 	mark_all_layers_dirty();
 }
@@ -232,12 +240,15 @@ uint32 Image_window8::layer_argb_pixel(const Layer& layer, unsigned char p) cons
 		const uint32 b    = GammaBlue[argb & 0xff];
 		return (a << 24) | (r << 16) | (g << 8) | b;
 	}
-	return (static_cast<uint32>(0xff) << 24) | (static_cast<uint32>(colors[3 * p]) << 16)
-		   | (static_cast<uint32>(colors[3 * p + 1]) << 8) | static_cast<uint32>(colors[3 * p + 2]);
+	// Use the layer's fixed-palette override if one is set, else the live one.
+	const std::vector<unsigned char>& ov  = get_ui_cfg(layer.ui_kind).ui_palette_colors;
+	const unsigned char*              pal = ov.empty() ? colors : ov.data();
+	return (static_cast<uint32>(0xff) << 24) | (static_cast<uint32>(pal[3 * p]) << 16) | (static_cast<uint32>(pal[3 * p + 1]) << 8)
+		   | static_cast<uint32>(pal[3 * p + 2]);
 }
 
 /*
- *  Convert an overlay layer's 8-bit paletted pixels into its ARGB texture,
+ *  Convert a layer's 8-bit paletted pixels into its ARGB texture,
  *  using the current palette.  The layer's transparent index is written as
  *  fully transparent so the scene shows through.
  */
@@ -283,6 +294,9 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 	const uint32*        ov     = has_ov ? layer.index_argb.data() : nullptr;
 	const int            tex_w  = logw * factor;
 	const int            tex_h  = logh * factor;
+	// Fixed-palette override for this layer, if any (else the live palette).
+	const std::vector<unsigned char>& pal_ov      = get_ui_cfg(layer.ui_kind).ui_palette_colors;
+	const unsigned char*              palette_rgb = pal_ov.empty() ? colors : pal_ov.data();
 
 	// Guard-banded 8-bit source (content at (gb,gb)) and a scaled 32-bit dest.
 	const int    ssw    = ((logw + 3) & ~3) + 2 * gb;
@@ -294,8 +308,8 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 	bool         ok     = false;
 	bool         have3  = false;
 	if (src8 && dst32 && dst32b) {
-		SDL_Palette* pal = SDL_CreateSurfacePalette(src8);
-		if (pal) {
+		SDL_Palette* sdl_pal = SDL_CreateSurfacePalette(src8);
+		if (sdl_pal) {
 			SDL_Color cols[256];
 			for (int i = 0; i < 256; i++) {
 				if (has_ov && ov[i] != 0) {    // Translucent slot -> blend colour.
@@ -303,13 +317,13 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 					cols[i].g = GammaGreen[(ov[i] >> 8) & 0xff];
 					cols[i].b = GammaBlue[ov[i] & 0xff];
 				} else {
-					cols[i].r = colors[3 * i];
-					cols[i].g = colors[3 * i + 1];
-					cols[i].b = colors[3 * i + 2];
+					cols[i].r = palette_rgb[3 * i];
+					cols[i].g = palette_rgb[3 * i + 1];
+					cols[i].b = palette_rgb[3 * i + 2];
 				}
 				cols[i].a = 255;
 			}
-			SDL_SetPaletteColors(pal, cols, 0, 256);
+			SDL_SetPaletteColors(sdl_pal, cols, 0, 256);
 			// Pad with the transparent index, then copy the content.
 			uint8*    sp       = static_cast<uint8*>(src8->pixels);
 			const int sp_pitch = src8->pitch;
@@ -335,12 +349,12 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 			fill.r = 255;
 			fill.g = 0;
 			fill.b = 0;    // Pass 1: red under transparency.
-			SDL_SetPaletteColors(pal, &fill, transp, 1);
+			SDL_SetPaletteColors(sdl_pal, &fill, transp, 1);
 			const bool ok1 = scale_layer_color(layer, src8, logw, logh, dst32);
 			fill.r         = 0;
 			fill.g         = 255;
 			fill.b         = 0;    // Pass 2: green under transparency.
-			SDL_SetPaletteColors(pal, &fill, transp, 1);
+			SDL_SetPaletteColors(sdl_pal, &fill, transp, 1);
 			const bool ok2 = scale_layer_color(layer, src8, logw, logh, dst32b);
 			ok             = ok1 && ok2;
 			if (ok) {
@@ -372,7 +386,7 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 						fill.r = 0;
 						fill.g = 0;
 						fill.b = 255;    // Pass 3: blue under transparency.
-						SDL_SetPaletteColors(pal, &fill, transp, 1);
+						SDL_SetPaletteColors(sdl_pal, &fill, transp, 1);
 						have3 = scale_layer_color(layer, src8, logw, logh, dst32c);
 					}
 				}

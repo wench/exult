@@ -182,10 +182,62 @@ void Palette::apply(bool repaint) {
 	pal1[255 * 3 + 1] = g;
 	pal1[255 * 3 + 2] = b;
 
+	// Keep the layers' fixed-palette overrides in sync with the new
+	// palette (they depend on the palette number and brightness).
+	update_ui_layer_palettes();
+
 	if (!repaint) {
 		return;
 	}
 	win->show();
+}
+
+/*
+ *  Give each layer that is configured for a fixed palette the
+ *  colours of that palette while the game's live palette is not the day
+ *  palette, so the layer stays readable.
+ */
+void Palette::update_ui_layer_palettes() {
+	if (win == nullptr) {
+		return;
+	}
+	// Reference (day / spell / overcast) raw palettes, loaded once from palettes.flx.
+	static bool          ref_ok = false;
+	static unsigned char ref_day[768];
+	static unsigned char ref_spell[768];
+	static unsigned char ref_overcast[768];
+	if (!ref_ok) {
+		try {
+			Palette tmp(this);
+			tmp.load(PALETTES_FLX, PATCH_PALETTES, PALETTE_DAY);
+			memcpy(ref_day, tmp.pal1, sizeof(ref_day));
+			tmp.load(PALETTES_FLX, PATCH_PALETTES, PALETTE_SPELL);
+			memcpy(ref_spell, tmp.pal1, sizeof(ref_spell));
+			tmp.load(PALETTES_FLX, PATCH_PALETTES, PALETTE_OVERCAST);
+			memcpy(ref_overcast, tmp.pal1, sizeof(ref_overcast));
+			ref_ok = true;
+		} catch (...) {
+			return;    // palettes.flx not available yet; retry on next apply.
+		}
+	}
+	const int     cur = palette;    // Current palette number (-1 = custom/transition).
+	unsigned char out[768];
+	for (int k = 0; k < Image_window::NumUiLayerKinds; ++k) {
+		const auto kind = static_cast<Image_window::UiLayerKind>(k);
+		const int  mode = win->get_ui_layer_palette_mode(kind);
+		if (mode == Image_window::UiPaletteDisabled || cur == PALETTE_DAY) {
+			win->set_ui_layer_palette_colors(kind, nullptr);
+			continue;
+		}
+		const unsigned char* raw = ref_day;
+		if (mode == Image_window::UiPaletteSpell) {
+			raw = ref_spell;
+		} else if (mode == Image_window::UiPaletteOvercast) {
+			raw = ref_overcast;
+		}
+		win->apply_gamma_palette(raw, max_val, brightness, out);
+		win->set_ui_layer_palette_colors(kind, out);
+	}
 }
 
 /**

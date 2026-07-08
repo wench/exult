@@ -36,6 +36,7 @@ public:
 		int                    scaler           = Image_window::point;
 		Image_window::FillMode fill_mode        = Image_window::Fit;
 		int                    fill_scaler      = Image_window::point;
+		int                    palette          = Image_window::UiPaletteDisabled;
 	};
 
 	UIOptions_gump();
@@ -58,10 +59,12 @@ private:
 		id_scale_method,
 		id_fill_mode,
 		id_fill_scaler,
+		id_palette,
 		id_universal,
 		id_layer_mouse,
 		id_layer_conversations,
 		id_layer_gumps,
+		id_layer_hud_gumps,
 		id_layer_text_gumps,
 		id_layer_modal_gumps,
 		id_layer_text_effect,
@@ -70,7 +73,7 @@ private:
 
 	std::array<std::unique_ptr<Gump_button>, id_count> buttons;
 	UiLayerSettings                                    global_cfg;
-	std::array<UiLayerSettings, 6>                     layer_cfgs;
+	std::array<UiLayerSettings, 7>                     layer_cfgs;
 	bool                                               universal = true;
 
 	void build_buttons();
@@ -81,11 +84,13 @@ private:
 	void toggle_scale_method(int state);
 	void toggle_fill_mode(int state);
 	void toggle_fill_scaler(int state);
+	void toggle_palette(int state);
 	void toggle_universal(int state);
 
 	void open_mouse_advanced();
 	void open_conversations_advanced();
 	void open_gumps_advanced();
+	void open_hud_gumps_advanced();
 	void open_text_gumps_advanced();
 	void open_modal_gumps_advanced();
 	void open_text_effect_advanced();

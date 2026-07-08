@@ -80,6 +80,14 @@ public:
 		NumUiLayerKinds
 	};
 
+	// Fixed-palette mode for a layer (see UiLayerConfig::ui_palette).
+	enum UiPaletteMode {
+		UiPaletteDisabled = 0,    // Follow the live (tinted) palette.
+		UiPaletteDay,             // Force the day palette.
+		UiPaletteSpell,           // Force the spell palette.
+		UiPaletteOvercast,        // Force the overcast palette.
+	};
+
 	enum FillMode {
 		Fill = 1,                ///< Game area fills all of the display surface
 		Fit  = 2,                ///< Game area is stretched to the closest edge, maintaining
@@ -126,6 +134,9 @@ public:
 		int      scaler           = 0;
 		FillMode fill_mode        = Fit;
 		int      fill_scaler      = 0;
+		// Optional fixed palette for the layer (see UiPaletteMode).
+		int                        ui_palette = UiPaletteDisabled;
+		std::vector<unsigned char> ui_palette_colors;    // 768 gamma RGB, empty = none.
 	};
 
 	struct Resolution {
@@ -138,7 +149,7 @@ public:
 		~ScalerVector();
 	};
 
-	// A compositing overlay layer. It owns its own 8-bit paletted buffer
+	// A compositing layer. It owns its own 8-bit paletted buffer
 	// that game code paints into using the normal shape/text routines. The
 	// window converts the buffer to a texture and draws it on top of the main
 	// game image at its own size, decoupled from the world scaling (so its
@@ -287,7 +298,7 @@ protected:
 	FillMode fill_mode;
 	int      fill_scaler;
 
-	// Overlay-layer ("UI") scaling configuration, mirroring the game area's
+	// Layer  scaling configuration, mirroring the game area's
 	// scaler/fill settings but applied to the layers. Layer sizing is explicit
 	// (width/height), with 0x0 meaning Auto (use game area size).
 	// Scaler/fill settings (unless ui_use_game_scaling) come from ui_scaler /
@@ -329,7 +340,7 @@ protected:
 	SDL_Surface* inter_surface;       // Post scaled/pre stretch surface  (960x600)
 	SDL_Surface* draw_surface;        // Pre scaled surface               (320x200)
 
-	// Overlay layers composited on top of the main image (see class Layer).
+	// Layers composited on top of the main image (see class Layer).
 	std::vector<std::unique_ptr<Layer>> layers;
 
 	// Compute a layer's on-screen destination rect (in display coords, which
@@ -342,7 +353,7 @@ protected:
 	// scale (used to size a hypothetical game area, e.g. 320x200 for "Full").
 	void compute_fill_dest(int logw, int logh, FillMode fmode, int escl, struct SDL_FRect& dst) const;
 	// Per-pixel scale a 320x200 game area would get on this display (the "Full"
-	// overlay scale), used to turn get_ui_scale_factor() into a size ratio.
+	// layer scale), used to turn get_ui_scale_factor() into a size ratio.
 	float ui_full_pixel_scale(UiLayerKind kind) const;
 	// Composite all visible layers onto the renderer (after the main image,
 	// before presenting).
@@ -354,8 +365,8 @@ protected:
 		ignore_unused_variable_warning(layer);
 	}
 
-	// Scale factor the current game scaler would apply to overlay layers, or
-	// 1 if the layers should just be uploaded 1:1 (arb / GPU scalers).
+	// Scale factor the current game scaler would apply to layer, or
+	// 1 if the layer should just be uploaded 1:1 (arb / GPU scalers).
 	int layer_render_scale(const Layer& layer) const;
 	// Run the current (member) scaler on a guard-banded 8-bit source surface
 	// into a 32-bit destination surface, by temporarily repointing the
@@ -605,8 +616,8 @@ public:
 
 	void toggle_fullscreen();
 
-	// -------- Overlay layers --------
-	// Create an overlay layer with a logical (game-pixel) size of w x h.
+	// -------- Layers --------
+	// Create a layer with a logical (game-pixel) size of w x h.
 	// Returns a non-negative handle, or -1 on failure.  Paint into the
 	// buffer returned by get_layer_ibuf(handle) using the normal routines.
 	// 'transparent' is the palette index treated as see-through; when
@@ -638,14 +649,23 @@ public:
 	// composited semi-transparently (e.g. the translucent shortcut bar).
 	void layer_set_alpha(int handle, unsigned char a);
 
-	// -------- Overlay-layer ("UI") scaling config --------
-	// Configure how overlay layers (conversation, mouse cursor) are scaled and
+	// -------- Layer scaling config --------
+	// Configure how layers (conversation, mouse cursor) are scaled and
 	// placed. width/height set a fixed UI layout size in game pixels. A value
 	// of 0,0 means Auto (use game area size). When use_game_scaling is true
 	// the game's scaler/fill settings are used; otherwise the given ones are.
 	void set_ui_config(int width, int height, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
 	void set_ui_layer_config(
 			UiLayerKind kind, int width, int height, bool use_game_scaling, int scaler, FillMode fmode, int fill_scaler);
+	// -------- Layer fixed palette --------
+	// Which fixed palette (if any) a layer uses when the game's live
+	// palette is not the day palette. Values are UiPaletteMode; the mapping to
+	// an actual game palette number is done by the caller (palette code).
+	void set_ui_layer_palette(UiLayerKind kind, int mode);
+	int  get_ui_layer_palette_mode(UiLayerKind kind) const;
+	// Push the (gamma-corrected, 768-byte RGB) palette a layer should draw with,
+	// or nullptr to clear the override so the layer follows the live palette.
+	void set_ui_layer_palette_colors(UiLayerKind kind, const unsigned char* colors768);
 	// Bitmask of composited layer kinds. Bit i controls UiLayerKind i.
 	// Default enables every kind.
 	void   set_ui_layer_kind_mask(uint32 mask);
@@ -663,7 +683,7 @@ public:
 	float get_ui_scale_factor() const;
 	float get_ui_scale_factor(UiLayerKind kind) const;
 	float get_ui_hud_scale(UiLayerKind kind) const;
-	// Compute an overlay layer's on-screen destination for a logw x logh
+	// Compute a layer's on-screen destination for a logw x logh
 	// layout: shaped by the UI fill mode (Fill stretches, Fit keeps 1:1 pixels,
 	// AspectCorrect* uses 1:1.2, Centre a fixed scale) and scaled by the UI
 	// size, centred in display coords.

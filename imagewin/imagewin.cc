@@ -1740,6 +1740,44 @@ void Image_window::set_ui_layer_config(
 	mark_all_layers_dirty();
 }
 
+void Image_window::set_ui_layer_palette(UiLayerKind kind, int mode) {
+	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
+		return;
+	}
+	UiLayerConfig& cfg = ui_cfgs[static_cast<int>(kind)];
+	if (cfg.ui_palette == mode) {
+		return;
+	}
+	cfg.ui_palette = mode;
+	if (mode == UiPaletteDisabled) {
+		cfg.ui_palette_colors.clear();    // No override; follow the live palette.
+	}
+	mark_all_layers_dirty();
+}
+
+int Image_window::get_ui_layer_palette_mode(UiLayerKind kind) const {
+	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
+		return UiPaletteDisabled;
+	}
+	return ui_cfgs[static_cast<int>(kind)].ui_palette;
+}
+
+void Image_window::set_ui_layer_palette_colors(UiLayerKind kind, const unsigned char* colors768) {
+	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
+		return;
+	}
+	UiLayerConfig& cfg = ui_cfgs[static_cast<int>(kind)];
+	if (colors768 == nullptr) {
+		if (cfg.ui_palette_colors.empty()) {
+			return;
+		}
+		cfg.ui_palette_colors.clear();
+	} else {
+		cfg.ui_palette_colors.assign(colors768, colors768 + 768);
+	}
+	mark_all_layers_dirty();
+}
+
 void Image_window::set_ui_layer_kind_mask(uint32 mask) {
 	ui_layer_kind_mask = mask;
 }

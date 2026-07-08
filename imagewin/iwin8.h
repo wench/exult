@@ -73,6 +73,11 @@ public:
 	// Set palette.
 	void set_palette(const unsigned char* rgbs, int maxval, int brightness = 100) override;
 
+	// Gamma-correct a raw 768-byte RGB palette into 'out' the same way
+	// set_palette builds the live 'colors' table, without disturbing it. Used
+	// to build a fixed-palette override for an overlay layer.
+	void apply_gamma_palette(const unsigned char* rgbs, int maxval, int brightness, unsigned char out[768]) const;
+
 	// Get palette.
 	virtual const unsigned char* get_palette() const {
 		return colors;

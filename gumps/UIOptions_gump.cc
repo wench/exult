@@ -44,6 +44,7 @@
 #include "gamewin.h"
 #include "items.h"
 #include "mouse.h"
+#include "palette.h"
 
 #include <algorithm>
 #include <array>
@@ -103,6 +104,10 @@ namespace {
 			return get_text_msg(0x6CF - msg_file_start);
 		}
 
+		static const char* HudGumps() {
+			return "HUD Gumps";
+		}
+
 		static auto TextGumps() {
 			return get_text_msg(0x6D0 - msg_file_start);
 		}
@@ -117,6 +122,26 @@ namespace {
 
 		static auto AdvancedSettings() {
 			return get_text_msg(0x6D3 - msg_file_start);
+		}
+
+		static auto Palette() {
+			return get_text_msg(0x6D5 - msg_file_start);
+		}
+
+		static auto Spell() {
+			return get_text_msg(0x6D6 - msg_file_start);
+		}
+
+		static auto Overcast() {
+			return get_text_msg(0x6D7 - msg_file_start);
+		}
+
+		static auto DisabledPaletteOption() {
+			return get_text_msg(0x59A - msg_file_start);
+		}
+
+		static auto DayPaletteOption() {
+			return get_text_msg(0x658 - msg_file_start);
 		}
 
 		static auto Fill() {
@@ -141,21 +166,23 @@ namespace {
 	constexpr int row_scale      = 1;
 	constexpr int row_fill_mode  = 2;
 	constexpr int row_fill_scl   = 3;
-	constexpr int row_universal  = 4;
+	constexpr int row_palette    = 4;
+	constexpr int row_universal  = 5;
 	constexpr int row_layer_hdr  = 6;
 	constexpr int row_layer_base = 7;
 	constexpr int row_buttons    = 14;
 
-	constexpr std::array<Image_window::UiLayerKind, 6> kLayerKinds = {
+	constexpr std::array<Image_window::UiLayerKind, 7> kLayerKinds = {
 			Image_window::UiLayerMousePointer, Image_window::UiLayerConversations, Image_window::UiLayerGumps,
-			Image_window::UiLayerTextGumps,    Image_window::UiLayerModalGumps,    Image_window::UiLayerTextEffects,
+			Image_window::UiLayerHudGumps,     Image_window::UiLayerTextGumps,     Image_window::UiLayerModalGumps,
+			Image_window::UiLayerTextEffects,
 	};
 
-	constexpr std::array<const char*, 6> kLayerKeys = {
-			"mouse_pointer", "conversations", "gumps", "text_gumps", "modal_gumps", "text_effect",
+	constexpr std::array<const char*, 7> kLayerKeys = {
+			"mouse_pointer", "conversations", "gumps", "hud_gumps", "text_gumps", "modal_gumps", "text_effects",
 	};
 
-	constexpr size_t kLayerCount = 6;
+	constexpr size_t kLayerCount = 7;
 
 	const char* get_layer_name(size_t idx) {
 		switch (idx) {
@@ -166,10 +193,12 @@ namespace {
 		case 2:
 			return Strings::Gumps();
 		case 3:
-			return Strings::TextGumps();
+			return Strings::HudGumps();
 		case 4:
-			return Strings::ModalGumps();
+			return Strings::TextGumps();
 		case 5:
+			return Strings::ModalGumps();
+		case 6:
 			return Strings::TextEffect();
 		default:
 			return "";
@@ -207,8 +236,6 @@ namespace {
 			cfg.width  = 420;
 			cfg.height = 263;
 		}
-		// Size only controls the layer's logical size. The scaler/fill settings
-		// are always the layer's own, even for Auto (0x0).
 		cfg.use_game_scaling = false;
 	}
 
@@ -250,6 +277,68 @@ namespace {
 			return Image_window::bilinear;
 		}
 		return Image_window::point;
+	}
+
+	// Fixed-palette option. Toggle index 0..3 maps to the
+	// UiPaletteMode values; the config strings are day/spell/overcast/disabled.
+
+	std::vector<std::string> palette_options() {
+		return {Strings::DisabledPaletteOption(), Strings::DayPaletteOption(), Strings::Spell(), Strings::Overcast()};
+	}
+
+	int palette_to_selection(int mode) {
+		switch (mode) {
+		case Image_window::UiPaletteDay:
+			return 1;
+		case Image_window::UiPaletteSpell:
+			return 2;
+		case Image_window::UiPaletteOvercast:
+			return 3;
+		default:
+			return 0;
+		}
+	}
+
+	int selection_to_palette(int state) {
+		switch (state) {
+		case 1:
+			return Image_window::UiPaletteDay;
+		case 2:
+			return Image_window::UiPaletteSpell;
+		case 3:
+			return Image_window::UiPaletteOvercast;
+		default:
+			return Image_window::UiPaletteDisabled;
+		}
+	}
+
+	const char* palette_name(int mode) {
+		switch (mode) {
+		case Image_window::UiPaletteDay:
+			return "day";
+		case Image_window::UiPaletteSpell:
+			return "spell";
+		case Image_window::UiPaletteOvercast:
+			return "overcast";
+		default:
+			return "disabled";
+		}
+	}
+
+	int palette_from_name(const std::string& s, int fallback) {
+		if (s == "day") {
+			return Image_window::UiPaletteDay;
+		}
+		if (s == "spell") {
+			return Image_window::UiPaletteSpell;
+		}
+		if (s == "overcast") {
+			return Image_window::UiPaletteOvercast;
+		}
+		if (s == "disabled") {
+			return Image_window::UiPaletteDisabled;
+		}
+		return fallback;
 	}
 
 	class UIOptionsLayerSettings_gump : public Modal_gump {
@@ -304,6 +393,7 @@ namespace {
 			font->paint_text(iwin->get_ib8(), Strings::Scalemethod_(), x + label_margin, y + yForRow(3) + 1);
 			font->paint_text(iwin->get_ib8(), Strings::Fillmode_(), x + label_margin, y + yForRow(4) + 1);
 			font->paint_text(iwin->get_ib8(), Strings::Fillscaler_(), x + label_margin, y + yForRow(5) + 1);
+			font->paint_text(iwin->get_ib8(), Strings::Palette(), x + label_margin, y + yForRow(6) + 1);
 			gwin->set_painted();
 		}
 
@@ -317,6 +407,7 @@ namespace {
 			id_scale_method,
 			id_fill_mode,
 			id_fill_scaler,
+			id_palette,
 			id_count
 		};
 
@@ -377,6 +468,10 @@ namespace {
 					fillscaler_to_selection(working_cfg.fill_scaler), get_button_pos_for_label(Strings::Fillscaler_()), yForRow(5),
 					108);
 
+			buttons[id_palette] = std::make_unique<Layer_toggle>(
+					this, &UIOptionsLayerSettings_gump::toggle_palette, palette_options(),
+					palette_to_selection(working_cfg.palette), get_button_pos_for_label(Strings::Palette()), yForRow(6), 108);
+
 			ResizeWidthToFitWidgets(tcb::span(buttons.data(), buttons.size()));
 			HorizontalArrangeWidgets(tcb::span(buttons.data(), 3));
 			RightAlignWidgets(tcb::span(buttons.data() + id_size, id_count - id_size));
@@ -399,6 +494,10 @@ namespace {
 
 		void toggle_fill_scaler(int state) {
 			working_cfg.fill_scaler = selection_to_fillscaler(state);
+		}
+
+		void toggle_palette(int state) {
+			working_cfg.palette = selection_to_palette(state);
 		}
 	};
 }    // namespace
@@ -491,6 +590,10 @@ void UIOptions_gump::build_buttons() {
             this, &UIOptions_gump::toggle_universal, yes_no, universal ? 1 : 0, get_button_pos_for_label(Strings::Universal_()),
             yForRow(row_universal), 44);
 
+	buttons[id_palette] = std::make_unique<UIOptions_toggle>(
+			this, &UIOptions_gump::toggle_palette, palette_options(), palette_to_selection(global_cfg.palette),
+			get_button_pos_for_label(Strings::Palette()), yForRow(row_palette), 108);
+
 	if (!universal) {
 		buttons[id_layer_mouse] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_mouse_advanced, Strings::AdvancedSettings(),
@@ -501,15 +604,18 @@ void UIOptions_gump::build_buttons() {
 		buttons[id_layer_gumps] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_gumps_advanced, Strings::AdvancedSettings(), get_button_pos_for_label(Strings::Gumps()),
 				yForRow(row_layer_base + 2), 108);
+		buttons[id_layer_hud_gumps] = std::make_unique<UIOptions_button>(
+				this, &UIOptions_gump::open_hud_gumps_advanced, Strings::AdvancedSettings(),
+				get_button_pos_for_label(Strings::HudGumps()), yForRow(row_layer_base + 3), 108);
 		buttons[id_layer_text_gumps] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_text_gumps_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::TextGumps()), yForRow(row_layer_base + 3), 108);
+				get_button_pos_for_label(Strings::TextGumps()), yForRow(row_layer_base + 4), 108);
 		buttons[id_layer_modal_gumps] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_modal_gumps_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::ModalGumps()), yForRow(row_layer_base + 4), 108);
+				get_button_pos_for_label(Strings::ModalGumps()), yForRow(row_layer_base + 5), 108);
 		buttons[id_layer_text_effect] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_text_effect_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::TextEffect()), yForRow(row_layer_base + 5), 108);
+				get_button_pos_for_label(Strings::TextEffect()), yForRow(row_layer_base + 6), 108);
 	}
 
 	ResizeWidthToFitWidgets(tcb::span(buttons.data(), buttons.size()));
@@ -553,6 +659,10 @@ void UIOptions_gump::load_settings() {
 			cfg.fill_scaler = fallback.fill_scaler;
 		}
 
+		string palette_str;
+		config->value(base + "/palette", palette_str, palette_name(fallback.palette));
+		cfg.palette = palette_from_name(palette_str, fallback.palette);
+
 		return cfg;
 	};
 
@@ -577,6 +687,7 @@ void UIOptions_gump::save_settings() {
 		Image_window::fillmode_to_string(cfg.fill_mode, fillmode_str);
 		config->set(base + "/fill_mode", fillmode_str, false);
 		config->set(base + "/fill_scaler", Image_window::get_name_for_scaler(cfg.fill_scaler), false);
+		config->set(base + "/palette", palette_name(cfg.palette), false);
 	};
 
 	config->set("config/video/ui/universal", universal ? "yes" : "no", false);
@@ -590,9 +701,14 @@ void UIOptions_gump::save_settings() {
 		const UiLayerSettings& cfg = universal ? global_cfg : layer_cfgs[i];
 		gwin->set_ui_layer_config(
 				kLayerKinds[i], cfg.width, cfg.height, cfg.use_game_scaling, cfg.scaler, cfg.fill_mode, cfg.fill_scaler);
+		gwin->set_ui_layer_palette(kLayerKinds[i], cfg.palette);
 	}
 
 	config->write_back();
+	// Recompute the layers' fixed-palette overrides for the new settings.
+	if (Palette* pal = gwin->get_pal()) {
+		pal->apply();
+	}
 	gwin->set_all_dirty();
 }
 
@@ -612,6 +728,10 @@ void UIOptions_gump::toggle_fill_mode(int state) {
 
 void UIOptions_gump::toggle_fill_scaler(int state) {
 	global_cfg.fill_scaler = selection_to_fillscaler(state);
+}
+
+void UIOptions_gump::toggle_palette(int state) {
+	global_cfg.palette = selection_to_palette(state);
 }
 
 void UIOptions_gump::toggle_universal(int state) {
@@ -641,16 +761,20 @@ void UIOptions_gump::open_gumps_advanced() {
 	open_layer_advanced(2);
 }
 
-void UIOptions_gump::open_text_gumps_advanced() {
+void UIOptions_gump::open_hud_gumps_advanced() {
 	open_layer_advanced(3);
 }
 
-void UIOptions_gump::open_modal_gumps_advanced() {
+void UIOptions_gump::open_text_gumps_advanced() {
 	open_layer_advanced(4);
 }
 
-void UIOptions_gump::open_text_effect_advanced() {
+void UIOptions_gump::open_modal_gumps_advanced() {
 	open_layer_advanced(5);
+}
+
+void UIOptions_gump::open_text_effect_advanced() {
+	open_layer_advanced(6);
 }
 
 void UIOptions_gump::paint() {
@@ -666,6 +790,7 @@ void UIOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::Scalemethod_(), x + label_margin, y + yForRow(row_scale) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Fillmode_(), x + label_margin, y + yForRow(row_fill_mode) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Fillscaler_(), x + label_margin, y + yForRow(row_fill_scl) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::Palette(), x + label_margin, y + yForRow(row_palette) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Universal_(), x + label_margin, y + yForRow(row_universal) + 1);
 
 	if (!universal) {
