@@ -229,6 +229,7 @@
 0x5E4:Game Engine
 0x5E5:Game Input
 0x5E6:Quit
+0x5E7:UI Options
 
 #AdvancedOptions_gump.cc
 0x5F0:Apply anyway?
@@ -431,6 +432,25 @@
 0X6C1:Press ESC to exit.
 0X6C2:Please add the games in File Sharing
 0X6C3:Touch screen for help!
+
+#UIOptions_gump.cc
+0x6C4:Size:
+0x6C5:Scale method:
+0x6C6:Fill mode:
+0x6C7:Fill scaler:
+0x6C8:All layers:
+0x6C9:Full
+0x6CA:Medium
+0x6CB:Auto
+0x6CC:UI layer settings
+0x6CD:Mouse Pointer
+0x6CE:Conversations
+0x6CF:Gumps
+0x6D0:Text Gumps
+0x6D1:Modal Gumps
+0x6D2:Text Effect
+0x6D3:Settings
+0x6D4:UI Options
 
 #Misc
 # SI copy protection failed
