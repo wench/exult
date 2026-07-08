@@ -156,6 +156,10 @@ namespace {
 	constexpr int row_layer_base = 7;
 	constexpr int row_buttons    = 14;
 
+	constexpr int yForLayerIndex(int idx) {
+		return UIOptions_gump::yForRow(row_layer_base) + idx * 12;
+	}
+
 	constexpr std::array<Image_window::UiLayerKind, 7> kLayerKinds = {
 			Image_window::UiLayerMousePointer, Image_window::UiLayerConversations, Image_window::UiLayerGumps,
 			Image_window::UiLayerHudGumps,     Image_window::UiLayerTextGumps,     Image_window::UiLayerModalGumps,
@@ -341,8 +345,8 @@ namespace {
 				btn.reset();
 			}
 
-			buttons[id_apply] = std::make_unique<Layer_button>(
-					this, &UIOptionsLayerSettings_gump::apply, Strings::APPLY(), 12, yForRow(7), 50);
+			buttons[id_ok]
+					= std::make_unique<Layer_button>(this, &UIOptionsLayerSettings_gump::ok, Strings::OK(), 12, yForRow(7), 50);
 			buttons[id_help]
 					= std::make_unique<Layer_button>(this, &UIOptionsLayerSettings_gump::help, Strings::HELP(), 50, yForRow(7), 50);
 			buttons[id_cancel] = std::make_unique<Layer_button>(
@@ -390,7 +394,7 @@ namespace {
 	private:
 		enum button_ids {
 			id_first = 0,
-			id_apply = id_first,
+			id_ok    = id_first,
 			id_help,
 			id_cancel,
 			id_size,
@@ -410,8 +414,9 @@ namespace {
 		std::string                                        layer_name;
 		std::vector<int>                                   scaler_values;
 
-		void apply() {
+		void ok() {
 			source_cfg = working_cfg;
+			done       = true;
 		}
 
 		void help() {
@@ -587,25 +592,25 @@ void UIOptions_gump::build_buttons() {
 	if (!universal) {
 		buttons[id_layer_mouse] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_mouse_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::MousePointer()), yForRow(row_layer_base + 0), 108);
+				get_button_pos_for_label(Strings::MousePointer()), yForLayerIndex(0), 108);
 		buttons[id_layer_conversations] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_conversations_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::Conversations()), yForRow(row_layer_base + 1), 108);
+				get_button_pos_for_label(Strings::Conversations()), yForLayerIndex(1), 108);
 		buttons[id_layer_gumps] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_gumps_advanced, Strings::AdvancedSettings(), get_button_pos_for_label(Strings::Gumps()),
-				yForRow(row_layer_base + 2), 108);
+				yForLayerIndex(2), 108);
 		buttons[id_layer_hud_gumps] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_hud_gumps_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::HudGumps()), yForRow(row_layer_base + 3), 108);
+				get_button_pos_for_label(Strings::HudGumps()), yForLayerIndex(3), 108);
 		buttons[id_layer_text_gumps] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_text_gumps_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::TextGumps()), yForRow(row_layer_base + 4), 108);
+				get_button_pos_for_label(Strings::TextGumps()), yForLayerIndex(4), 108);
 		buttons[id_layer_modal_gumps] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_modal_gumps_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::ModalGumps()), yForRow(row_layer_base + 5), 108);
+				get_button_pos_for_label(Strings::ModalGumps()), yForLayerIndex(5), 108);
 		buttons[id_layer_text_effect] = std::make_unique<UIOptions_button>(
 				this, &UIOptions_gump::open_text_effect_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::TextEffect()), yForRow(row_layer_base + 6), 108);
+				get_button_pos_for_label(Strings::TextEffect()), yForLayerIndex(6), 108);
 	}
 
 	ResizeWidthToFitWidgets(tcb::span(buttons.data(), buttons.size()));
@@ -780,7 +785,7 @@ void UIOptions_gump::paint() {
 	if (!universal) {
 		font->paint_text(iwin->get_ib8(), Strings::UIlayersettings(), x + label_margin, y + yForRow(row_layer_hdr) + 1);
 		for (size_t i = 0; i < kLayerCount; ++i) {
-			font->paint_text(iwin->get_ib8(), get_layer_name(i), x + label_margin, y + yForRow(row_layer_base + i) + 1);
+			font->paint_text(iwin->get_ib8(), get_layer_name(i), x + label_margin, y + yForLayerIndex(static_cast<int>(i)) + 1);
 		}
 	}
 
