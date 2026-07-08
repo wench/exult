@@ -362,11 +362,34 @@ void Dragging_info::paint_obj_to_layer() {
 	gwin->layer_set_dirty(item_layer);
 
 	// Place the layer using the same per-axis scale as the mouse pointer, so
-	// the item's size matches the cursor.
-	float sx = 1.0f;
-	float sy = 1.0f;
-	if (Mouse::mouse()) {
+	// the item's size matches the cursor. Only apply this resize when the
+	// mouse UI layout is smaller than the game area; if it's equal/larger,
+	// keep dragged items at 1:1 game-pixel size.
+	float     sx    = 1.0f;
+	float     sy    = 1.0f;
+	const int uiw   = iwin->get_ui_width(Image_window::UiLayerMousePointer);
+	const int uih   = iwin->get_ui_height(Image_window::UiLayerMousePointer);
+	const int gamew = iwin->get_game_width();
+	const int gameh = iwin->get_game_height();
+	if (Mouse::mouse() && (uiw < gamew || uih < gameh)) {
 		Mouse::mouse()->get_pointer_scale(sx, sy);
+	} else if (gamew > 0 && gameh > 0) {
+		// No UI-resize case: keep the item's game-pixel size by applying only
+		// the main game area's screen scale (not the mouse UI layer scale).
+		int gx0;
+		int gy0;
+		int gx1;
+		int gy1;
+		iwin->game_to_screen(0, 0, false, gx0, gy0);
+		iwin->game_to_screen(gamew, gameh, false, gx1, gy1);
+		sx = static_cast<float>(gx1 - gx0) / static_cast<float>(gamew);
+		sy = static_cast<float>(gy1 - gy0) / static_cast<float>(gameh);
+		if (sx <= 0.0f) {
+			sx = 1.0f;
+		}
+		if (sy <= 0.0f) {
+			sy = 1.0f;
+		}
 	}
 	int cx;
 	int cy;
