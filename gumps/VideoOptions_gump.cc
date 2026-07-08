@@ -454,7 +454,11 @@ void VideoOptions_gump::load_settings(bool Fullscreen) {
 		}
 	}
 
-	gclock->reset_palette();
+	if (day_palette_forced) {
+		if (Palette* pal = gwin->get_pal()) {
+			pal->set(PALETTE_DAY, -1, false);
+		}
+	}
 
 	o_resolution      = resolution;
 	o_scaling         = scaling;
@@ -467,6 +471,13 @@ void VideoOptions_gump::load_settings(bool Fullscreen) {
 VideoOptions_gump::VideoOptions_gump() : Modal_gump(nullptr, -1), startup_fill_mode(static_cast<Image_window::FillMode>(0)) {
 	SetProceduralBackground(TileRect(0, 0, 100, yForRow(13)), -1);
 	video_options_gump = this;
+
+	if (gwin->get_ui_layer_palette_mode(Image_window::UiLayerModalGumps) == Image_window::UiPaletteDisabled) {
+		if (Palette* pal = gwin->get_pal()) {
+			saved_palette_index = pal->get_palette_index();
+			day_palette_forced  = true;
+		}
+	}
 
 	const std::vector<std::string> enabledtext = {Strings::Disabled(), Strings::Enabled()};
 
@@ -497,6 +508,19 @@ VideoOptions_gump::VideoOptions_gump() : Modal_gump(nullptr, -1), startup_fill_m
 	load_settings(fullscreen);
 
 	rebuild_buttons();
+}
+
+VideoOptions_gump::~VideoOptions_gump() {
+	// Restore the palette that was active before this gump forced the day
+	// palette.
+	if (day_palette_forced) {
+		if (Palette* pal = gwin->get_pal()) {
+			pal->set(saved_palette_index, -1, true);
+		}
+	}
+	if (video_options_gump == this) {
+		video_options_gump = nullptr;
+	}
 }
 
 void VideoOptions_gump::save_settings() {
@@ -568,6 +592,14 @@ void VideoOptions_gump::save_settings() {
 		o_fill_mode       = fill_mode;
 		o_fill_scaler     = fill_scaler;
 		o_share_settings  = share_settings;
+	}
+
+	// Applying settings above re-runs the game clock's palette logic, so
+	// re-assert the day palette preview if this gump is forcing it.
+	if (day_palette_forced) {
+		if (Palette* pal = gwin->get_pal()) {
+			pal->set(PALETTE_DAY, -1, true);
+		}
 	}
 }
 

@@ -55,6 +55,9 @@ private:
 
 	Image_window::FillMode startup_fill_mode;
 
+	bool day_palette_forced  = false;
+	int  saved_palette_index = -1;
+
 	enum button_ids {
 		id_first = 0,
 		id_apply = id_first,
@@ -78,6 +81,7 @@ private:
 
 public:
 	VideoOptions_gump();
+	~VideoOptions_gump() override;
 
 	static VideoOptions_gump* get_instance() {
 		return video_options_gump;
