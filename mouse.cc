@@ -171,8 +171,8 @@ void Mouse::Init() {
 			maxbelow = ybelow;
 		}
 	}
-	const int maxw = maxleft + maxright;
-	const int maxh = maxabove + maxbelow;
+	const int maxw = maxleft + maxright + 1;
+	const int maxh = maxabove + maxbelow + 1;
 	// Create backup buffer.
 	backup = iwin->create_buffer(maxw, maxh);
 	box.w  = maxw;
