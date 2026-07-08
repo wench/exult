@@ -285,12 +285,15 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 	const int            tex_h  = logh * factor;
 
 	// Guard-banded 8-bit source (content at (gb,gb)) and a scaled 32-bit dest.
-	const int    ssw   = ((logw + 3) & ~3) + 2 * gb;
-	const int    ssh   = logh + 2 * gb;
-	SDL_Surface* src8  = SDL_CreateSurface(ssw, ssh, SDL_PIXELFORMAT_INDEX8);
-	SDL_Surface* dst32 = SDL_CreateSurface(ssw * factor, ssh * factor, SDL_PIXELFORMAT_ARGB8888);
-	bool         ok    = false;
-	if (src8 && dst32) {
+	const int    ssw    = ((logw + 3) & ~3) + 2 * gb;
+	const int    ssh    = logh + 2 * gb;
+	SDL_Surface* src8   = SDL_CreateSurface(ssw, ssh, SDL_PIXELFORMAT_INDEX8);
+	SDL_Surface* dst32  = SDL_CreateSurface(ssw * factor, ssh * factor, SDL_PIXELFORMAT_ARGB8888);
+	SDL_Surface* dst32b = SDL_CreateSurface(ssw * factor, ssh * factor, SDL_PIXELFORMAT_ARGB8888);
+	SDL_Surface* dst32c = nullptr;
+	bool         ok     = false;
+	bool         have3  = false;
+	if (src8 && dst32 && dst32b) {
 		SDL_Palette* pal = SDL_CreateSurfacePalette(src8);
 		if (pal) {
 			SDL_Color cols[256];
@@ -316,30 +319,163 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 			for (int y = 0; y < logh; y++) {
 				memcpy(sp + static_cast<size_t>(y + gb) * sp_pitch + gb, src + static_cast<size_t>(y) * spitch, logw);
 			}
-			ok = scale_layer_color(layer, src8, logw, logh, dst32);
+			// CONSENSUS DIFFERENCE MATTING: run the colour scaler with a pure
+			// red, then a pure green fill under the transparent index. Wherever
+			// the two outputs differ, the difference measures how much
+			// transparent colour the scaler mixed into that pixel; from that we
+			// recover the TRUE un-bled colour and the scaler's own smooth edge
+			// coverage. Two passes are enough when they agree everywhere; only
+			// if some pixel disagrees (the shape contains a colour close to red
+			// or green, making the edge-directed scalers branch differently in
+			// that pass) do we run a THIRD pass with a blue fill, and each
+			// pixel then picks whichever PAIR of passes agrees best. So the
+			// common case costs two scaler runs, and tricky shapes three.
+			SDL_Color fill;
+			fill.a = 255;
+			fill.r = 255;
+			fill.g = 0;
+			fill.b = 0;    // Pass 1: red under transparency.
+			SDL_SetPaletteColors(pal, &fill, transp, 1);
+			const bool ok1 = scale_layer_color(layer, src8, logw, logh, dst32);
+			fill.r         = 0;
+			fill.g         = 255;
+			fill.b         = 0;    // Pass 2: green under transparency.
+			SDL_SetPaletteColors(pal, &fill, transp, 1);
+			const bool ok2 = scale_layer_color(layer, src8, logw, logh, dst32b);
+			ok             = ok1 && ok2;
+			if (ok) {
+				// Pre-scan: do the red/green passes disagree anywhere? (Early
+				// exit on the first such pixel; this is far cheaper than an
+				// unconditional third scaler run.)
+				const uint32* pix1   = static_cast<const uint32*>(dst32->pixels);
+				const uint32* pix2   = static_cast<const uint32*>(dst32b->pixels);
+				const int     dpitch = dst32->pitch / static_cast<int>(sizeof(uint32));
+				bool          needs3 = false;
+				for (int y = 0; y < tex_h && !needs3; y++) {
+					const size_t  roff = static_cast<size_t>(y + factor * gb) * dpitch + factor * gb;
+					const uint32* row1 = pix1 + roff;
+					const uint32* row2 = pix2 + roff;
+					for (int x = 0; x < tex_w; x++) {
+						const uint32 p1   = row1[x];
+						const uint32 p2   = row2[x];
+						const int    t12a = static_cast<int>((p1 >> 16) & 0xff) - static_cast<int>((p2 >> 16) & 0xff);
+						const int    t12b = static_cast<int>((p2 >> 8) & 0xff) - static_cast<int>((p1 >> 8) & 0xff);
+						if (std::abs(t12a - t12b) > 96) {
+							needs3 = true;
+							break;
+						}
+					}
+				}
+				if (needs3) {
+					dst32c = SDL_CreateSurface(ssw * factor, ssh * factor, SDL_PIXELFORMAT_ARGB8888);
+					if (dst32c) {
+						fill.r = 0;
+						fill.g = 0;
+						fill.b = 255;    // Pass 3: blue under transparency.
+						SDL_SetPaletteColors(pal, &fill, transp, 1);
+						have3 = scale_layer_color(layer, src8, logw, logh, dst32c);
+					}
+				}
+			}
 		}
 	}
 
 	auto texpix = make_unique<uint32[]>(static_cast<size_t>(tex_w) * tex_h);
 	if (ok) {
-		const uint32* dpix   = static_cast<const uint32*>(dst32->pixels);
+		const uint32* pix1   = static_cast<const uint32*>(dst32->pixels);
+		const uint32* pix2   = static_cast<const uint32*>(dst32b->pixels);
+		const uint32* pix3   = have3 ? static_cast<const uint32*>(dst32c->pixels) : nullptr;
 		const int     dpitch = dst32->pitch / static_cast<int>(sizeof(uint32));
 		for (int y = 0; y < tex_h; y++) {
 			const int            sy   = y / factor;
-			const uint32*        drow = dpix + static_cast<size_t>(y + factor * gb) * dpitch + factor * gb;
+			const size_t         roff = static_cast<size_t>(y + factor * gb) * dpitch + factor * gb;
+			const uint32*        row1 = pix1 + roff;
+			const uint32*        row2 = pix2 + roff;
+			const uint32*        row3 = have3 ? pix3 + roff : nullptr;
 			const unsigned char* srow = src + static_cast<size_t>(sy) * spitch;
 			uint32*              trow = texpix.get() + static_cast<size_t>(y) * tex_w;
 			for (int x = 0; x < tex_w; x++) {
 				const unsigned char idx = srow[x / factor];
-				uint32              a;
-				if (idx == transp) {
-					a = 0;
-				} else if (has_ov && ov[idx] != 0) {
-					a = (ov[idx] >> 24) & 0xff;
-				} else {
-					a = 0xff;
+				const uint32        p1  = row1[x];
+				const uint32        p2  = row2[x];
+				const int           r1  = (p1 >> 16) & 0xff;
+				const int           g1  = (p1 >> 8) & 0xff;
+				const int           b1  = p1 & 0xff;
+				const int           r2  = (p2 >> 16) & 0xff;
+				const int           g2  = (p2 >> 8) & 0xff;
+				const int           b2  = p2 & 0xff;
+				// For each pair of passes, two independent estimates of the
+				// transparent fraction t (0..255) from the channels where the
+				// fills differ by 255. If a pair's estimates agree, both its
+				// passes made identical scaling decisions and its t is exact.
+				// Pass fills: 1=red, 2=green, 3=blue (pass 3 only when needed).
+				const int t12a = r1 - r2, t12b = g2 - g1;    // pair (1,2)
+				int       t2sum = t12a + t12b;               // Sum of the two estimates (= 2*t).
+				int       use   = 1;                         // Which pass to un-blend from (1 or 2).
+				int       sbest = std::abs(t12a - t12b);
+				if (have3) {
+					const uint32 p3   = row3[x];
+					const int    r3   = (p3 >> 16) & 0xff;
+					const int    g3   = (p3 >> 8) & 0xff;
+					const int    b3   = p3 & 0xff;
+					const int    t13a = r1 - r3, t13b = b3 - b1;    // pair (1,3)
+					const int    t23a = g2 - g3, t23b = b3 - b2;    // pair (2,3)
+					const int    s13 = std::abs(t13a - t13b);
+					const int    s23 = std::abs(t23a - t23b);
+					if (s13 < sbest) {
+						sbest = s13;
+						t2sum = t13a + t13b;
+						use   = 1;
+					}
+					if (s23 < sbest) {
+						sbest = s23;
+						t2sum = t23a + t23b;
+						use   = 2;
+					}
 				}
-				trow[x] = (a << 24) | (drow[x] & 0x00ffffff);
+				int    cov;
+				uint32 rgb;
+				if (sbest > 96) {
+					// All pairs disagreed: fall back to the crisp source pixel.
+					cov = idx == transp ? 0 : 255;
+					rgb = layer_argb_pixel(layer, idx) & 0x00ffffffu;
+				} else {
+					const int t = std::max(0, std::min(255, (t2sum + 1) / 2));
+					cov         = 255 - t;
+					if (cov <= 8) {    // (Nearly) fully transparent.
+						cov = 0;
+						rgb = 0;
+					} else {
+						// Un-blend: out = c*cov/255 + fill*t/255, fill is pure
+						// red (pass 1) or pure green (pass 2).
+						const int t255 = 255 - cov;
+						int       cR, cG, cB;
+						if (use == 1) {
+							cR = (r1 - t255) * 255 / cov;
+							cG = g1 * 255 / cov;
+							cB = b1 * 255 / cov;
+						} else {
+							cR = r2 * 255 / cov;
+							cG = (g2 - t255) * 255 / cov;
+							cB = b2 * 255 / cov;
+						}
+						cR  = std::max(0, std::min(255, cR));
+						cG  = std::max(0, std::min(255, cG));
+						cB  = std::max(0, std::min(255, cB));
+						rgb = (static_cast<uint32>(cR) << 16) | (static_cast<uint32>(cG) << 8) | static_cast<uint32>(cB);
+					}
+				}
+				// Intrinsic (translucency) alpha of the underlying source pixel,
+				// so translucent layers stay translucent. The coverage keeps the
+				// scaler's own smooth (anti-aliased) edge.
+				int intrinsic;
+				if (idx != transp && has_ov && ov[idx] != 0) {
+					intrinsic = (ov[idx] >> 24) & 0xff;
+				} else {
+					intrinsic = 255;    // Opaque (or an outer AA pixel).
+				}
+				const uint32 a = static_cast<uint32>(cov * intrinsic / 255);
+				trow[x]        = (a << 24) | rgb;
 			}
 		}
 	} else {
@@ -353,6 +489,12 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 		}
 	}
 	SDL_UpdateTexture(layer.texture, nullptr, texpix.get(), tex_w * static_cast<int>(sizeof(uint32)));
+	if (dst32c) {
+		SDL_DestroySurface(dst32c);
+	}
+	if (dst32b) {
+		SDL_DestroySurface(dst32b);
+	}
 	if (dst32) {
 		SDL_DestroySurface(dst32);
 	}
