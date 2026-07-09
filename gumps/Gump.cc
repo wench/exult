@@ -83,8 +83,8 @@ Gump::Gump(
 		Container_game_object* cont,     // Container it represents.
 		int                    shnum,    // Shape #.
 		ShapeFile              shfile)
-		: Gump_Base(shnum, shnum == -1 ? -1 : 0, shfile), container(cont), handles_kbd(false) {
-	set_pos();
+		: Gump_Base(shnum, shnum == -1 ? -1 : 0, shfile), container(cont), x(0), y(0), handles_kbd(false) {
+	center_rect_on_screen(Gump::get_rect());
 }
 
 /*
@@ -156,6 +156,11 @@ void Gump::free_render_layer() {
  *   Set centered.
  */
 
+void Gump::center_rect_on_screen(const TileRect& rect) {
+	x = (gwin->get_width() - rect.w) / 2 - rect.x;
+	y = (gwin->get_height() - rect.h) / 2 - rect.y;
+}
+
 void Gump::set_pos() {
 	// reset coords to 0 while getting rect
 	x         = 0;
@@ -163,8 +168,7 @@ void Gump::set_pos() {
 	auto rect = get_rect();
 	// mark old position dirty
 	gwin->add_dirty(rect);
-	x = (gwin->get_width() - rect.w) / 2 - rect.x;
-	y = (gwin->get_height() - rect.h) / 2 - rect.y;
+	center_rect_on_screen(rect);
 
 	// mark new position dirty
 	gwin->add_dirty(get_rect());

@@ -30,6 +30,7 @@ Boston, MA  02111-1307, USA.
 #include "ibuf8.h"
 #include "imagewin.h"
 
+#include <array>
 #include <memory>
 
 template <class T>
@@ -76,7 +77,7 @@ public:
 	// Gamma-correct a raw 768-byte RGB palette into 'out' the same way
 	// set_palette builds the live 'colors' table, without disturbing it. Used
 	// to build a fixed-palette override for an overlay layer.
-	void apply_gamma_palette(const unsigned char* rgbs, int maxval, int brightness, unsigned char out[768]) const;
+	void apply_gamma_palette(const unsigned char* rgbs, int maxval, int brightness, std::array<unsigned char, 768>& out) const;
 
 	// Get palette.
 	virtual const unsigned char* get_palette() const {

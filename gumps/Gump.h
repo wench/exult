@@ -151,6 +151,8 @@ protected:
 		}
 	}
 
+	void center_rect_on_screen(const TileRect& rect);
+
 public:
 	const Gump_elems& get_elems() const {
 		return elems;
@@ -271,7 +273,7 @@ public:
 	// (like the mouse pointer) independently of the game area. The handle and
 	// the game-coordinate bounds the layer buffer was built for are cached
 	// here; Gump_manager owns the create/render/destroy lifecycle.
-	int      render_layer  = -1;
+	int      render_layer = -1;
 	TileRect layer_bounds{0, 0, 0, 0};
 
 	// Optional SECOND overlay layer + bounds, for HUD gumps that render as two

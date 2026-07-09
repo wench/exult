@@ -1801,14 +1801,17 @@ static void Handle_event(SDL_Event& event) {
 		gwin->get_win()->screen_to_game(event.button.x, event.button.y, gwin->get_fastmouse(), x, y);
 		if (event.button.button == 1) {
 			Gump_button* button;
+			bool         closing_parent_gump = false;
+			if ((gump = gump_man->find_gump(x, y, false)) != nullptr) {
+				gump_man->map_game_to_gump(gump, x, y, gx, gy);
+				button              = gump->on_button(gx, gy);
+				closing_parent_gump = button != nullptr && button->is_checkmark();
+			}
 			// Allow dragging only either if the avatar can act or if map edit
 			// or hackmove is on.
-			if (avatar_can_act || cheat.in_hack_mover()
-				|| ((gump = gump_man->find_gump(x, y, false))
-					&& (gump_man->map_game_to_gump(gump, x, y, gx, gy), (button = gump->on_button(gx, gy)))
-					&& button->is_checkmark())) {    // also allow closing
-													 // parent gump when
-													 // clicking on checkmark
+			if (avatar_can_act || cheat.in_hack_mover() || closing_parent_gump) {    // also allow closing
+																					 // parent gump when
+																					 // clicking on checkmark
 #ifdef USE_EXULTSTUDIO
 				if (cheat.in_map_editor()) {
 					// Paint if shift-click.
@@ -2904,6 +2907,7 @@ void BuildGameMap(BaseGameInfo* game, int mapnum) {
 	}
 }
 
+// Applies the UI layer configuration from the config file to the game window.
 static void apply_ui_layer_config() {
 	if (gwin == nullptr) {
 		return;

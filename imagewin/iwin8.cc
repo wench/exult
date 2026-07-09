@@ -118,7 +118,8 @@ void Image_window8::set_palette(
 	mark_all_layers_dirty();
 }
 
-void Image_window8::apply_gamma_palette(const unsigned char* rgbs, int maxval, int brightness, unsigned char out[768]) const {
+void Image_window8::apply_gamma_palette(
+		const unsigned char* rgbs, int maxval, int brightness, std::array<unsigned char, 768>& out) const {
 	for (int i = 0; i < 256; i++) {
 		out[3 * i]     = GammaRed[Get_color8(rgbs[3 * i], maxval, brightness)];
 		out[3 * i + 1] = GammaGreen[Get_color8(rgbs[3 * i + 1], maxval, brightness)];
@@ -361,12 +362,13 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 				// Pre-scan: do the red/green passes disagree anywhere? (Early
 				// exit on the first such pixel; this is far cheaper than an
 				// unconditional third scaler run.)
-				const uint32* pix1   = static_cast<const uint32*>(dst32->pixels);
-				const uint32* pix2   = static_cast<const uint32*>(dst32b->pixels);
-				const int     dpitch = dst32->pitch / static_cast<int>(sizeof(uint32));
-				bool          needs3 = false;
+				const uint32* pix1             = static_cast<const uint32*>(dst32->pixels);
+				const uint32* pix2             = static_cast<const uint32*>(dst32b->pixels);
+				const size_t  dpitch           = static_cast<size_t>(dst32->pitch) / sizeof(uint32);
+				const size_t  scaled_guardband = static_cast<size_t>(factor) * static_cast<size_t>(gb);
+				bool          needs3           = false;
 				for (int y = 0; y < tex_h && !needs3; y++) {
-					const size_t  roff = static_cast<size_t>(y + factor * gb) * dpitch + factor * gb;
+					const size_t  roff = (static_cast<size_t>(y) + scaled_guardband) * dpitch + scaled_guardband;
 					const uint32* row1 = pix1 + roff;
 					const uint32* row2 = pix2 + roff;
 					for (int x = 0; x < tex_w; x++) {
@@ -396,13 +398,14 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 
 	auto texpix = make_unique<uint32[]>(static_cast<size_t>(tex_w) * tex_h);
 	if (ok) {
-		const uint32* pix1   = static_cast<const uint32*>(dst32->pixels);
-		const uint32* pix2   = static_cast<const uint32*>(dst32b->pixels);
-		const uint32* pix3   = have3 ? static_cast<const uint32*>(dst32c->pixels) : nullptr;
-		const int     dpitch = dst32->pitch / static_cast<int>(sizeof(uint32));
+		const uint32* pix1             = static_cast<const uint32*>(dst32->pixels);
+		const uint32* pix2             = static_cast<const uint32*>(dst32b->pixels);
+		const uint32* pix3             = have3 ? static_cast<const uint32*>(dst32c->pixels) : nullptr;
+		const size_t  dpitch           = static_cast<size_t>(dst32->pitch) / sizeof(uint32);
+		const size_t  scaled_guardband = static_cast<size_t>(factor) * static_cast<size_t>(gb);
 		for (int y = 0; y < tex_h; y++) {
 			const int            sy   = y / factor;
-			const size_t         roff = static_cast<size_t>(y + factor * gb) * dpitch + factor * gb;
+			const size_t         roff = (static_cast<size_t>(y) + scaled_guardband) * dpitch + scaled_guardband;
 			const uint32*        row1 = pix1 + roff;
 			const uint32*        row2 = pix2 + roff;
 			const uint32*        row3 = have3 ? pix3 + roff : nullptr;

@@ -33,6 +33,7 @@
 #include "utils.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 
 #ifdef __GNUC__
@@ -256,8 +257,8 @@ void Palette::update_ui_layer_palettes() {
         return ref_pal[pal_num];
 	};
 
-	const int     cur = palette;    // Current palette number (-1 = custom/transition).
-	unsigned char out[768];
+	const int                      cur = palette;    // Current palette number (-1 = custom/transition).
+	std::array<unsigned char, 768> out;
 	for (int k = 0; k < Image_window::NumUiLayerKinds; ++k) {
 		const auto kind    = static_cast<Image_window::UiLayerKind>(k);
 		const int  mode    = win->get_ui_layer_palette_mode(kind);
@@ -272,7 +273,7 @@ void Palette::update_ui_layer_palettes() {
 			continue;
 		}
 		win->apply_gamma_palette(raw, max_val, brightness, out);
-		win->set_ui_layer_palette_colors(kind, out);
+		win->set_ui_layer_palette_colors(kind, out.data());
 	}
 }
 

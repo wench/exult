@@ -356,7 +356,9 @@ void Shape_manager::load() {
 	const int xfstart = 0xff - static_cast<int>(nxforms);
 	for (size_t i = 0; i < nblends; i++) {
 		const int idx = xfstart + static_cast<int>(i);
-		if (idx < 0 || idx > 0xfe) {
+		// idx is >= 0 (xfstart >= 0 since nblends is read from a byte); only
+		// the upper bound needs guarding for the translucency_argb[] write.
+		if (idx > 0xfe) {
 			continue;
 		}
 		const uint32 r         = blends[4 * i + 0];
