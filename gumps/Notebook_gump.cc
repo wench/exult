@@ -479,6 +479,46 @@ Gump_button* Notebook_gump::on_button(
  */
 
 void Notebook_gump::paint() {
+	// The notebook is composited from its own scaled overlay layer. During the
+	// normal render pass the gump manager makes that layer the active render
+	// target before calling paint(). But paint() is also invoked directly from
+	// input handlers (to reposition the text cursor, turn a page, edit text).
+	// In that case the active render target is the main game buffer, and
+	// drawing there leaves an unscaled duplicate of the notebook underneath the
+	// real (scaled) gump — very visible on iOS, where the gump layer is scaled
+	// up. Detect a stray paint and redirect it to a throwaway buffer: it still
+	// updates pagination and cursor.x/y (in game coordinates, as the navigation
+	// code expects) without touching the visible buffer, and we mark the gump
+	// dirty so its layer is re-rendered for the actual on-screen update.
+	Image_window8* iwin      = gwin->get_win();
+	Image_buffer8* layer_buf = render_layer >= 0 ? gwin->get_layer_ibuf(render_layer) : nullptr;
+	if (layer_buf != nullptr && iwin->get_render_buffer() == layer_buf) {
+		paint_contents();    // Normal layer render pass.
+		return;
+	}
+	// Reused off-screen scratch buffer (game-window sized) so cursor.x/y are
+	// computed exactly as if painting to the game buffer, just discarded.
+	static std::unique_ptr<Image_buffer> scratch;
+	static int                           scratch_w = 0;
+	static int                           scratch_h = 0;
+	const int                            w         = gwin->get_width();
+	const int                            h         = gwin->get_height();
+	if (!scratch || scratch_w != w || scratch_h != h) {
+		scratch   = iwin->create_buffer(w, h);
+		scratch_w = w;
+		scratch_h = h;
+	}
+	if (scratch) {
+		Image_buffer8* prev = gwin->push_render_target(static_cast<Image_buffer8*>(scratch.get()));
+		paint_contents();
+		gwin->pop_render_target(prev);
+		gwin->add_dirty(get_rect());    // Re-render the layer for display.
+	} else {
+		paint_contents();
+	}
+}
+
+void Notebook_gump::paint_contents() {
 	Gump::paint();
 	if (curpage > 0) {    // Not the first?
 		leftpage->paint();
