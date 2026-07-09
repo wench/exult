@@ -433,36 +433,6 @@
 0X6C2:Please add the games in File Sharing
 0X6C3:Touch screen for help!
 
-#UIOptions_gump.cc
-0x6C4:Size:
-0x6C5:Scale method:
-0x6C6:Fill mode:
-0x6C7:Fill scaler:
-0x6C8:Same settings for
-0x6C9:all layers:
-0x6CA:Full
-0x6CB:Medium
-0x6CC:Auto
-0x6CD:Mouse Pointer
-0x6CE:Conversations
-0x6CF:Gumps
-0x6D0:HUD Gumps
-0x6D1:Text Gumps
-0x6D2:Modal Gumps
-0x6D3:Text Effect
-0x6D4:UI Options
-0x6D5:Night Palette:
-0x6D6:Spell
-0x6D7:Overcast
-0x6D8:Dusk
-0x6D9:Invisible
-0x6DA:Fog
-0x6DB:Candle
-0x6DC:Red
-0x6DD:Lightning
-0x6DE:Single light
-0x6DF:Many lights
-
 #Misc
 # SI copy protection failed
 0x6F0:Oink!
@@ -1140,3 +1110,31 @@
 0xA6E:Reload Usecode
 0xA6F:Flag Editor
 
+#UIOptions_gump.cc
+0xB00:Size:
+0xB01:Scale method:
+0xB02:Fill mode:
+0xB03:Fill scaler:
+0xB04:Same settings for
+0xB05:all layers:
+0xB06:Full
+0xB07:Medium
+0xB08:Auto
+0xB09:Mouse Pointer
+0xB0A:Conversations
+0xB0B:Gumps
+0xB0C:HUD Gumps
+0xB0D:Text Gumps
+0xB0E:Modal Gumps
+0xB0F:Text Effect
+0xB10:Night Palette:
+0xB11:Dusk
+0xB12:Invisible
+0xB13:Overcast
+0xB14:Fog
+0xB15:Spell
+0xB16:Candle
+0xB17:Red
+0xB18:Lightning
+0xB19:Single light
+0xB1A:Many lights

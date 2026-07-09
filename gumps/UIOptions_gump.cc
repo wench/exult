@@ -57,67 +57,67 @@ namespace {
 	class Strings : public GumpStrings {
 	public:
 		static auto Size_() {
-			return get_text_msg(0x6C4 - msg_file_start);
+			return get_text_msg(0xB00 - msg_file_start);
 		}
 
 		static auto Scalemethod_() {
-			return get_text_msg(0x6C5 - msg_file_start);
+			return get_text_msg(0xB01 - msg_file_start);
 		}
 
 		static auto Fillmode_() {
-			return get_text_msg(0x6C6 - msg_file_start);
+			return get_text_msg(0xB02 - msg_file_start);
 		}
 
 		static auto Fillscaler_() {
-			return get_text_msg(0x6C7 - msg_file_start);
+			return get_text_msg(0xB03 - msg_file_start);
 		}
 
 		static auto SameSettingsFor_() {
-			return get_text_msg(0x6C8 - msg_file_start);
+			return get_text_msg(0xB04 - msg_file_start);
 		}
 
 		static auto AllLayers_() {
-			return get_text_msg(0x6C9 - msg_file_start);
+			return get_text_msg(0xB05 - msg_file_start);
 		}
 
 		static auto Full320x200_() {
-			return get_text_msg(0x6CA - msg_file_start);
+			return get_text_msg(0xB06 - msg_file_start);
 		}
 
 		static auto Medium420x263_() {
-			return get_text_msg(0x6CB - msg_file_start);
+			return get_text_msg(0xB07 - msg_file_start);
 		}
 
 		static auto Auto0x0_() {
-			return get_text_msg(0x6CC - msg_file_start);
+			return get_text_msg(0xB08 - msg_file_start);
 		}
 
 		static auto MousePointer_() {
-			return get_text_msg(0x6CD - msg_file_start);
+			return get_text_msg(0xB09 - msg_file_start);
 		}
 
 		static auto Conversations_() {
-			return get_text_msg(0x6CE - msg_file_start);
+			return get_text_msg(0xB0A - msg_file_start);
 		}
 
 		static auto Gumps_() {
-			return get_text_msg(0x6CF - msg_file_start);
+			return get_text_msg(0xB0B - msg_file_start);
 		}
 
 		static const char* HudGumps_() {
-			return get_text_msg(0x6D0 - msg_file_start);
+			return get_text_msg(0xB0C - msg_file_start);
 		}
 
 		static auto TextGumps_() {
-			return get_text_msg(0x6D1 - msg_file_start);
+			return get_text_msg(0xB0D - msg_file_start);
 		}
 
 		static auto ModalGumps_() {
-			return get_text_msg(0x6D2 - msg_file_start);
+			return get_text_msg(0xB0E - msg_file_start);
 		}
 
 		static auto TextEffect_() {
-			return get_text_msg(0x6D3 - msg_file_start);
+			return get_text_msg(0xB0F - msg_file_start);
 		}
 
 		static auto AdvancedSettings_() {
@@ -125,7 +125,7 @@ namespace {
 		}
 
 		static auto Palette_() {
-			return get_text_msg(0x6D5 - msg_file_start);
+			return get_text_msg(0xB10 - msg_file_start);
 		}
 
 		static auto Fill_() {
@@ -279,16 +279,16 @@ namespace {
 			{
              {Image_window::UiPaletteDisabled, "disabled", 0x59A},
              {Image_window::UiPaletteDay, "day", 0x658},
-             {Image_window::UiPaletteDusk, "dusk", 0x6D8},
-             {Image_window::UiPaletteInvisible, "invisible", 0x6D9},
-             {Image_window::UiPaletteOvercast, "overcast", 0x6D7},
-             {Image_window::UiPaletteFog, "fog", 0x6DA},
-             {Image_window::UiPaletteSpell, "spell", 0x6D6},
-             {Image_window::UiPaletteCandle, "candle", 0x6DB},
-             {Image_window::UiPaletteRed, "red", 0x6DC},
-             {Image_window::UiPaletteLightning, "lightning", 0x6DD},
-             {Image_window::UiPaletteSingleLight, "single_light", 0x6DE},
-             {Image_window::UiPaletteManyLights, "many_lights", 0x6DF},
+             {Image_window::UiPaletteDusk, "dusk", 0xB11},
+             {Image_window::UiPaletteInvisible, "invisible", 0xB12},
+             {Image_window::UiPaletteOvercast, "overcast", 0xB13},
+             {Image_window::UiPaletteFog, "fog", 0xB14},
+             {Image_window::UiPaletteSpell, "spell", 0xB15},
+             {Image_window::UiPaletteCandle, "candle", 0xB16},
+             {Image_window::UiPaletteRed, "red", 0xB17},
+             {Image_window::UiPaletteLightning, "lightning", 0xB18},
+             {Image_window::UiPaletteSingleLight, "single_light", 0xB19},
+             {Image_window::UiPaletteManyLights, "many_lights", 0xB1A},
 			 }
     };
 
