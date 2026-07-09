@@ -257,7 +257,11 @@ void Palette::update_ui_layer_palettes() {
         return ref_pal[pal_num];
 	};
 
-	const int                      cur = palette;    // Current palette number (-1 = custom/transition).
+	const int cur = palette;    // Current palette number (-1 = custom/transition).
+	// While the palette number is -1 we are mid cross-fade and don't want the UI layers to change their palette.
+	if (cur < 0) {
+		return;
+	}
 	std::array<unsigned char, 768> out;
 	for (int k = 0; k < Image_window::NumUiLayerKinds; ++k) {
 		const auto kind    = static_cast<Image_window::UiLayerKind>(k);
