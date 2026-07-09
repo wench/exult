@@ -542,8 +542,8 @@ void Face_stats::create_buttons() {
 	for (i = 0; i < 8; i++) {
 		if (party[i]) {
 			const TileRect r = party[i]->get_rect();
-			region      = have_region ? region.add(r) : r;
-			have_region = true;
+			region           = have_region ? region.add(r) : r;
+			have_region      = true;
 		}
 	}
 }
@@ -573,7 +573,10 @@ TileRect Face_stats::hud_part_rect(int part) {
 		}
 	}
 	if (!have) {
-		return region;
+		// This part has no portraits (e.g. the right column when there are
+		// four or fewer party members). Return an empty rect so the caller
+		// hides this part's layer instead of duplicating the other column.
+		return TileRect(0, 0, 0, 0);
 	}
 	// Always reserve four portrait heights (from the top portrait down) so the
 	// column is positioned as if there were four heads, regardless of how many

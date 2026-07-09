@@ -146,7 +146,17 @@ void Gump_manager::render_gump_part_to_layer(Gump* g, int z, int part, bool is_h
 
 	// Tight game-coordinate content rect for this part, then the padded buffer.
 	TileRect content = (g->hud_part_count() > 1) ? g->hud_part_rect(part) : g->get_dirty();
-	TileRect b       = content;
+	// An empty content rect means this part has nothing to draw (e.g. the
+	// right-hand face-stats column when there are four or fewer party members);
+	// hide its layer. This must be checked before enlarge(), which would inflate
+	// a 0x0 rect into a non-empty buffer.
+	if (content.w <= 0 || content.h <= 0) {
+		if (layer >= 0) {
+			gwin->layer_set_visible(layer, false);
+		}
+		return;
+	}
+	TileRect b = content;
 	b.enlarge(gump_layer_margin);
 	if (b.w <= 0 || b.h <= 0) {
 		if (layer >= 0) {
