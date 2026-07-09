@@ -72,71 +72,71 @@ namespace {
 			return get_text_msg(0x6C7 - msg_file_start);
 		}
 
-		static auto Universal_() {
+		static auto SameSettingsFor_() {
 			return get_text_msg(0x6C8 - msg_file_start);
 		}
 
-		static auto Full320x200() {
+		static auto AllLayers_() {
 			return get_text_msg(0x6C9 - msg_file_start);
 		}
 
-		static auto Medium420x263() {
+		static auto Full320x200_() {
 			return get_text_msg(0x6CA - msg_file_start);
 		}
 
-		static auto Auto0x0() {
+		static auto Medium420x263_() {
 			return get_text_msg(0x6CB - msg_file_start);
 		}
 
-		static auto UIlayersettings() {
+		static auto Auto0x0_() {
 			return get_text_msg(0x6CC - msg_file_start);
 		}
 
-		static auto MousePointer() {
+		static auto MousePointer_() {
 			return get_text_msg(0x6CD - msg_file_start);
 		}
 
-		static auto Conversations() {
+		static auto Conversations_() {
 			return get_text_msg(0x6CE - msg_file_start);
 		}
 
-		static auto Gumps() {
+		static auto Gumps_() {
 			return get_text_msg(0x6CF - msg_file_start);
 		}
 
-		static const char* HudGumps() {
-			return "HUD Gumps";
-		}
-
-		static auto TextGumps() {
+		static const char* HudGumps_() {
 			return get_text_msg(0x6D0 - msg_file_start);
 		}
 
-		static auto ModalGumps() {
+		static auto TextGumps_() {
 			return get_text_msg(0x6D1 - msg_file_start);
 		}
 
-		static auto TextEffect() {
+		static auto ModalGumps_() {
 			return get_text_msg(0x6D2 - msg_file_start);
 		}
 
-		static auto AdvancedSettings() {
+		static auto TextEffect_() {
 			return get_text_msg(0x6D3 - msg_file_start);
 		}
 
-		static auto Palette() {
+		static auto AdvancedSettings_() {
+			return get_text_msg(0x601 - msg_file_start);
+		}
+
+		static auto Palette_() {
 			return get_text_msg(0x6D5 - msg_file_start);
 		}
 
-		static auto Fill() {
+		static auto Fill_() {
 			return get_text_msg(0x683 - msg_file_start);
 		}
 
-		static auto Fit() {
+		static auto Fit_() {
 			return get_text_msg(0x684 - msg_file_start);
 		}
 
-		static auto Centre() {
+		static auto Centre_() {
 			return get_text_msg(0x685 - msg_file_start);
 		}
 	};
@@ -151,8 +151,8 @@ namespace {
 	constexpr int row_fill_mode  = 2;
 	constexpr int row_fill_scl   = 3;
 	constexpr int row_palette    = 4;
-	constexpr int row_universal  = 5;
-	constexpr int row_layer_hdr  = 6;
+	constexpr int row_same       = 5;
+	constexpr int row_universal  = 6;
 	constexpr int row_layer_base = 7;
 	constexpr int row_buttons    = 14;
 
@@ -175,19 +175,19 @@ namespace {
 	const char* get_layer_name(size_t idx) {
 		switch (idx) {
 		case 0:
-			return Strings::MousePointer();
+			return Strings::MousePointer_();
 		case 1:
-			return Strings::Conversations();
+			return Strings::Conversations_();
 		case 2:
-			return Strings::Gumps();
+			return Strings::Gumps_();
 		case 3:
-			return Strings::HudGumps();
+			return Strings::HudGumps_();
 		case 4:
-			return Strings::TextGumps();
+			return Strings::TextGumps_();
 		case 5:
-			return Strings::ModalGumps();
+			return Strings::ModalGumps_();
 		case 6:
-			return Strings::TextEffect();
+			return Strings::TextEffect_();
 		default:
 			return "";
 		}
@@ -387,7 +387,7 @@ namespace {
 			font->paint_text(iwin->get_ib8(), Strings::Scalemethod_(), x + label_margin, y + yForRow(3) + 1);
 			font->paint_text(iwin->get_ib8(), Strings::Fillmode_(), x + label_margin, y + yForRow(4) + 1);
 			font->paint_text(iwin->get_ib8(), Strings::Fillscaler_(), x + label_margin, y + yForRow(5) + 1);
-			font->paint_text(iwin->get_ib8(), Strings::Palette(), x + label_margin, y + yForRow(6) + 1);
+			font->paint_text(iwin->get_ib8(), Strings::Palette_(), x + label_margin, y + yForRow(6) + 1);
 			gwin->set_painted();
 		}
 
@@ -424,7 +424,7 @@ namespace {
 		}
 
 		void build_buttons() {
-			std::vector<std::string> size_text = {Strings::Full320x200(), Strings::Medium420x263(), Strings::Auto0x0()};
+			std::vector<std::string> size_text = {Strings::Full320x200_(), Strings::Medium420x263_(), Strings::Auto0x0_()};
 			buttons[id_size]                   = std::make_unique<Layer_toggle>(
                     this, &UIOptionsLayerSettings_gump::toggle_size, std::move(size_text), size_to_selection(working_cfg),
                     get_button_pos_for_label(Strings::Size_()), yForRow(2), 108);
@@ -447,7 +447,7 @@ namespace {
 					this, &UIOptionsLayerSettings_gump::toggle_scale_method, std::move(scaler_text), scaler_sel,
 					get_button_pos_for_label(Strings::Scalemethod_()), yForRow(3), 108);
 
-			std::vector<std::string> fill_mode_text = {Strings::Fill(), Strings::Fit(), Strings::Centre()};
+			std::vector<std::string> fill_mode_text = {Strings::Fill_(), Strings::Fit_(), Strings::Centre_()};
 			buttons[id_fill_mode]                   = std::make_unique<Layer_toggle>(
                     this, &UIOptionsLayerSettings_gump::toggle_fill_mode, std::move(fill_mode_text),
                     fillmode_to_selection(working_cfg.fill_mode), get_button_pos_for_label(Strings::Fillmode_()), yForRow(4), 108);
@@ -465,7 +465,7 @@ namespace {
 
 			buttons[id_palette] = std::make_unique<Layer_toggle>(
 					this, &UIOptionsLayerSettings_gump::toggle_palette, palette_options(),
-					palette_to_selection(working_cfg.palette), get_button_pos_for_label(Strings::Palette()), yForRow(6), 108);
+					palette_to_selection(working_cfg.palette), get_button_pos_for_label(Strings::Palette_()), yForRow(6), 108);
 
 			ResizeWidthToFitWidgets(tcb::span(buttons.data(), buttons.size()));
 			HorizontalArrangeWidgets(tcb::span(buttons.data(), 3));
@@ -547,7 +547,7 @@ void UIOptions_gump::build_buttons() {
 		buttons[i].reset();
 	}
 
-	std::vector<std::string> size_text = {Strings::Full320x200(), Strings::Medium420x263(), Strings::Auto0x0()};
+	std::vector<std::string> size_text = {Strings::Full320x200_(), Strings::Medium420x263_(), Strings::Auto0x0_()};
 	buttons[id_size]                   = std::make_unique<UIOptions_toggle>(
             this, &UIOptions_gump::toggle_size, std::move(size_text), size_to_selection(global_cfg),
             get_button_pos_for_label(Strings::Size_()), yForRow(row_size), 108);
@@ -565,7 +565,7 @@ void UIOptions_gump::build_buttons() {
 			this, &UIOptions_gump::toggle_scale_method, std::move(scaler_text), scaler_sel,
 			get_button_pos_for_label(Strings::Scalemethod_()), yForRow(row_scale), 108);
 
-	std::vector<std::string> fill_mode_text = {Strings::Fill(), Strings::Fit(), Strings::Centre()};
+	std::vector<std::string> fill_mode_text = {Strings::Fill_(), Strings::Fit_(), Strings::Centre_()};
 	buttons[id_fill_mode]                   = std::make_unique<UIOptions_toggle>(
             this, &UIOptions_gump::toggle_fill_mode, std::move(fill_mode_text), fillmode_to_selection(global_cfg.fill_mode),
             get_button_pos_for_label(Strings::Fillmode_()), yForRow(row_fill_mode), 108);
@@ -582,35 +582,35 @@ void UIOptions_gump::build_buttons() {
 
 	const std::vector<std::string> yes_no = {Strings::No(), Strings::Yes()};
 	buttons[id_universal]                 = std::make_unique<UIOptions_toggle>(
-            this, &UIOptions_gump::toggle_universal, yes_no, universal ? 1 : 0, get_button_pos_for_label(Strings::Universal_()),
+            this, &UIOptions_gump::toggle_universal, yes_no, universal ? 1 : 0, get_button_pos_for_label(Strings::AllLayers_()),
             yForRow(row_universal), 44);
 
 	buttons[id_palette] = std::make_unique<UIOptions_toggle>(
 			this, &UIOptions_gump::toggle_palette, palette_options(), palette_to_selection(global_cfg.palette),
-			get_button_pos_for_label(Strings::Palette()), yForRow(row_palette), 108);
+			get_button_pos_for_label(Strings::Palette_()), yForRow(row_palette), 108);
 
 	if (!universal) {
 		buttons[id_layer_mouse] = std::make_unique<UIOptions_button>(
-				this, &UIOptions_gump::open_mouse_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::MousePointer()), yForLayerIndex(0), 108);
+				this, &UIOptions_gump::open_mouse_advanced, Strings::AdvancedSettings_(),
+				get_button_pos_for_label(Strings::MousePointer_()), yForLayerIndex(0), 108);
 		buttons[id_layer_conversations] = std::make_unique<UIOptions_button>(
-				this, &UIOptions_gump::open_conversations_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::Conversations()), yForLayerIndex(1), 108);
+				this, &UIOptions_gump::open_conversations_advanced, Strings::AdvancedSettings_(),
+				get_button_pos_for_label(Strings::Conversations_()), yForLayerIndex(1), 108);
 		buttons[id_layer_gumps] = std::make_unique<UIOptions_button>(
-				this, &UIOptions_gump::open_gumps_advanced, Strings::AdvancedSettings(), get_button_pos_for_label(Strings::Gumps()),
-				yForLayerIndex(2), 108);
+				this, &UIOptions_gump::open_gumps_advanced, Strings::AdvancedSettings_(),
+				get_button_pos_for_label(Strings::Gumps_()), yForLayerIndex(2), 108);
 		buttons[id_layer_hud_gumps] = std::make_unique<UIOptions_button>(
-				this, &UIOptions_gump::open_hud_gumps_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::HudGumps()), yForLayerIndex(3), 108);
+				this, &UIOptions_gump::open_hud_gumps_advanced, Strings::AdvancedSettings_(),
+				get_button_pos_for_label(Strings::HudGumps_()), yForLayerIndex(3), 108);
 		buttons[id_layer_text_gumps] = std::make_unique<UIOptions_button>(
-				this, &UIOptions_gump::open_text_gumps_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::TextGumps()), yForLayerIndex(4), 108);
+				this, &UIOptions_gump::open_text_gumps_advanced, Strings::AdvancedSettings_(),
+				get_button_pos_for_label(Strings::TextGumps_()), yForLayerIndex(4), 108);
 		buttons[id_layer_modal_gumps] = std::make_unique<UIOptions_button>(
-				this, &UIOptions_gump::open_modal_gumps_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::ModalGumps()), yForLayerIndex(5), 108);
+				this, &UIOptions_gump::open_modal_gumps_advanced, Strings::AdvancedSettings_(),
+				get_button_pos_for_label(Strings::ModalGumps_()), yForLayerIndex(5), 108);
 		buttons[id_layer_text_effect] = std::make_unique<UIOptions_button>(
-				this, &UIOptions_gump::open_text_effect_advanced, Strings::AdvancedSettings(),
-				get_button_pos_for_label(Strings::TextEffect()), yForLayerIndex(6), 108);
+				this, &UIOptions_gump::open_text_effect_advanced, Strings::AdvancedSettings_(),
+				get_button_pos_for_label(Strings::TextEffect_()), yForLayerIndex(6), 108);
 	}
 
 	ResizeWidthToFitWidgets(tcb::span(buttons.data(), buttons.size()));
@@ -779,11 +779,11 @@ void UIOptions_gump::paint() {
 	font->paint_text(iwin->get_ib8(), Strings::Scalemethod_(), x + label_margin, y + yForRow(row_scale) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Fillmode_(), x + label_margin, y + yForRow(row_fill_mode) + 1);
 	font->paint_text(iwin->get_ib8(), Strings::Fillscaler_(), x + label_margin, y + yForRow(row_fill_scl) + 1);
-	font->paint_text(iwin->get_ib8(), Strings::Palette(), x + label_margin, y + yForRow(row_palette) + 1);
-	font->paint_text(iwin->get_ib8(), Strings::Universal_(), x + label_margin, y + yForRow(row_universal) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::Palette_(), x + label_margin, y + yForRow(row_palette) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::SameSettingsFor_(), x + label_margin, y + yForRow(row_same) + 1);
+	font->paint_text(iwin->get_ib8(), Strings::AllLayers_(), x + label_margin, y + yForRow(row_universal) + 1);
 
 	if (!universal) {
-		font->paint_text(iwin->get_ib8(), Strings::UIlayersettings(), x + label_margin, y + yForRow(row_layer_hdr) + 1);
 		for (size_t i = 0; i < kLayerCount; ++i) {
 			font->paint_text(iwin->get_ib8(), get_layer_name(i), x + label_margin, y + yForLayerIndex(static_cast<int>(i)) + 1);
 		}
