@@ -7,6 +7,7 @@ MAIN_OBJS:=actions.o \
 	browser.o \
 	cheat.o \
 	cheat_screen.o \
+	cheat_screen_actors.o \
 	combat.o \
 	dir.o \
 	drag.o \

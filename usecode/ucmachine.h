@@ -65,6 +65,8 @@ public:
 	static Usecode_machine* create();
 	Usecode_machine();
 	virtual ~Usecode_machine();
+	// Read in usecode from static and patch. Called by Usecode_internal constructor but can be called again later to reload usecode
+	virtual void read_usecode()=0;
 	// Read in usecode functions.
 	virtual void read_usecode(std::istream& file, bool patch = false) = 0;
 
@@ -80,6 +82,7 @@ public:
 		died          = 7,    // In SI only, I think.
 		chat          = 9,    // When a NPC wants to talk to you in SI
 		si_path_fail  = 14,
+		num_events    = 15,
 	};
 
 	enum Global_flag_names {
@@ -188,6 +191,8 @@ public:
 	virtual void         restore_intercept(Game_object* obj, Tile_coord* t) = 0;
 
 	virtual bool function_exists(int funcid) = 0;
+
+	virtual int get_num_funcs () = 0;
 };
 
 #endif /* INCL_USECODE */

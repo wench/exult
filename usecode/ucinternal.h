@@ -488,6 +488,7 @@ public:
 	~Usecode_internal() override;
 	// Read in usecode functions.
 	void read_usecode(std::istream& file, bool patch = false) override;
+	void read_usecode() override;
 	// Call desired function.
 	int         call_usecode(int id, Game_object* item, Usecode_events event) override;
 	bool        call_method(Usecode_value* inst, int id, Game_object* item) override;
@@ -542,6 +543,12 @@ public:
 	bool function_exists(int funcid) override {
 		Usecode_function* fun = find_function(funcid);
 		return fun != nullptr;
+	}
+	int get_num_funcs() override {
+		if (funs.empty()) {
+			return 0;
+		}
+		return (funs.size()-1) * 0x100 + funs.back().size();
 	}
 };
 

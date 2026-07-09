@@ -552,7 +552,7 @@ void Conversation::remove_slot_face(int slot) {
  */
 
 void Conversation::show_npc_message(const char* msg) {
-	if (last_face_shown == -1) {
+	if (last_face_shown <= -1 || size_t(last_face_shown) >= face_info.size() || !face_info[last_face_shown]) {
 		return;
 	}
 	string translated(msg);

@@ -773,6 +773,9 @@
     <ClCompile Include="..\..\win32\crash.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\cheat_screen_actors.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\actions.h">
@@ -1532,6 +1535,9 @@
       <Filter>gumps</Filter>
     </ClInclude>
     <ClInclude Include="..\..\playscene.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\cheat_screen_strings.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

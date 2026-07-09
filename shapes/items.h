@@ -28,7 +28,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "exult_constants.h"
 
+#include <array>
 #include <iosfwd>
+#include <string>
+#include <string_view>
 
 // The game items' names.
 int         get_num_item_names();
@@ -39,7 +42,6 @@ void        Set_item_name(unsigned num, const char* name);
 int         get_num_text_msgs();
 const char* get_text_msg(unsigned num);
 void        Set_text_msg(unsigned num, const char* msg);
-
 // Frames, etc (0x500 - 0x5ff/0x685 (BG/SI)).
 int         get_num_misc_names();
 const char* get_misc_name(unsigned num);
@@ -48,6 +50,9 @@ void        Set_misc_name(unsigned num, const char* name);
 void Setup_text(bool si, bool expansion, bool sibeta, Game_Language language, bool use_special_chars = false);
 void Free_text();
 void Write_text_file();
+// Load counter is used to track when strings have been cleared or reloaded.
+// If this changes any strings previously loaded have been invalidated
+int get_text_load_counter();
 
 // This is the offset messages start at in txt.flx and exultmsg.txt
 // Subtract by this to get the message number used with get_text_msg()
@@ -180,57 +185,125 @@ const int congrats_si = 0x17F;    // to 0x187
 
 const int msg_out_of_food = 0x190;
 
+struct StringsBase {
+	// Helper class to fetch message file strings
+	// Template argument INDEX: the strings index in exultmsg
+	// Template argument COUNT: the number of Strings starting at INDEX in a string array
+	// Template Argument TReturn: The type of string the methods should return, Defaults to const char *
+	// If COUNT is 1 implicit conversion to TReturn can be done.
+	// If COUNT is more than 1 then string can only be accessed with [] () or get
+	// This will return an  empty string or an error string on failure it will never return null
+	// This class is intended to be used to declare const inline static fields in a class that inherits StringsBase
+	// see class GumpStrings below for an example
+	//
+	// String Lifetime should not be expected to last longer than the current game.
+	template <unsigned INDEX, unsigned COUNT = 1, typename TReturn = const char*>
+	struct String {
+	public:
+		const char* def_string;
+
+		// the default string is returned when the string is empty. it is set to a string containing  2 null chars so str+1 is
+		// always a valid string even if str[0] == 0
+		String(const char* def_string = "\0\0") : def_string(def_string) {}
+
+		virtual ~String() {}
+
+		TReturn get(unsigned offset = 0) const {
+			if (offset >= COUNT) {
+				return def_string;
+			}
+			offset += INDEX;
+			auto ret = get_text_msg(offset - msg_file_start);
+			return ret && *ret ? ret : def_string;
+		}
+
+		static_assert(INDEX > msg_file_start, "StringsBase::String INDEX out of range for the msg file ");
+		static_assert(COUNT != 0, "StringsBase::String COUNT must not be zero");
+
+		virtual TReturn operator[](unsigned offset) const {
+			return get(offset);
+		}
+
+		// conversion operator to TReturn
+		// This is only allowed if the string is not a string group
+		operator TReturn() const {
+			static_assert(COUNT == 1);
+			return operator[](0);
+		}
+
+		virtual TReturn operator()(unsigned offset = 0) const {
+			return operator[](offset);
+		}
+
+	private:
+		mutable std::array<TReturn, COUNT>* cached_array = nullptr;
+		mutable int                         lc           = 0;
+
+	public:
+		// Get strings in a group as an array
+		// If get_text_load_counter() changes, any string arrays can be considered invalidated and calling this method again will
+		// delete previously returned arrays and will return a new array
+		// Don't keep returned arrays around long term.
+		const std::array<TReturn, COUNT>& ToArray() const {
+			int current_lc = get_text_load_counter();
+
+			// Create the cached string array as needed
+			// If the load counter is different to when the array was created, we recreate the array because the strings have
+			// been invalidated
+			if (!cached_array || lc != current_lc) {
+				delete cached_array;
+				lc = current_lc;
+				if constexpr (COUNT == 2) {
+					// Simple easy optimization for the common case where the array is size 2
+					cached_array = new std::array<TReturn, COUNT>{(*this)[0], (*this)[1]};
+
+				} else {
+					cached_array = new std::array<TReturn, COUNT>();
+					for (size_t i = 0; i < COUNT; i++) {
+						(*cached_array)[i] = (*this)[i];
+					}
+				}
+			}
+			return *cached_array;
+		}
+	};
+
+	// Alias of String that return std::string instead of const char *
+	template <unsigned INDEX, unsigned COUNT = 1>
+	using stringString = String<INDEX, COUNT, std::string>;
+
+	// Alias of String that returns std::string_view
+	template <unsigned INDEX, unsigned COUNT = 1>
+	using stringviewString = String<INDEX, COUNT, std::string_view>;
+};
+
 // Shared gump strings are here, gump specific strings are found in the Strings
 // class in the specific gump's cc file.
-class GumpStrings {
+class GumpStrings : public StringsBase {
 public:
-	static auto OK() {
-		return get_text_msg(0x591 - msg_file_start);
-	}
+	static inline const String<0x591> OK = {};
 
-	static auto CANCEL() {
-		return get_text_msg(0x592 - msg_file_start);
-	}
+	static inline const String<0x592> CANCEL = {};
 
-	static auto HELP() {
-		return get_text_msg(0x593 - msg_file_start);
-	}
+	static inline const String<0x593> HELP = {};
 
-	static auto APPLY() {
-		return get_text_msg(0x594 - msg_file_start);
-	}
+	static inline const String<0x594> APPLY = {};
 
-	static auto Yes() {
-		return get_text_msg(0x595 - msg_file_start);
-	}
+	static inline const String<0x595> Yes = {};
 
-	static auto No() {
-		return get_text_msg(0x596 - msg_file_start);
-	}
+	static inline const String<0x596> No = {};
 
-	static auto Cancel() {
-		return get_text_msg(0x597 - msg_file_start);
-	}
+	static inline const String<0x597> Cancel = {};
 
-	static auto disabled() {
-		return get_text_msg(0x599 - msg_file_start);
-	}
+	static inline const String<0x599> disabled = {};
 
-	static auto Disabled() {
-		return get_text_msg(0x59A - msg_file_start);
-	}
+	static inline const String<0x59A> Disabled = {};
 
-	static auto Enabled() {
-		return get_text_msg(0x59B - msg_file_start);
-	}
+	static inline const String<0x59B> Enabled = {};
 
-	static auto Default() {
-		return get_text_msg(0x59C - msg_file_start);
-	}
+	static inline const String<0x59C> Default = {};
 
-	static auto Doyoureallywanttoquit_() {
-		return get_text_msg(0x59D - msg_file_start);
-	}
+	static inline const String<0x59D> Doyoureallywanttoquit_ = {};
 };
 
 //	Misc. text (frames, etc.) start at 0x500 in text.flx.

@@ -796,3 +796,347 @@
 0x8B6:   ready_type: 0x
 0x8B7:  3d: 
 0x8B8: No Shape
+
+#cheat_screen_strings.h
+0x8F0:Select->
+0x8F1:_
+0x8F2: Exit
+0x8F3:Advanced Option Cheat Screen
+0x8F4:Running: 
+0x8F5:Current time: 
+0x8F6:Day: 
+0x8F7:Coordinates 
+0x8F8:North 
+0x8F9:South
+0x8FA:Map #
+0x8FB:West
+0x8FC:East
+0x8FD:Coords in hex 
+0x8FE:Coords in dec 
+0x8FF:No
+0x900:Yes
+0x901:Off
+0x902:On
+0x903: Press A Key
+0x904:Waiting for up events: 
+0x905: Fingers
+0x906: Finger
+0x907: Left Mouse Button
+0x908: Middle Mouse Button
+0x909: Right Mouse Button
+0x90A: Key 
+0x90B: Unknown Key #
+#3 char key names
+0x90C:ESC
+0x90D:???
+0x90E:Tab
+0x90F:RET
+0x910:BS
+# Prompt Messages
+0x911:Enter Command.
+0x912:Hit a key.
+0x913:Invalid NPC.
+0x914:Invalid Object.
+0x915:Invalid Command.
+0x916:Cancelled
+0x917:Input Required
+0x918:Invalid Value
+0x919:Which NPC?
+0x91A:Enter NPC number
+0x91B: to Cancel
+0x91C:Clock Set.
+0x91D:Invalid Time.
+0x91E:Invalid Shape.
+
+0x920:Shape Set.
+0x922:Name Changed.
+0x923:Wrong shape file. Must be SHAPES.VGA.
+0x924:Enter Value.
+0x925:Enter Minute.
+0x926:Enter Hour.
+0x927:Enter Day.
+0x928:Enter Shape
+0x929:Enter Activity
+0x92A:Enter X Coord.
+0x92B:Enter Y Coord.
+0x92C:Enter Z Coord.
+0x92D:Enter Lift.
+0x92E:Enter Global Flag
+0x92F:Enter NPC Flag
+0x930:Enter Temperature
+0x931:Enter Latitude.
+0x932:Enter Longitude.
+0x934:Enter a new Name...
+0x935:  Min: 
+0x936:  Max: 
+0x937:Pick Object  
+0x938:Pick NPC          
+0x939:Browse
+0x93A:Enter Frame
+0x93B:Press
+0x93C: to exit now
+
+# Schedules - 35 indices 0x940 - 0x962
+0x940:Combat
+0x941:Hor. Pace
+0x942:Ver. Pace
+0x943:Talk
+0x944:Dance
+0x945:Eat
+0x946:Farm
+0x947:Tend Shop
+0x948:Miner
+0x949:Hound
+0x94A:Stand
+0x94B:Loiter
+0x94C:Wander
+0x94D:Blacksmith
+0x94E:Sleep
+0x94F:Wait
+0x950:Major Sit
+0x951:Graze
+0x952:Bake
+0x953:Sew
+0x954:Shy
+0x955:Lab
+0x956:Thief
+0x957:Waiter
+0x958:Special
+0x959:Kid Games
+0x95A:Eat at Inn
+0x95B:Duel
+0x95C:Preach
+0x95D:Patrol
+0x95E:Desk Work
+0x95F:Follow Avt
+0x960:Move2Sched
+0x961:Street Maintenance
+0x962:Arrest Avatar
+
+
+# NPC flags 64 indices 0x970 - 0x9AF (some empty)
+0x970:: invisible
+0x971:: asleep
+0x972:: charmed
+0x973:: cursed
+0x974:: dead
+0x976:: in_party
+#0x975:
+0x977:: paralyzed
+
+0x978:: poisoned
+0x979:: protection
+0x97A:: on_moving_barge
+0x97B:: okay_to_take
+0x97C:: might
+0x97D:: immunities
+0x97E:: cant_die
+0x97F:: in_action
+
+0x980:: dont_move/bg_dont_render
+0x981:: si_on_moving_barge
+0x982:: is_temporary
+#0x983:
+0x984:: sailor
+0x985:: okay_to_land
+0x986:: dont_render/bg_dont_move
+0x987:: in_dungeon
+
+#0x988:
+0x989:: confused
+0x98A:: in_motion
+#0x98B:
+0x98C:: met
+0x98D:: tournament
+0x98E:: si_zombie
+0x98F:: no_spell_casting
+
+0x990:: polymorph
+0x991:: tattooed
+0x992:: read
+0x993:: petra
+0x994:: si_lizard_king
+0x995:: freeze
+0x996:: naked
+
+
+# Alignments - 4 Indices 0x9B0 - 0x9B3
+0x9B0:Neutral
+0x9B1:Good
+0x9B2:Evil
+0x9B3:Chaotic
+
+#Menu Item Labels
+# Note Most menu items use the first character as the key binding. 
+# Only characters that map to a valid SDK_Keycode will work
+# This Means only keys on a US Keyboard.
+# Accented or shifted characters will not work.
+# For convienience both uppercase and lowercase letters will work
+# Menu items bound to arrow keys 
+# can not have their key bindings changed here
+#Business Menu 
+0x9B8: Set
+0x9B9: location
+0x9BA: Clear
+0x9BB:Set Current Activity
+0x9BC:Revert
+
+
+# Root Menu
+0x9E0:Paperdolls..: 
+0x9E1:God Mode....: 
+0x9E2:Wizard Mode.: 
+0x9E3:Infravision.: 
+0x9E4:Hack Mover..: 
+0x9E5:Eggs Visible: 
+0x9E6:Set Time    
+0x9E7:NPC Tool    
+0x9E8:Usecode Menu
+0x9E9:Teleport
+0x9EA:Time Rate: 
+
+#NPC Menu
+0x9F0:Business Activity
+0x9F1:Change Shape
+0x9F2:Exprience
+0x9F3:Npc flags
+0x9F4:1 Name
+0x9F5:Stats
+0x9F6:2 Training Points
+0x9F7:Teleport to NPC
+0x9F8:Palette Effect
+0x9F9:Walk to Avatar
+0x9FA: Change NPC
+0x9FB:Scroll NPCs
+0x9FC:NPC 
+0x9FD:Loc 
+0x9FE:Shape 
+0x9FF:Current Activity: 
+0xA00:Level: 
+0xA01:  Health: 
+0xA02:Training: 
+0xA03:Experience: 
+0xA04: (ununsed)
+0xA05:Met
+0xA06:Not Met
+0xA07:Usecode item 
+0xA08: function 
+0xA09:Usecode function  
+0xA0A:Alignment: 
+0xA0B:orig: 
+0xA0C:Polymorphed from 
+0xA0D:Invalid NPC!
+0xA0E:No Loc. Not on Map
+
+0xA10:Dexterity....
+0xA11:Food Level...
+0xA12:Intellicence.
+0xA13:Strength.....
+0xA14:Combat Skill.
+0xA15:Hit Points...
+0xA16:Magic Points.
+0xA17:Vana Level...
+#NPC Flags
+0xA18:A Asleep.
+0xA19:B Charmd.
+0xA1A:C Cursed.
+0xA1B:D Prlyzd.
+0xA1C:E Poisnd.
+0xA1D:F Prtctd.
+0xA1E:G Tourna.
+0xA1F:H Polymo.
+0xA20: Advanced
+0xA21:I Party..
+0xA22:J Invsbl.
+0xA23:K Fly....
+0xA24:L Walk...
+0xA25:M Swim...
+0xA26:N Ethrel.
+0xA27:O Prtcee.
+0xA28:P Conjrd.
+0xA29:7 Naked..
+0xA2A:Q Summnd.
+0xA2B:R Bleedn.
+0xA2C:S Sex....
+0xA2D:T Skin...
+0xA2E:4 Read...
+0xA3F:U Met....
+0xA30:V NoCast.
+0xA31:ID#:
+0xA32:W Freeze.
+0xA33:Y Temp:
+0xA34:Warmth:
+0xA35:5 Petra..
+0xA36:N
+0xA37:Y
+0xA38:M
+0xA39:F
+#advanced Flag Menu and Global Flags
+0xA3A:Flag is SET
+0xA3B:Flag is UNSET
+0xA3C:Toggle Flag
+0xA3D:NPC Flag 
+0xA3E:Global Flag 
+0xA3F:(unnamed)
+0xA40: Change Flag
+0xA41:Scroll Flags
+0xA42:Global Flags
+
+#teleport Menu
+0xA43:Geographic Coordinates
+0xA44:Tile Coordinates
+0xA45:NPC Number
+0xA46:Map Number
+0xA47:Latitude
+0xA48:North or 
+0xA49:South?         
+0xA4a:Longitude
+0xA4b:West or 
+0xA4c:East?          
+0xA4d:Teleport Menu
+0xA4e:Dangerous
+0xA4f:use with care!
+0xA50:of
+0xA51:OnMap #
+0xA52:Coords 
+0xA53:Can't Teleport to NPC not on map
+
+#palette effect Menu
+#menu items
+0xA54:Ramp Remap
+0xA55:Xform
+0xA56:shift
+0xA57:Clear
+#display Strings
+0xA58:Palette effect: 
+0xA59:None
+0xA5A:Ramp Remap All To 
+0xA5B:Ramp Remap 
+0xA5C: To 
+0xA5D:Xform 
+0xA5E:Shift by 
+0xA5F:From Ramp: All
+0xA60:From Ramp: 
+
+#prompts
+0xA61: enter From Ramp 
+0xA62: or 255 for all 
+0xA63: enter XFORM Index
+0xA64: enter shift amount
+0xA65: enter To Ramp
+
+#usecode Menu
+#prompts
+0xA66:Enter usecode number
+0xA67:Invalid Usecode Number
+0xA68:Enter Usecode Event id
+0xA69:Invalid Usecode Event Number
+#display
+0xA6A:Usecode Menu
+0xA6B:Dangerous
+0xA6C:use with care!
+#menu items
+0xA6D:Call Usecode
+0xA6E:Reload Usecode
+0xA6F:Flag Editor
+
