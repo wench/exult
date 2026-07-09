@@ -1354,7 +1354,10 @@ static void Handle_events() {
 		// int scale = gwin->get_fastmouse() ? 1 :
 		//              gwin->get_win()->get_scale();
 
-		Mouse::mouse()->hide();    // Turn off mouse.
+		// NOTE: the cursor layer is deliberately NOT hidden here. Hiding it for
+		// the duration of the frame was a relic of the pre-layer renderer, where
+		// the cursor was blitted into the frame buffer and had to be lifted off
+		// before painting.
 		Mouse::mouse_update = false;
 
 		// Get current time.

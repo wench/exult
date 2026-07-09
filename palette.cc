@@ -761,7 +761,12 @@ bool Palette_transition::set_step(int hour, int min, int tick) {
 	}
 
 	if (current) {
-		current->apply(true);
+		// Apply the palette but do NOT present from here. A present from here would
+		// show a cursor-less frame -> the pointer flickers for the duration
+		// of the transition. Marking the window painted defers the present to
+		// the main loop's show(), which happens right after the cursor is re-shown.
+		current->apply(false);
+		gwin->set_painted();
 	}
 	return step < max_steps;
 }
