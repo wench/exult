@@ -199,17 +199,16 @@ bool Dragging_info::start(
 	rect = gump ? (obj ? gump->get_shape_rect(obj.get()) : gump->get_dirty()) : gwin->get_shape_rect(obj.get());
 	if (gump) {    // Remove from actual position.
 		if (obj) {
-			int gx = x;
-			int gy = y;
-			gumpman->map_game_to_gump(gump, x, y, gx, gy);
+			int gx = mousex;
+			int gy = mousey;
+			gumpman->map_game_to_gump(gump, mousex, mousey, gx, gy);
 			// Dragged items are painted in raw game coordinates. When the source
 			// gump is scaled in a layer, the grab point (gx,gy) is in mapped
-			// gump coordinates, so convert the initial anchor once to raw coords
-			// to avoid a one-frame cursor/item jump at drag start.
+			// gump coordinates, so convert the anchor to raw game coordinates.
 			const int anchor_dx          = gx - paintx;
 			const int anchor_dy          = gy - painty;
-			paintx                       = x - anchor_dx;
-			painty                       = y - anchor_dy;
+			paintx                       = mousex - anchor_dx;
+			painty                       = mousey - anchor_dy;
 			Container_game_object* owner = gump->get_cont_or_actor(gx, gy);
 			// Get the object
 			Game_object* owner_obj  = gump->get_owner()->get_outermost();
@@ -361,21 +360,15 @@ void Dragging_info::paint_obj_to_layer() {
 	gwin->pop_render_target(prev);
 	gwin->layer_set_dirty(item_layer);
 
-	// Place the layer using the same per-axis scale as the mouse pointer, so
-	// the item's size matches the cursor. Only apply this resize when the
-	// mouse UI layout is smaller than the game area; if it's equal/larger,
-	// keep dragged items at 1:1 game-pixel size.
+	// Size the dragged item to match the mouse pointer, but ENLARGE ONLY: never
+	// shrink it below its native (game -> screen) size. So compute the item's
+	// native world scale, then grow each axis up to the pointer scale if the
+	// pointer is larger; if the pointer would shrink it, keep it native.
 	float     sx    = 1.0f;
 	float     sy    = 1.0f;
-	const int uiw   = iwin->get_ui_width(Image_window::UiLayerMousePointer);
-	const int uih   = iwin->get_ui_height(Image_window::UiLayerMousePointer);
 	const int gamew = iwin->get_game_width();
 	const int gameh = iwin->get_game_height();
-	if (Mouse::mouse() && (uiw < gamew || uih < gameh)) {
-		Mouse::mouse()->get_pointer_scale(sx, sy);
-	} else if (gamew > 0 && gameh > 0) {
-		// No UI-resize case: keep the item's game-pixel size by applying only
-		// the main game area's screen scale (not the mouse UI layer scale).
+	if (gamew > 0 && gameh > 0) {
 		int gx0;
 		int gy0;
 		int gx1;
@@ -389,6 +382,17 @@ void Dragging_info::paint_obj_to_layer() {
 		}
 		if (sy <= 0.0f) {
 			sy = 1.0f;
+		}
+	}
+	if (Mouse::mouse()) {
+		float px = sx;
+		float py = sy;
+		Mouse::mouse()->get_pointer_scale(px, py);
+		if (px > sx) {
+			sx = px;    // Enlarge to the pointer size.
+		}
+		if (py > sy) {
+			sy = py;
 		}
 	}
 	int cx;
