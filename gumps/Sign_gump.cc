@@ -30,8 +30,7 @@ namespace {
 	// Above normal/hud gumps, below modal gumps.
 	constexpr int text_gump_layer_z = (1 << 18) + (1 << 16) + 1;
 
-	bool begin_text_layer_paint(
-			Gump* g, int drawx, int drawy, int& ox, int& oy, int& w, int& h, Image_buffer8*& prev_target) {
+	bool begin_text_layer_paint(Gump* g, int drawx, int drawy, int& ox, int& oy, int& w, int& h, Image_buffer8*& prev_target) {
 		if (!g) {
 			return false;
 		}
@@ -86,7 +85,8 @@ namespace {
 		const float   dh   = static_cast<float>(h) * f;
 		const float   dx   = (static_cast<float>(iwin->get_display_width()) - dw) / 2.0f;
 		const float   dy   = (static_cast<float>(iwin->get_display_height()) - dh) / 2.0f;
-		gwin->layer_set_dest(g->render_layer, static_cast<int>(dx), static_cast<int>(dy), static_cast<int>(dw), static_cast<int>(dh));
+		gwin->layer_set_dest(
+				g->render_layer, static_cast<int>(dx), static_cast<int>(dy), static_cast<int>(dw), static_cast<int>(dh));
 		gwin->layer_set_visible(g->render_layer, true);
 		gwin->layer_set_dirty(g->render_layer);
 	}
@@ -194,8 +194,8 @@ void Sign_gump::paint() {
 		return;
 	}
 
-	x              = ox;
-	y              = oy;
+	x = ox;
+	y = oy;
 
 	int font = 1;    // Normal runes.
 	if (get_shapenum() == game->get_shape("gumps/goldsign")) {

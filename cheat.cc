@@ -1212,11 +1212,11 @@ class Cheat_map : public Game_singletons, public Paintable {
 public:
 	int          w, h;
 	int          layer = -1;
-	Shape_frame* map  = nullptr;
-	Vga_file*    mini = nullptr;    // If "minimaps.vga" is found.
+	Shape_frame* map   = nullptr;
+	Vga_file*    mini  = nullptr;    // If "minimaps.vga" is found.
 
 	// Above gump/hud/modal layers, below mouse cursor.
-	static constexpr int display_map_layer_z = (1 << 19) + 1;
+	constexpr static int display_map_layer_z = (1 << 19) + 1;
 
 	Cheat_map(int mapnum = 0) {
 		if (U7exists(PATCH_MINIMAPS)) {

@@ -59,8 +59,8 @@ class ShortcutBar_gump : public Gump {
 public:
 	ShortcutBar_gump(int placex = 0, int placey = 0);
 	~ShortcutBar_gump() override;
-	int  handle_event(SDL_Event* event);
-	void paint() override;
+	int      handle_event(SDL_Event* event);
+	void     paint() override;
 	TileRect get_rect() const override;
 	bool     has_point(int x, int y) const override;
 
@@ -106,7 +106,7 @@ public:
 		has_changed = true;
 	}
 
-	void        check_for_updates(int shnum);
+	void check_for_updates(int shnum);
 	// True when the bar is drawn in the translucent style (config + on-screen).
 	// Used by the layer renderer to composite the whole bar semi-transparently.
 	bool        wants_translucent() const;

@@ -1507,12 +1507,12 @@ USECODE_INTRINSIC(summon) {
  */
 class Paint_centered : public Paintable, public Game_singletons {
 protected:
-	ShapeID* sid;          // ->shape.
-	int      layer = -1;   // Dedicated display-map overlay layer.
+	ShapeID* sid;           // ->shape.
+	int      layer = -1;    // Dedicated display-map overlay layer.
 	int      w = 0, h = 0;
 
 	// Above normal/hud/modal gump layers, below mouse cursor.
-	static constexpr int display_map_layer_z = (1 << 19) + 1;
+	constexpr static int display_map_layer_z = (1 << 19) + 1;
 
 	virtual void paint_overlay(Shape_frame* shape) {
 		ignore_unused_variable_warning(shape);

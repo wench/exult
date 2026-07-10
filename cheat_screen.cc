@@ -1075,7 +1075,7 @@ void CheatScreen::Hotspot::PositionLeftOf(const Hotspot* hotspot) {
 		x = hotspot->x - getWidth();
 	} else {
 		// position to left of right edge of screen or 320 which is smaller
-		x = std::min(320,cscreen->maxx) - getWidth();
+		x = std::min(320, cscreen->maxx) - getWidth();
 	}
 }
 

@@ -339,11 +339,11 @@ void ShortcutBar_gump::paint() {
 	const bool layered = uses_render_layer();
 
 	for (int i = 0; i < numButtons; i++) {
-		const ShortcutBarButtonItem& item  = buttonItems[i];
-		int                          x     = locx + item.mx;
-		int                          y     = locy + item.my;
+		const ShortcutBarButtonItem& item = buttonItems[i];
+		int                          x    = locx + item.mx;
+		int                          y    = locy + item.my;
 		local_to_screen(x, y);
-		Shape_frame*                 frame = item.shapeId->get_shape();
+		Shape_frame* frame = item.shapeId->get_shape();
 		sman->paint_shape(x, y, frame, item.translucent && !layered);
 		// when the bar is on the game screen it may need an outline
 		if (frame && frame->is_rle() && gwin->get_outline_color() < NPIXCOLORS && starty >= 0) {

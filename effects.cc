@@ -69,7 +69,7 @@ int Lightning_effect::active = 0;
 namespace {
 	// Above normal and HUD gumps, below modal gumps.
 	constexpr int text_effect_layer_z = (1 << 18) + (1 << 16);
-}
+}    // namespace
 
 /**
  *  Clean up.
@@ -1058,7 +1058,7 @@ void Text_effect::init() {
 		msg[0] = '"';
 	}
 	const int len = msg.size();
-	if (len>0 && msg[len - 1] == '@') {
+	if (len > 0 && msg[len - 1] == '@') {
 		msg[len - 1] = '"';
 	}
 }

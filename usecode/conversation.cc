@@ -267,8 +267,7 @@ int Conversation::get_conv_bg_layer() {
 void Conversation::position_conv_layer(int layer) {
 	SDL_FRect fr;
 	gwin->get_win()->compute_ui_layer_dest(conv_width, conv_height, fr, Image_window::UiLayerConversations);
-	gwin->layer_set_dest(
-			layer, static_cast<int>(fr.x), static_cast<int>(fr.y), static_cast<int>(fr.w), static_cast<int>(fr.h));
+	gwin->layer_set_dest(layer, static_cast<int>(fr.x), static_cast<int>(fr.y), static_cast<int>(fr.w), static_cast<int>(fr.h));
 }
 
 /*
@@ -288,7 +287,7 @@ void Conversation::render_conv_layer() {
 	if (cl < 0) {
 		return;
 	}
-	const int bgl = get_conv_bg_layer();
+	const int      bgl  = get_conv_bg_layer();
 	Image_buffer8* lbuf = gwin->get_layer_ibuf(cl);
 	if (!lbuf) {
 		return;
@@ -576,11 +575,11 @@ void Conversation::show_npc_message(const char* msg) {
 		eman->set_sprites_always(false);
 		gwin->get_tqueue()->resume(SDL_GetTicks());
 	}
-	Npc_face_info* info = face_info[last_face_shown];
-	const int      font = info->large_face ? 7 : 0;    // Use red for Guardian, snake.
+	Npc_face_info* info    = face_info[last_face_shown];
+	const int      font    = info->large_face ? 7 : 0;    // Use red for Guardian, snake.
 	const int      text_bg = gwin->get_text_bg();
-	info->cur_text      = "";
-	const TileRect& box = info->text_rect;
+	info->cur_text         = "";
+	const TileRect& box    = info->text_rect;
 	/* NOTE:  The original centers text for Guardian, snake.    */
 	// Draw the text into the overlay layer (with paging).
 	gwin->paint();    // Repaint world beneath (the layer composites on top).
@@ -594,12 +593,12 @@ void Conversation::show_npc_message(const char* msg) {
 	if (cl >= 0) {
 		position_conv_layer(cl);
 	}
-	int            height;    // Break at punctuation.
+	int height;    // Break at punctuation.
 	for (;;) {
 		// Draw the faces and this page of text into the overlay layer.  The
 		// current face's text is (re)drawn here, so keep its stored text
 		// empty while paint_faces() runs to avoid drawing it twice.
-		info->cur_text      = "";
+		info->cur_text = "";
 		if (bbuf) {
 			Image_buffer8* prev_bg = gwin->push_render_target(bbuf);
 			bbuf->set_clip(0, 0, static_cast<int>(bbuf->get_width()), static_cast<int>(bbuf->get_height()));
@@ -746,10 +745,10 @@ void Conversation::show_avatar_choices(int num_choices, char** choices) {
 	// Draw portrait.
 	sman->paint_shape(mbox.x + face->get_xleft(), mbox.y + face->get_yabove(), face);
 	delete[] conv_choices;    // Set up new list of choices.
-	conv_choices = new TileRect[num_choices + 1];
-	const int text_bg   = gwin->get_text_bg();
-	const int bg_offset = (sman->get_text_height(0) - line_height) / 2;
-	Image_buffer8* prev_bg = nullptr;
+	conv_choices             = new TileRect[num_choices + 1];
+	const int      text_bg   = gwin->get_text_bg();
+	const int      bg_offset = (sman->get_text_height(0) - line_height) / 2;
+	Image_buffer8* prev_bg   = nullptr;
 	if (text_bg >= 0) {
 		const int bgl = get_conv_bg_layer();
 		if (bgl >= 0) {
