@@ -927,6 +927,7 @@ void ScenePlayer::play_scene() {
 	if (!scene_available() || !parse_info_file()) {
 		return;
 	}
+	Game_window::Scoped_ui_layer_mask scene_layers(gwin, 0);
 
 	try {
 		// Save the current palette index to restore it later.

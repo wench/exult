@@ -41,6 +41,7 @@
 		8A38EB772E2AA11300450868 /* playscene.cc in Sources */ = {isa = PBXBuildFile; fileRef = 8A38EB762E2AA11300450868 /* playscene.cc */; };
 		8A3D5ADF2EE1D9420044D0FF /* gumpinf.cc in Sources */ = {isa = PBXBuildFile; fileRef = 8A3D5ADE2EE1D9420044D0FF /* gumpinf.cc */; };
 		8A45A3B8247C068500F12F4D /* joythumb-glass.png in Resources */ = {isa = PBXBuildFile; fileRef = 8A45A3AC247C068500F12F4D /* joythumb-glass.png */; };
+		8A511D472FFE3B810045D7E6 /* UIOptions_gump.cc in Sources */ = {isa = PBXBuildFile; fileRef = 8A511D462FFE3B810045D7E6 /* UIOptions_gump.cc */; };
 		8A599C2224605925006E3252 /* libmt32emu.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8A599C21246058A9006E3252 /* libmt32emu.a */; platformFilter = ios; };
 		8A6013712057CFAD00FCA555 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8A6013662057CF0C00FCA555 /* Metal.framework */; };
 		8A7F1F7E1DE5B7820066F6FC /* expack.cc in Sources */ = {isa = PBXBuildFile; fileRef = 8A7F1F7D1DE5B7820066F6FC /* expack.cc */; };
@@ -386,6 +387,8 @@
 		8A3D5ADD2EE1D9420044D0FF /* gumpinf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = gumpinf.h; sourceTree = "<group>"; };
 		8A3D5ADE2EE1D9420044D0FF /* gumpinf.cc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = gumpinf.cc; sourceTree = "<group>"; };
 		8A45A3AC247C068500F12F4D /* joythumb-glass.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "joythumb-glass.png"; sourceTree = "<group>"; };
+		8A511D452FFE3B810045D7E6 /* UIOptions_gump.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = UIOptions_gump.h; path = ../gumps/UIOptions_gump.h; sourceTree = SOURCE_ROOT; };
+		8A511D462FFE3B810045D7E6 /* UIOptions_gump.cc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = UIOptions_gump.cc; path = ../gumps/UIOptions_gump.cc; sourceTree = SOURCE_ROOT; };
 		8A599C1C246058A9006E3252 /* libmt32emu.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = libmt32emu.xcodeproj; sourceTree = "<group>"; };
 		8A6013662057CF0C00FCA555 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		8A7F1F721DE5B72A0066F6FC /* expack */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = expack; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1509,6 +1512,8 @@
 				E700DE761A6E3497006C8BE4 /* Text_button.h */,
 				E700DE771A6E3497006C8BE4 /* Text_gump.cc */,
 				E700DE781A6E3497006C8BE4 /* Text_gump.h */,
+				8A511D452FFE3B810045D7E6 /* UIOptions_gump.h */,
+				8A511D462FFE3B810045D7E6 /* UIOptions_gump.cc */,
 				E700DE791A6E3497006C8BE4 /* VideoOptions_gump.cc */,
 				E700DE7A1A6E3497006C8BE4 /* VideoOptions_gump.h */,
 				E700DE7B1A6E3497006C8BE4 /* Yesno_gump.cc */,
@@ -2049,6 +2054,7 @@
 				E700DFD61A6E3943006C8BE4 /* modmgr.cc in Sources */,
 				E700DCA81A6E30A7006C8BE4 /* npctime.cc in Sources */,
 				E700DD541A6E3121006C8BE4 /* expinf.cc in Sources */,
+				8A511D472FFE3B810045D7E6 /* UIOptions_gump.cc in Sources */,
 				8A9EB725281878EC0025C639 /* sdlrwopsstreambuf.cc in Sources */,
 				E700DE211A6E344D006C8BE4 /* BilinearScalerInternal_Arb.cpp in Sources */,
 				E700DBE01A6E2CE7006C8BE4 /* FMOplMidiDriver.cpp in Sources */,

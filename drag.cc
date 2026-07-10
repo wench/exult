@@ -74,7 +74,10 @@ Dragging_info::Dragging_info(
 		  paintx(-1000), painty(-1000), mouse_shape(Mouse::mouse()->get_shape()), rect(0, 0, 0, 0), okay(false),
 		  possible_theft(false) {
 	// First see if it's a gump.
-	gump                 = gumpman->find_gump(x, y);
+	gump   = gumpman->find_gump(x, y);
+	int gx = x;
+	int gy = y;
+	gumpman->map_game_to_gump(gump, x, y, gx, gy);
 	Game_object* to_drag = nullptr;
 	// Debug: log click chain for dynamic gumps
 	auto* dyn_gump = gump ? dynamic_cast<Dynamic_container_gump*>(gump) : nullptr;
@@ -84,7 +87,7 @@ Dragging_info::Dragging_info(
 				  << std::endl;
 	}
 	if (gump) {
-		to_drag = gump->find_object(x, y);
+		to_drag = gump->find_object(gx, gy);
 		if (to_drag) {
 			// Save location info.
 			gump->get_shape_location(to_drag, paintx, painty);
@@ -92,12 +95,15 @@ Dragging_info::Dragging_info(
 			if (Main_actor* act = gwin->get_main_actor()) {
 				old_lift = act->get_lift();
 			}
-		} else if ((button = gump->on_button(x, y)) != nullptr) {
+		} else if ((button = gump->on_button(gx, gy)) != nullptr) {
 			if (dyn_gump && (dyn_gump->get_debug_flags() & GUMP_DEBUG_CONSOLE)) {
 				std::cerr << "[Drag] on_button -> FOUND button shape=" << button->get_shapenum() << " pos=(" << button->get_x()
 						  << "," << button->get_y() << ")" << std::endl;
 			}
-			gump = nullptr;
+			// Remember the owning gump so the release can be hit-tested in the
+			// gump's own (scaled) layer coordinates.
+			widget_gump = gump;
+			gump        = nullptr;
 			if (!button->is_draggable()) {
 				return;
 			}
@@ -107,7 +113,7 @@ Dragging_info::Dragging_info(
 				Audio::get_ptr()->play_sound_effect(Audio::game_sfx(73));
 			}
 			gwin->set_painted();
-		} else if ((mouse_widget = gump->forward_mouse_down(x, y, Gump::MouseButton::Left)) != nullptr) {
+		} else if ((mouse_widget = gump->forward_mouse_down(gx, gy, Gump::MouseButton::Left)) != nullptr) {
 			// A widget (e.g. slider thumb/track) captured the click.
 			if (dyn_gump && (dyn_gump->get_debug_flags() & GUMP_DEBUG_CONSOLE)) {
 				std::cerr << "[Drag] forward_mouse_down -> widget captured click" << std::endl;
@@ -142,6 +148,13 @@ Dragging_info::Dragging_info(
 		obj      = to_drag->shared_from_this();
 	}
 	okay = true;
+}
+
+/*
+ *  Clean up: free the dragged-object overlay layer.
+ */
+Dragging_info::~Dragging_info() {
+	free_item_layer();
 }
 
 /*
@@ -186,7 +199,17 @@ bool Dragging_info::start(
 	rect = gump ? (obj ? gump->get_shape_rect(obj.get()) : gump->get_dirty()) : gwin->get_shape_rect(obj.get());
 	if (gump) {    // Remove from actual position.
 		if (obj) {
-			Container_game_object* owner = gump->get_cont_or_actor(x, y);
+			int gx = mousex;
+			int gy = mousey;
+			gumpman->map_game_to_gump(gump, mousex, mousey, gx, gy);
+			// Dragged items are painted in raw game coordinates. When the source
+			// gump is scaled in a layer, the grab point (gx,gy) is in mapped
+			// gump coordinates, so convert the anchor to raw game coordinates.
+			const int anchor_dx          = gx - paintx;
+			const int anchor_dy          = gy - painty;
+			paintx                       = mousex - anchor_dx;
+			painty                       = mousey - anchor_dy;
+			Container_game_object* owner = gump->get_cont_or_actor(gx, gy);
 			// Get the object
 			Game_object* owner_obj  = gump->get_owner()->get_outermost();
 			Main_actor*  main_actor = gwin->get_main_actor();
@@ -239,7 +262,10 @@ bool Dragging_info::moved(
 ) {
 	// Forward drag to a widget that captured the initial click.
 	if (mouse_widget) {
-		mouse_widget->mouse_drag(x, y);
+		int wx = x;
+		int wy = y;
+		gumpman->map_game_to_gump(widget_gump, x, y, wx, wy);
+		mouse_widget->mouse_drag(wx, wy);
 		return true;
 	}
 	if (!obj && !gump) {
@@ -268,6 +294,118 @@ bool Dragging_info::moved(
 	return true;
 }
 
+// The dragged item's layer sits directly beneath the mouse-pointer layer.
+static const int item_layer_z = (1 << 20) - 1;
+
+/*
+ *  Destroy the dragged-object overlay layer (if any).
+ */
+void Dragging_info::free_item_layer() {
+	// Only touch the window if it still exists (at shutdown it may be gone).
+	if (item_layer >= 0 && Game_window::get_instance() == gwin) {
+		gwin->destroy_layer(item_layer);
+	}
+	item_layer   = -1;
+	item_layer_w = 0;
+	item_layer_h = 0;
+}
+
+/*
+ *  Render the dragged object into its own layer, scaled and placed to
+ *  match the mouse-pointer layer.
+ */
+void Dragging_info::paint_obj_to_layer() {
+	Shape_frame* frame = obj->get_shape();
+	if (!frame) {
+		return;
+	}
+	const int xleft  = frame->get_xleft();
+	const int yabove = frame->get_yabove();
+	const int w      = frame->get_width();
+	const int h      = frame->get_height();
+	if (w <= 0 || h <= 0) {
+		return;
+	}
+	Image_window* iwin = gwin->get_win();
+	// (Re)create the layer if missing or the shape size changed.
+	if (item_layer < 0 || item_layer_w != w || item_layer_h != h) {
+		if (item_layer >= 0) {
+			gwin->destroy_layer(item_layer);
+			item_layer = -1;
+		}
+		item_layer = gwin->create_layer(w, h, 255, 0, item_layer_z);
+		if (item_layer < 0) {
+			return;
+		}
+		// Derive scale/placement settings from the mouse-pointer layer.
+		gwin->layer_set_ui_kind(item_layer, Image_window::UiLayerMousePointer);
+		item_layer_w = w;
+		item_layer_h = h;
+	}
+	gwin->layer_set_z(item_layer, item_layer_z);
+
+	Image_buffer8* lbuf = gwin->get_layer_ibuf(item_layer);
+	if (!lbuf) {
+		return;
+	}
+	lbuf->clear_clip();
+	lbuf->fill8(255);    // Fully transparent.
+	Image_buffer8* prev = gwin->push_render_target(lbuf);
+	// Paint the shape at its origin within the layer buffer.
+	if (obj->get_flag(Obj_flags::invisible)) {
+		obj->paint_invisible(xleft, yabove);
+	} else {
+		obj->paint_shape(xleft, yabove);
+	}
+	gwin->pop_render_target(prev);
+	gwin->layer_set_dirty(item_layer);
+
+	// Size the dragged item to match the mouse pointer, but ENLARGE ONLY: never
+	// shrink it below its native (game -> screen) size. So compute the item's
+	// native world scale, then grow each axis up to the pointer scale if the
+	// pointer is larger; if the pointer would shrink it, keep it native.
+	float     sx    = 1.0f;
+	float     sy    = 1.0f;
+	const int gamew = iwin->get_game_width();
+	const int gameh = iwin->get_game_height();
+	if (gamew > 0 && gameh > 0) {
+		int gx0;
+		int gy0;
+		int gx1;
+		int gy1;
+		iwin->game_to_screen(0, 0, false, gx0, gy0);
+		iwin->game_to_screen(gamew, gameh, false, gx1, gy1);
+		sx = static_cast<float>(gx1 - gx0) / static_cast<float>(gamew);
+		sy = static_cast<float>(gy1 - gy0) / static_cast<float>(gameh);
+		if (sx <= 0.0f) {
+			sx = 1.0f;
+		}
+		if (sy <= 0.0f) {
+			sy = 1.0f;
+		}
+	}
+	if (Mouse::mouse()) {
+		float px = sx;
+		float py = sy;
+		Mouse::mouse()->get_pointer_scale(px, py);
+		if (px > sx) {
+			sx = px;    // Enlarge to the pointer size.
+		}
+		if (py > sy) {
+			sy = py;
+		}
+	}
+	int cx;
+	int cy;
+	iwin->game_to_screen(mousex, mousey, false, cx, cy);
+	const float ox = static_cast<float>(cx) + static_cast<float>(paintx - mousex) * sx;
+	const float oy = static_cast<float>(cy) + static_cast<float>(painty - mousey) * sy;
+	const int   dx = static_cast<int>(ox - xleft * sx);
+	const int   dy = static_cast<int>(oy - yabove * sy);
+	gwin->layer_set_dest(item_layer, dx, dy, static_cast<int>(w * sx), static_cast<int>(h * sy));
+	gwin->layer_set_visible(item_layer, true);
+}
+
 /*
  *  Paint object being moved.
  */
@@ -277,27 +415,37 @@ void Dragging_info::paint() {
 		return;
 	}
 	if (obj) {
-		if (obj->get_flag(Obj_flags::invisible)) {
-			obj->paint_invisible(paintx, painty);
-		} else {
-			int bbox = gwin->get_render()->get_bbox_index();
-
-			// paint bbox back
-			if (bbox != -1) {
-				obj->get_info().paint_bbox(
-						paintx, painty, obj->get_framenum(), Game_window::get_instance()->get_win()->get_ib8(), bbox, 2);
+		const int bbox = gwin->get_render()->get_bbox_index();
+		// In map-edit mode the dragged item is not promoted to its own layer.
+		// Once the drop has started also revert back so the item paints below
+		// a possible quantity slider gump.
+		if (bbox != -1 || cheat.in_map_editor() || dropping) {
+			// Legacy direct paint into the main buffer.
+			free_item_layer();
+			if (obj->get_flag(Obj_flags::invisible)) {
+				obj->paint_invisible(paintx, painty);
+			} else {
+				// paint bbox back
+				if (bbox != -1) {
+					obj->get_info().paint_bbox(
+							paintx, painty, obj->get_framenum(), Game_window::get_instance()->get_win()->get_ib8(), bbox, 2);
+				}
+				obj->paint_shape(paintx, painty);
+				// paint bbox front
+				if (bbox != -1) {
+					obj->get_info().paint_bbox(
+							paintx, painty, obj->get_framenum(), Game_window::get_instance()->get_win()->get_ib8(), bbox, 1);
+				}
 			}
-
-			obj->paint_shape(paintx, painty);
-
-			// paint bbox front
-			if (bbox != -1) {
-				obj->get_info().paint_bbox(
-						paintx, painty, obj->get_framenum(), Game_window::get_instance()->get_win()->get_ib8(), bbox, 1);
-			}
+			return;
 		}
+		// Normal case: render the dragged object into its own overlay layer.
+		paint_obj_to_layer();
 	} else if (gump) {
-		gump->paint();
+		// The dragged gump lives outside the open-gump list, so render it into
+		// its own overlay layer (bumped above the other gumps) so it scales
+		// exactly like it does when settled - no snap on drop.
+		gumpman->render_gump_to_layer(gump, 1 << 19);
 	}
 }
 
@@ -313,9 +461,17 @@ bool Dragging_info::drop(
 ) {
 	bool handled = moved;
 	Mouse::mouse()->set_shape(mouse_shape);
+	// The drop is finishing: stop promoting the item to its high-z overlay
+	// layer and free it now, so anything shown during the drop (e.g. the
+	// quantity slider) is not covered by the dragged item.
+	dropping = true;
+	free_item_layer();
 	if (mouse_widget) {
 		// Release a widget that captured the initial click (e.g. slider).
-		mouse_widget->mouse_up(x, y, Gump::MouseButton::Left);
+		int wx = x;
+		int wy = y;
+		gumpman->map_game_to_gump(widget_gump, x, y, wx, wy);
+		mouse_widget->mouse_up(wx, wy, Gump::MouseButton::Left);
 		mouse_widget = nullptr;
 		widget_gump  = nullptr;
 		gwin->paint();
@@ -323,7 +479,10 @@ bool Dragging_info::drop(
 	}
 	if (button) {
 		button->unpush(Gump::MouseButton::Left);
-		const bool release_hit = button->on_button(x, y);
+		int bx = x;
+		int by = y;
+		gumpman->map_game_to_gump(widget_gump, x, y, bx, by);
+		const bool release_hit = button->on_button(bx, by);
 		if (release_hit) {
 			// Clicked on button.
 			button->activate(Gump::MouseButton::Left);
@@ -344,6 +503,7 @@ bool Dragging_info::drop(
 	}
 	obj  = nullptr;    // Clear so we don't paint them.
 	gump = nullptr;
+	free_item_layer();    // Object returns to the main layer.
 	gwin->paint();
 	return handled;
 }
@@ -430,14 +590,17 @@ bool Dragging_info::drop_on_gump(
 		Mouse::mouse()->flash_shape(Mouse::outofrange);
 		return false;
 	}
-	if (!Check_weight(gwin, to_drop, on_gump->get_cont_or_actor(x, y))) {
+	int gx = x;
+	int gy = y;
+	gumpman->map_game_to_gump(on_gump, x, y, gx, gy);
+	if (!Check_weight(gwin, to_drop, on_gump->get_cont_or_actor(gx, gy))) {
 		return false;
 	}
 	if (on_gump != gump) {    // Not moving within same gump?
 		possible_theft = true;
 	}
 	// Add, and allow to combine.
-	if (!on_gump->add(to_drop, x, y, paintx, painty, false, true)) {
+	if (!on_gump->add(to_drop, gx, gy, paintx, painty, false, true)) {
 		// Failed.
 		if (to_drop != obj.get()) {
 			// Watch for partial drop.
@@ -598,7 +761,10 @@ bool Dragging_info::drop(
 	// Special:  BlackSword in SI.
 	else if (readied_index >= 0 && obj->get_shapenum() == 806) {
 		// Do 'unreadied' usecode.
-		gump->get_cont_or_actor(x, y)->call_readied_usecode(readied_index, obj.get(), Usecode_machine::unreadied);
+		int gx = x;
+		int gy = y;
+		gumpman->map_game_to_gump(gump, x, y, gx, gy);
+		gump->get_cont_or_actor(gx, gy)->call_readied_usecode(readied_index, obj.get(), Usecode_machine::unreadied);
 	}
 	// On a barge?
 	Barge_object* barge = gwin->get_moving_barge();

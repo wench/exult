@@ -33,6 +33,7 @@
 #include "utils.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 
 #ifdef __GNUC__
@@ -182,10 +183,102 @@ void Palette::apply(bool repaint) {
 	pal1[255 * 3 + 1] = g;
 	pal1[255 * 3 + 2] = b;
 
+	// Keep the layers' fixed-palette overrides in sync with the new
+	// palette (they depend on the palette number and brightness).
+	update_ui_layer_palettes();
+
 	if (!repaint) {
 		return;
 	}
 	win->show();
+}
+
+/*
+ *  Give each layer that is configured for a fixed palette the
+ *  colours of that palette while the game's live palette is not the day
+ *  palette, so the layer stays readable.
+ */
+/*
+ *  Map a UI layer fixed-palette mode to a palettes.flx palette number.
+ *  Returns -1 for "disabled" (no fixed palette).
+ */
+static int ui_palette_mode_to_number(int mode) {
+	switch (mode) {
+	case Image_window::UiPaletteDay:
+		return PALETTE_DAY;
+	case Image_window::UiPaletteDusk:
+		return PALETTE_DUSK;
+	case Image_window::UiPaletteInvisible:
+		return PALETTE_INVISIBLE;
+	case Image_window::UiPaletteOvercast:
+		return PALETTE_OVERCAST;
+	case Image_window::UiPaletteFog:
+		return PALETTE_FOG;
+	case Image_window::UiPaletteSpell:
+		return PALETTE_SPELL;
+	case Image_window::UiPaletteCandle:
+		return PALETTE_CANDLE;
+	case Image_window::UiPaletteRed:
+		return PALETTE_RED;
+	case Image_window::UiPaletteLightning:
+		return PALETTE_LIGHTNING;
+	case Image_window::UiPaletteSingleLight:
+		return PALETTE_SINGLE_LIGHT;
+	case Image_window::UiPaletteManyLights:
+		return PALETTE_MANY_LIGHTS;
+	default:
+		return -1;    // Disabled.
+	}
+}
+
+void Palette::update_ui_layer_palettes() {
+	if (win == nullptr) {
+		return;
+	}
+	// Raw reference palettes, loaded once (on demand) from palettes.flx and
+	// cached by palette number.
+	constexpr static int kNumRefPalettes = 13;    // palettes.flx numbers 0..12.
+	static bool          ref_loaded[kNumRefPalettes]{};
+	static unsigned char ref_pal[kNumRefPalettes][768];
+	auto                 load_ref = [this](int pal_num) -> const unsigned char* {
+        if (pal_num < 0 || pal_num >= kNumRefPalettes) {
+            return nullptr;
+        }
+        if (!ref_loaded[pal_num]) {
+            try {
+                Palette tmp(this);
+                tmp.load(PALETTES_FLX, PATCH_PALETTES, pal_num);
+                memcpy(ref_pal[pal_num], tmp.pal1, 768);
+                ref_loaded[pal_num] = true;
+            } catch (...) {
+                return nullptr;    // palettes.flx not available yet.
+            }
+        }
+        return ref_pal[pal_num];
+	};
+
+	const int cur = palette;    // Current palette number (-1 = custom/transition).
+	// While the palette number is -1 we are mid cross-fade and don't want the UI layers to change their palette.
+	if (cur < 0) {
+		return;
+	}
+	std::array<unsigned char, 768> out;
+	for (int k = 0; k < Image_window::NumUiLayerKinds; ++k) {
+		const auto kind    = static_cast<Image_window::UiLayerKind>(k);
+		const int  mode    = win->get_ui_layer_palette_mode(kind);
+		const int  pal_num = ui_palette_mode_to_number(mode);
+		if (pal_num < 0 || cur == PALETTE_DAY) {
+			win->set_ui_layer_palette_colors(kind, nullptr);
+			continue;
+		}
+		const unsigned char* raw = load_ref(pal_num);
+		if (raw == nullptr) {
+			win->set_ui_layer_palette_colors(kind, nullptr);
+			continue;
+		}
+		win->apply_gamma_palette(raw, max_val, brightness, out);
+		win->set_ui_layer_palette_colors(kind, out.data());
+	}
 }
 
 /**
@@ -672,7 +765,12 @@ bool Palette_transition::set_step(int hour, int min, int tick) {
 	}
 
 	if (current) {
-		current->apply(true);
+		// Apply the palette but do NOT present from here. A present from here would
+		// show a cursor-less frame -> the pointer flickers for the duration
+		// of the transition. Marking the window painted defers the present to
+		// the main loop's show(), which happens right after the cursor is re-shown.
+		current->apply(false);
+		gwin->set_painted();
 	}
 	return step < max_steps;
 }

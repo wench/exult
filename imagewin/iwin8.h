@@ -30,6 +30,7 @@ Boston, MA  02111-1307, USA.
 #include "ibuf8.h"
 #include "imagewin.h"
 
+#include <array>
 #include <memory>
 
 template <class T>
@@ -55,8 +56,28 @@ public:
 		return ib8;
 	}
 
+	// Redirect drawing (shapes/text/fills) to the given buffer, e.g. an
+	// overlay layer, and return the previous buffer so it can be restored.
+	// Callers must also point Shape_frame::set_to_render at the same buffer;
+	// use Game_window::push_render_target / pop_render_target which do both.
+	Image_buffer8* set_render_buffer(Image_buffer8* buf) {
+		Image_buffer8* prev = ib8;
+		ib8                 = buf;
+		ibuf                = buf;
+		return prev;
+	}
+
+	Image_buffer8* get_render_buffer() const {
+		return ib8;
+	}
+
 	// Set palette.
 	void set_palette(const unsigned char* rgbs, int maxval, int brightness = 100) override;
+
+	// Gamma-correct a raw 768-byte RGB palette into 'out' the same way
+	// set_palette builds the live 'colors' table, without disturbing it. Used
+	// to build a fixed-palette override for an overlay layer.
+	void apply_gamma_palette(const unsigned char* rgbs, int maxval, int brightness, std::array<unsigned char, 768>& out) const;
 
 	// Get palette.
 	virtual const unsigned char* get_palette() const {
@@ -131,6 +152,20 @@ public:
 	static void set_gamma(double r, double g, double b);
 
 	std::unique_ptr<unsigned char[]> mini_screenshot();
+
+protected:
+	// Convert an overlay layer's 8-bit paletted pixels to its texture, using
+	// the current palette; the transparent index becomes fully transparent.
+	void refresh_layer(Layer& layer) override;
+
+private:
+	// ARGB for one palette index within a layer (transparent index -> 0,
+	// translucent override -> its ARGB, otherwise the opaque palette colour).
+	uint32 layer_argb_pixel(const Layer& layer, unsigned char p) const;
+	// Pre-scale a layer with the current (member) game scaler by factor N and
+	// upload it, preserving transparency/translucency. Returns false if the
+	// scaler could not be applied.
+	bool refresh_layer_scaled(Layer& layer, int factor);
 };
 
 #endif

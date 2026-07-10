@@ -32,6 +32,7 @@ private:
 		id_first     = 0,
 		id_load_save = id_first,
 		id_video_options,
+		id_ui_options,
 		id_audio_options,
 		id_game_display_options,
 		id_game_engine_options,
@@ -66,6 +67,7 @@ public:
 
 	void loadsave();
 	void video_options();
+	void ui_options();
 	void audio_options();
 	void game_display_options();
 	void game_engine_options();

@@ -55,6 +55,16 @@ class Dragging_info : public Game_singletons {
 	bool                okay;              // True if drag constructed okay.
 	bool                possible_theft;    // Moved enough to be 'theft'.
 
+	// Overlay layer holding the dragged object while it is being moved.
+	// When the object is dropped the layer is freed and the object returns to the main layer.
+	int  item_layer   = -1;
+	int  item_layer_w = 0;
+	int  item_layer_h = 0;
+	bool dropping     = false;    // Drop started: stop using the overlay layer
+								  //   (so a quantity slider paints above it).
+	void paint_obj_to_layer();    // Render dragged object into item_layer.
+	void free_item_layer();       // Destroy item_layer if present.
+
 	bool start(int x, int y);    // First motion.
 	void put_back();             // Put back object.
 	bool drop_on_gump(int x, int y, Game_object* to_drop, Gump* gump);
@@ -65,9 +75,10 @@ public:
 	// Create for dropping new object.
 	Dragging_info(Game_object_shared newobj);
 	Dragging_info(int x, int y);    // Create for given mouse position.
-	bool moved(int x, int y);       // Mouse moved.
-	void paint();                   // Paint object being dragged.
-	bool drop(int x, int y);        // Drop obj. at given position.
+	~Dragging_info();
+	bool moved(int x, int y);    // Mouse moved.
+	void paint();                // Paint object being dragged.
+	bool drop(int x, int y);     // Drop obj. at given position.
 	// Mouse button released.
 	bool drop(int x, int y, bool moved);
 };

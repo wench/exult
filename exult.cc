@@ -1354,7 +1354,10 @@ static void Handle_events() {
 		// int scale = gwin->get_fastmouse() ? 1 :
 		//              gwin->get_win()->get_scale();
 
-		Mouse::mouse()->hide();    // Turn off mouse.
+		// NOTE: the cursor layer is deliberately NOT hidden here. Hiding it for
+		// the duration of the frame was a relic of the pre-layer renderer, where
+		// the cursor was blitted into the frame buffer and had to be lifted off
+		// before painting.
 		Mouse::mouse_update = false;
 
 		// Get current time.
@@ -1796,16 +1799,22 @@ static void Handle_event(SDL_Event& event) {
 		}
 		int x;
 		int y;
+		int gx;
+		int gy;
 		gwin->get_win()->screen_to_game(event.button.x, event.button.y, gwin->get_fastmouse(), x, y);
 		if (event.button.button == 1) {
 			Gump_button* button;
+			bool         closing_parent_gump = false;
+			if ((gump = gump_man->find_gump(x, y, false)) != nullptr) {
+				gump_man->map_game_to_gump(gump, x, y, gx, gy);
+				button              = gump->on_button(gx, gy);
+				closing_parent_gump = button != nullptr && button->is_checkmark();
+			}
 			// Allow dragging only either if the avatar can act or if map edit
 			// or hackmove is on.
-			if (avatar_can_act || cheat.in_hack_mover()
-				|| ((gump = gump_man->find_gump(x, y, false)) && (button = gump->on_button(x, y))
-					&& button->is_checkmark())) {    // also allow closing
-													 // parent gump when
-													 // clicking on checkmark
+			if (avatar_can_act || cheat.in_hack_mover() || closing_parent_gump) {    // also allow closing
+																					 // parent gump when
+																					 // clicking on checkmark
 #ifdef USE_EXULTSTUDIO
 				if (cheat.in_map_editor()) {
 					// Paint if shift-click.
@@ -2901,6 +2910,214 @@ void BuildGameMap(BaseGameInfo* game, int mapnum) {
 	}
 }
 
+// Applies the UI layer configuration from the config file to the game window.
+static void apply_ui_layer_config() {
+	if (gwin == nullptr) {
+		return;
+	}
+	bool ui_universal;
+	config->value("config/video/ui/universal", ui_universal, true);
+
+	auto normalize_dims = [](int& width, int& height) {
+		if (width == 0 && height == 0) {
+			return;
+		}
+		if (width <= 0 || height <= 0) {
+			width  = 420;
+			height = 263;
+		}
+	};
+
+	struct LayerUiCfg {
+		int                    width;
+		int                    height;
+		int                    scaler;
+		Image_window::FillMode fillmode;
+		int                    fill_scaler;
+		int                    palette;    // Image_window::UiPaletteMode.
+	};
+
+	auto palette_from_string = [](const string& s, int fallback) {
+		if (s == "day") {
+			return static_cast<int>(Image_window::UiPaletteDay);
+		}
+		if (s == "dusk") {
+			return static_cast<int>(Image_window::UiPaletteDusk);
+		}
+		if (s == "invisible") {
+			return static_cast<int>(Image_window::UiPaletteInvisible);
+		}
+		if (s == "overcast") {
+			return static_cast<int>(Image_window::UiPaletteOvercast);
+		}
+		if (s == "fog") {
+			return static_cast<int>(Image_window::UiPaletteFog);
+		}
+		if (s == "spell") {
+			return static_cast<int>(Image_window::UiPaletteSpell);
+		}
+		if (s == "candle") {
+			return static_cast<int>(Image_window::UiPaletteCandle);
+		}
+		if (s == "red") {
+			return static_cast<int>(Image_window::UiPaletteRed);
+		}
+		if (s == "lightning") {
+			return static_cast<int>(Image_window::UiPaletteLightning);
+		}
+		if (s == "single_light") {
+			return static_cast<int>(Image_window::UiPaletteSingleLight);
+		}
+		if (s == "many_lights") {
+			return static_cast<int>(Image_window::UiPaletteManyLights);
+		}
+		if (s == "disabled") {
+			return static_cast<int>(Image_window::UiPaletteDisabled);
+		}
+		return fallback;
+	};
+	auto palette_to_string = [](int mode) -> const char* {
+		switch (mode) {
+		case Image_window::UiPaletteDay:
+			return "day";
+		case Image_window::UiPaletteDusk:
+			return "dusk";
+		case Image_window::UiPaletteInvisible:
+			return "invisible";
+		case Image_window::UiPaletteOvercast:
+			return "overcast";
+		case Image_window::UiPaletteFog:
+			return "fog";
+		case Image_window::UiPaletteSpell:
+			return "spell";
+		case Image_window::UiPaletteCandle:
+			return "candle";
+		case Image_window::UiPaletteRed:
+			return "red";
+		case Image_window::UiPaletteLightning:
+			return "lightning";
+		case Image_window::UiPaletteSingleLight:
+			return "single_light";
+		case Image_window::UiPaletteManyLights:
+			return "many_lights";
+		default:
+			return "disabled";
+		}
+	};
+
+	auto read_layer_cfg = [&](const string& base, const LayerUiCfg& fallback) {
+		LayerUiCfg cfg = fallback;
+		config->value(base + "/width", cfg.width, fallback.width);
+		config->value(base + "/height", cfg.height, fallback.height);
+		normalize_dims(cfg.width, cfg.height);
+
+		string s;
+		config->value(base + "/scale_method", s, Image_window::get_name_for_scaler(fallback.scaler));
+		cfg.scaler = Image_window::get_scaler_for_name(s.c_str());
+		if (cfg.scaler == Image_window::NoScaler) {
+			cfg.scaler = fallback.scaler;
+		}
+
+		string fb_fmode;
+		Image_window::fillmode_to_string(fallback.fillmode, fb_fmode);
+		string fm;
+		config->value(base + "/fill_mode", fm, fb_fmode.c_str());
+		cfg.fillmode = Image_window::string_to_fillmode(fm.c_str());
+		if (cfg.fillmode == 0) {
+			cfg.fillmode = fallback.fillmode;
+		}
+
+		string fs;
+		config->value(base + "/fill_scaler", fs, Image_window::get_name_for_scaler(fallback.fill_scaler));
+		cfg.fill_scaler = Image_window::get_scaler_for_name(fs.c_str());
+		if (cfg.fill_scaler == Image_window::NoScaler) {
+			cfg.fill_scaler = fallback.fill_scaler;
+		}
+
+		string pl;
+		config->value(base + "/palette", pl, palette_to_string(fallback.palette));
+		cfg.palette = palette_from_string(pl, fallback.palette);
+		return cfg;
+	};
+
+	auto write_layer_cfg = [&](const string& base, const LayerUiCfg& cfg, bool overwrite) {
+		if (overwrite || !config->key_exists(base + "/width")) {
+			config->set(base + "/width", cfg.width, false);
+		}
+		if (overwrite || !config->key_exists(base + "/height")) {
+			config->set(base + "/height", cfg.height, false);
+		}
+		if (overwrite || !config->key_exists(base + "/scale_method")) {
+			config->set(base + "/scale_method", Image_window::get_name_for_scaler(cfg.scaler), false);
+		}
+		if (overwrite || !config->key_exists(base + "/fill_mode")) {
+			string fmode_s;
+			Image_window::fillmode_to_string(cfg.fillmode, fmode_s);
+			config->set(base + "/fill_mode", fmode_s, false);
+		}
+		if (overwrite || !config->key_exists(base + "/fill_scaler")) {
+			config->set(base + "/fill_scaler", Image_window::get_name_for_scaler(cfg.fill_scaler), false);
+		}
+		if (overwrite || !config->key_exists(base + "/palette")) {
+			config->set(base + "/palette", palette_to_string(cfg.palette), false);
+		}
+	};
+
+	LayerUiCfg global_cfg;
+	global_cfg.width  = 420;
+	global_cfg.height = 263;
+	config->value("config/video/ui/width", global_cfg.width, 420);
+	config->value("config/video/ui/height", global_cfg.height, 263);
+	normalize_dims(global_cfg.width, global_cfg.height);
+	{
+		string s;
+		config->value("config/video/ui/scale_method", s, Image_window::get_name_for_scaler(Image_window::point));
+		global_cfg.scaler = Image_window::get_scaler_for_name(s.c_str());
+		if (global_cfg.scaler == Image_window::NoScaler) {
+			global_cfg.scaler = Image_window::point;
+		}
+		string fit_default;
+		Image_window::fillmode_to_string(Image_window::Fit, fit_default);
+		string fm;
+		config->value("config/video/ui/fill_mode", fm, fit_default.c_str());
+		global_cfg.fillmode = Image_window::string_to_fillmode(fm.c_str());
+		if (global_cfg.fillmode == 0) {
+			global_cfg.fillmode = Image_window::Fit;
+		}
+		string fs;
+		config->value("config/video/ui/fill_scaler", fs, Image_window::get_name_for_scaler(Image_window::point));
+		global_cfg.fill_scaler = Image_window::get_scaler_for_name(fs.c_str());
+		if (global_cfg.fill_scaler == Image_window::NoScaler) {
+			global_cfg.fill_scaler = Image_window::point;
+		}
+		string pl;
+		config->value("config/video/ui/palette", pl, "disabled");
+		global_cfg.palette = palette_from_string(pl, Image_window::UiPaletteDisabled);
+	}
+
+	config->set("config/video/ui/universal", ui_universal ? "yes" : "no", false);
+	write_layer_cfg("config/video/ui", global_cfg, true);
+
+	gwin->set_ui_config(global_cfg.width, global_cfg.height, global_cfg.scaler, global_cfg.fillmode, global_cfg.fill_scaler);
+
+	auto apply_named_layer = [&](Image_window::UiLayerKind kind, const string& key) {
+		const string base = "config/video/ui/" + key;
+		LayerUiCfg   cfg  = ui_universal ? global_cfg : read_layer_cfg(base, global_cfg);
+		gwin->set_ui_layer_config(kind, cfg.width, cfg.height, cfg.scaler, cfg.fillmode, cfg.fill_scaler);
+		gwin->set_ui_layer_palette(kind, cfg.palette);
+		write_layer_cfg(base, cfg, !ui_universal);
+	};
+
+	apply_named_layer(Image_window::UiLayerConversations, "conversations");
+	apply_named_layer(Image_window::UiLayerMousePointer, "mouse_pointer");
+	apply_named_layer(Image_window::UiLayerGumps, "gumps");
+	apply_named_layer(Image_window::UiLayerHudGumps, "hud_gumps");
+	apply_named_layer(Image_window::UiLayerTextGumps, "text_gumps");
+	apply_named_layer(Image_window::UiLayerModalGumps, "modal_gumps");
+	apply_named_layer(Image_window::UiLayerDisplayMap, "display_map");
+	apply_named_layer(Image_window::UiLayerTextEffects, "text_effect");
+}
+
 /*
  *  Most of the game setable video configuration stuff is stored here so
  *  it isn't duplicated all over the place. fullscreen is determined
@@ -3061,6 +3278,10 @@ void setup_video(
 			 << " fill scaler, " << (fullscreen ? "full screen" : "window") << endl;
 #endif
 		gwin->resized(resx, resy, fullscreen, gw, gh, scaleval, scaler, fillmode, fill_scaler);
+	}
+	if ((video_init || change_gwin) && gwin != nullptr) {
+		// Apply the overlay-layer ("UI") scaling settings.
+		apply_ui_layer_config();
 	}
 	if (menu_init) {
 #ifdef DEBUG

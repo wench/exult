@@ -509,8 +509,13 @@ Game_window::~Game_window() {
 	delete background_noise;
 	delete tqueue;
 	tqueue = nullptr;
-	delete win;
+	// Free objects that may own layers living in 'win' before the
+	// window itself (the drag state and text effects each own layers).
 	delete dragging;
+	dragging = nullptr;
+	delete effects;
+	effects = nullptr;
+	delete win;
 	delete pal;
 	for (auto* map : maps) {
 		if (map) {
@@ -520,8 +525,27 @@ Game_window::~Game_window() {
 	delete usecode;
 	delete clock;
 	delete npc_prox;
-	delete effects;
 	delete render;
+	// The single instance is gone; clear the static so get_instance() returns
+	// null (e.g. Mouse's destructor checks this before touching the window).
+	game_window = nullptr;
+}
+
+/*
+ *  Redirect all shape/text drawing to a buffer (e.g. an overlay layer),
+ *  returning the previous target. Both the window's active buffer and the
+ *  static shape render target are switched so every drawing path follows.
+ */
+
+Image_buffer8* Game_window::push_render_target(Image_buffer8* buf) {
+	Image_buffer8* prev = win->set_render_buffer(buf);
+	Shape_frame::set_to_render(buf);
+	return prev;
+}
+
+void Game_window::pop_render_target(Image_buffer8* prev) {
+	win->set_render_buffer(prev);
+	Shape_frame::set_to_render(prev);
 }
 
 /*
@@ -545,6 +569,8 @@ bool Game_window::is_background_track(int num) const {    // ripped out of Backg
 }
 
 void Game_window::init_files(bool cycle) {
+	const uint32                      menu_mouse_only = 1u << static_cast<int>(Image_window::UiLayerMousePointer);
+	Game_window::Scoped_ui_layer_mask load_layers(this, cycle ? 0u : menu_mouse_only);
 	// Display red plasma during load...
 	if (cycle) {
 		setup_load_palette();
@@ -1424,6 +1450,7 @@ void Game_window::write(bool nopaint) {
  */
 
 void Game_window::read() {
+	Game_window::Scoped_ui_layer_mask load_layers(this, 0);
 	Audio::get_ptr()->cancel_streams();
 	// Display red plasma during load...
 	setup_load_palette();
@@ -2158,14 +2185,17 @@ void Game_window::show_items(
 		bool ctrl        // Control key is pressed.
 ) {
 	// Look for obj. in open gump.
-	Gump*        gump = gump_man->find_gump(x, y);
+	Gump* gump = gump_man->find_gump(x, y);
+	int   gx;
+	int   gy;
+	gump_man->map_game_to_gump(gump, x, y, gx, gy);
 	Game_object* obj;    // What we find.
 	bool         found_in_gump = false;
 	if (gump) {
-		obj           = gump->find_object(x, y);
+		obj           = gump->find_object(gx, gy);
 		found_in_gump = (obj != nullptr);
 		if (!obj) {
-			obj = gump->get_cont_or_actor(x, y);
+			obj = gump->get_cont_or_actor(gx, gy);
 		}
 	} else {    // Search rest of world.
 		obj = find_object(x, y);
@@ -2177,7 +2207,7 @@ void Game_window::show_items(
 		if (!mobjxy.empty() && Notebook_gump::get_instance() == nullptr) {
 			// Make sure menu is visible on the screen
 			Itemmenu_gump itemgump(&mobjxy, x, y);
-			Game_window::get_instance()->get_gump_man()->do_modal_gump(&itemgump, Mouse::hand);
+			Game_window::get_instance()->get_gump_man()->do_modal_gump(&itemgump, Mouse::hand, itemgump.get_outline_painter());
 			obj = nullptr;
 		}
 	}

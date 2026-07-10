@@ -1131,9 +1131,12 @@ USECODE_INTRINSIC(click_on_item) {
 		// Look for obj. in open gump.
 		Gump* gump = gumpman->find_gump(x, y);
 		if (gump) {
-			obj = gump->find_object(x, y);
+			int gx;
+			int gy;
+			gumpman->map_game_to_gump(gump, x, y, gx, gy);
+			obj = gump->find_object(gx, gy);
 			if (!obj) {
-				obj = gump->find_actor(x, y);
+				obj = gump->find_actor(gx, gy);
 			}
 		} else {    // Search rest of world.
 			obj = gwin->find_object(x, y);
@@ -1504,18 +1507,68 @@ USECODE_INTRINSIC(summon) {
  */
 class Paint_centered : public Paintable, public Game_singletons {
 protected:
-	ShapeID* sid;     // ->shape.
-	int      x, y;    // Where to paint.
+	ShapeID* sid;           // ->shape.
+	int      layer = -1;    // Dedicated display-map overlay layer.
+	int      w = 0, h = 0;
+
+	// Above normal/hud/modal gump layers, below mouse cursor.
+	constexpr static int display_map_layer_z = (1 << 19) + 1;
+
+	virtual void paint_overlay(Shape_frame* shape) {
+		ignore_unused_variable_warning(shape);
+	}
+
 public:
 	Paint_centered(ShapeID* si) : sid(si) {
 		Shape_frame* s = sid->get_shape();
-		// Get coords. for centered view.
-		x = (gwin->get_game_width() - s->get_width()) / 2 + s->get_xleft();
-		y = (gwin->get_game_height() - s->get_height()) / 2 + s->get_yabove();
+		if (s) {
+			w = s->get_width();
+			h = s->get_height();
+		}
+	}
+
+	~Paint_centered() override {
+		if (layer >= 0) {
+			gwin->destroy_layer(layer);
+			layer = -1;
+		}
 	}
 
 	void paint() override {
-		sid->paint_shape(x, y);
+		Shape_frame* s = sid->get_shape();
+		if (!s || w <= 0 || h <= 0) {
+			return;
+		}
+		if (layer < 0) {
+			layer = gwin->create_layer(w, h, 255, 0, display_map_layer_z);
+			if (layer < 0) {
+				return;
+			}
+			gwin->layer_set_ui_kind(layer, Image_window::UiLayerDisplayMap);
+		}
+
+		Image_buffer8* lbuf = gwin->get_layer_ibuf(layer);
+		if (!lbuf) {
+			return;
+		}
+
+		lbuf->clear_clip();
+		lbuf->fill8(255);    // fully transparent
+		Image_buffer8* prev = gwin->push_render_target(lbuf);
+		// Paint 0-based into the layer buffer.
+		sman->paint_shape(s->get_xleft(), s->get_yabove(), s);
+		paint_overlay(s);
+		gwin->pop_render_target(prev);
+
+		Image_window* iwin = gwin->get_win();
+		const float   f    = iwin->get_ui_scale_factor(Image_window::UiLayerDisplayMap);
+		const float   dw   = static_cast<float>(w) * f;
+		const float   dh   = static_cast<float>(h) * f;
+		const float   dx   = (static_cast<float>(iwin->get_display_width()) - dw) / 2.0f;
+		const float   dy   = (static_cast<float>(iwin->get_display_height()) - dh) / 2.0f;
+		gwin->layer_set_dest(layer, static_cast<int>(dx), static_cast<int>(dy), static_cast<int>(dw), static_cast<int>(dh));
+		gwin->layer_set_visible(layer, true);
+		gwin->layer_set_dirty(layer);
 	}
 };
 
@@ -1528,8 +1581,10 @@ class Paint_map : public Paint_centered {
 public:
 	Paint_map(ShapeID* s, bool loc) : Paint_centered(s), show_loc(loc) {}
 
-	void paint() override {
-		Paint_centered::paint();
+	void paint_overlay(Shape_frame* s) override {
+		if (!s || !show_loc) {
+			return;
+		}
 		if (show_loc) {
 			// mark location
 			int              xx;
@@ -1545,9 +1600,7 @@ public:
 				xx = std::lround(t.tx / 16.0 + 5);
 				yy = std::lround(t.ty / 16.0 + 5);
 			}
-			Shape_frame* s = sid->get_shape();
-			xx += x - s->get_xleft();
-			yy += y - s->get_yabove();
+			// Local to the dedicated map layer buffer.
 			gwin->get_win()->fill8(50, 1, 5, xx, yy - 2);
 			gwin->get_win()->fill8(50, 5, 1, xx - 2, yy);
 		}
@@ -1573,12 +1626,13 @@ USECODE_INTRINSIC(display_map) {
 		ShortcutBar_gump::HideGump();
 	}
 	gwin->paint();
-	ShapeID   msid(game->get_shape("sprites/map"), 0, SF_SPRITES_VGA);
-	Paint_map map(&msid, loc);
-
-	int xx;
-	int yy;
-	Get_click(xx, yy, Mouse::hand, nullptr, false, &map);
+	ShapeID msid(game->get_shape("sprites/map"), 0, SF_SPRITES_VGA);
+	int     xx;
+	int     yy;
+	{
+		Paint_map map(&msid, loc);
+		Get_click(xx, yy, Mouse::hand, nullptr, false, &map);
+	}
 	gwin->paint();
 	if (touchui != nullptr) {
 		Gump_manager* gumpman = gwin->get_gump_man();
@@ -1635,11 +1689,13 @@ USECODE_INTRINSIC(si_display_map) {
 		ShortcutBar_gump::HideGump();
 	}
 	gwin->paint();
-	ShapeID        msid(shapenum, 0, SF_SPRITES_VGA);
-	Paint_centered map(&msid);
-	int            xx;
-	int            yy;
-	Get_click(xx, yy, Mouse::hand, nullptr, false, &map);
+	ShapeID msid(shapenum, 0, SF_SPRITES_VGA);
+	int     xx;
+	int     yy;
+	{
+		Paint_centered map(&msid);
+		Get_click(xx, yy, Mouse::hand, nullptr, false, &map);
+	}
 	gwin->paint();
 	if (touchui != nullptr) {
 		Gump_manager* gumpman = gwin->get_gump_man();
@@ -1673,12 +1729,13 @@ USECODE_INTRINSIC(display_map_ex) {
 		ShortcutBar_gump::HideGump();
 	}
 	gwin->paint();
-	ShapeID   msid(map_shp, 0, SF_SPRITES_VGA);
-	Paint_map map(&msid, loc);
-
-	int xx;
-	int yy;
-	Get_click(xx, yy, Mouse::hand, nullptr, false, &map);
+	ShapeID msid(map_shp, 0, SF_SPRITES_VGA);
+	int     xx;
+	int     yy;
+	{
+		Paint_map map(&msid, loc);
+		Get_click(xx, yy, Mouse::hand, nullptr, false, &map);
+	}
 	gwin->paint();
 	if (touchui != nullptr) {
 		Gump_manager* gumpman = gwin->get_gump_man();

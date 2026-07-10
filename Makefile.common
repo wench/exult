@@ -183,6 +183,7 @@ GUMPS_OBJS:= \
 	gumps/Text_button.o \
 	gumps/Text_gump.o \
 	gumps/InputOptions_gump.o \
+	gumps/UIOptions_gump.o \
 	gumps/VideoOptions_gump.o \
 	gumps/Yesno_gump.o \
 	gumps/StringList_widget.o \
@@ -598,6 +599,8 @@ gumps/Scrollable_widget.o : gumps/Scrollable_widget.cc $(EXULT_FLX)
 gumps/ShortcutBar_gump.o : gumps/ShortcutBar_gump.cc $(EXULT_FLX)
 
 gumps/Stats_gump.o : gumps/Stats_gump.cc $(EXULT_FLX)
+
+gumps/VideoOptions_gump.o : gumps/UIOptions_gump.cc $(EXULT_FLX)
 
 gumps/VideoOptions_gump.o : gumps/VideoOptions_gump.cc $(EXULT_FLX)
 

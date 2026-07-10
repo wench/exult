@@ -66,6 +66,11 @@ using std::vector;
 int Cloud::randcnt           = 0;
 int Lightning_effect::active = 0;
 
+namespace {
+	// Above normal and HUD gumps, below modal gumps.
+	constexpr int text_effect_layer_z = (1 << 18) + (1 << 16);
+}    // namespace
+
 /**
  *  Clean up.
  */
@@ -290,7 +295,7 @@ void Effects_manager::paint() {
 
 void Effects_manager::paint_text() {
 	for (auto& txt : texts) {
-		txt->paint();
+		txt->paint_to_layer();
 	}
 }
 
@@ -1053,7 +1058,7 @@ void Text_effect::init() {
 		msg[0] = '"';
 	}
 	const int len = msg.size();
-	if (len>0 && msg[len - 1] == '@') {
+	if (len > 0 && msg[len - 1] == '@') {
 		msg[len - 1] = '"';
 	}
 }
@@ -1124,16 +1129,89 @@ Text_effect::~Text_effect() {
 	if (in_queue()) {
 		gwin->get_tqueue()->remove(this);
 	}
+	free_layer();
 }
 
 /**
- *  Render.
+ *  Destroy this text's layer (if any).
+ */
+void Text_effect::free_layer() {
+	// Only touch the window if it still exists (at shutdown it may be gone).
+	if (text_layer >= 0 && Game_window::get_instance() == gwin) {
+		gwin->destroy_layer(text_layer);
+	}
+	text_layer = -1;
+	layer_w    = 0;
+	layer_h    = 0;
+}
+
+/**
+ *  Render (legacy direct paint into the current target).
  */
 
 void Text_effect::paint() {
 	const char* ptr = msg.c_str();
 	const int   len = strlen(ptr);
 	sman->paint_text(0, ptr, len, pos.x, pos.y);
+}
+
+/**
+ *  Render into this text's own layer, scaled by the text-effect UI
+ *  size and anchored over the object so it stays in place as the size option
+ *  changes the glyph size.
+ */
+void Text_effect::paint_to_layer() {
+	const int w = width;
+	const int h = height;
+	if (w <= 0 || h <= 0) {
+		return;
+	}
+	Image_window* iwin = gwin->get_win();
+	if (!iwin) {
+		return;
+	}
+	// (Re)create the layer if missing or the text size changed.
+	if (text_layer < 0 || layer_w != w || layer_h != h) {
+		if (text_layer >= 0) {
+			gwin->destroy_layer(text_layer);
+			text_layer = -1;
+		}
+		text_layer = gwin->create_layer(w, h, 255, 0, text_effect_layer_z);
+		if (text_layer < 0) {
+			return;
+		}
+		gwin->layer_set_ui_kind(text_layer, Image_window::UiLayerTextEffects);
+		layer_w = w;
+		layer_h = h;
+	}
+	gwin->layer_set_z(text_layer, text_effect_layer_z);
+
+	Image_buffer8* lbuf = gwin->get_layer_ibuf(text_layer);
+	if (!lbuf) {
+		return;
+	}
+	lbuf->clear_clip();
+	lbuf->fill8(255);    // Fully transparent.
+	Image_buffer8* prev = gwin->push_render_target(lbuf);
+	// Paint the text at the layer's local origin.
+	const char* ptr = msg.c_str();
+	const int   len = strlen(ptr);
+	sman->paint_text(0, ptr, len, 0, 0);
+	gwin->pop_render_target(prev);
+	gwin->layer_set_dirty(text_layer);
+
+	// Scale by the text-effect UI size and centre over the same game point the
+	// text occupies, so the label stays anchored over its object.
+	const float f = iwin->get_ui_scale_factor(Image_window::UiLayerTextEffects);
+	int         csx;
+	int         csy;
+	iwin->game_to_screen(pos.x + w / 2, pos.y + h / 2, false, csx, csy);
+	const float dw = static_cast<float>(w) * f;
+	const float dh = static_cast<float>(h) * f;
+	const int   dx = static_cast<int>(static_cast<float>(csx) - dw / 2.0f);
+	const int   dy = static_cast<int>(static_cast<float>(csy) - dh / 2.0f);
+	gwin->layer_set_dest(text_layer, dx, dy, static_cast<int>(dw), static_cast<int>(dh));
+	gwin->layer_set_visible(text_layer, true);
 }
 
 /**

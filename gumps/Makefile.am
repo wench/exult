@@ -98,6 +98,8 @@ libgumps_la_SOURCES = \
 	ItemMenu_gump.h	\
 	InputOptions_gump.cc	\
 	InputOptions_gump.h \
+	UIOptions_gump.cc \
+	UIOptions_gump.h \
 	AdvancedOptions_gump.cc \
 	AdvancedOptions_gump.h \
 	ConfigSetting_widget.cc \

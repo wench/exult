@@ -26,13 +26,17 @@
 
 #include "Actor_gump.h"
 #include "Audio.h"
+#include "Book_gump.h"
 #include "CombatStats_gump.h"
 #include "Configuration.h"
 #include "Dynamic_container_gump.h"
+#include "Face_stats.h"
 #include "Gump.h"
 #include "Jawbone_gump.h"
 #include "Paperdoll_gump.h"
+#include "Scroll_gump.h"
 #include "ShortcutBar_gump.h"
+#include "Sign_gump.h"
 #include "Slider_gump.h"
 #include "Spellbook_gump.h"
 #include "Stats_gump.h"
@@ -76,6 +80,256 @@ Gump_manager::Gump_manager() {
 	config->set("config/gameplay/gumps_dont_pause_game", dont_pause_game ? "yes" : "no", true);
 }
 
+// Per-gump overlay layers are composited above the conversation layer (z 0)
+// and below the mouse cursor (z 1<<20). Later gumps in the list get a higher z
+// so they stack on top; the dragged gump is bumped above every other gump
+// (see Dragging_info::paint, which uses z 1<<19).
+namespace {
+	constexpr int gump_layer_z_base            = 1 << 18;
+	constexpr int gump_layer_text_tier_offset  = 1 << 16;
+	constexpr int gump_layer_modal_tier_offset = 1 << 17;
+	// Extra margin around a gump's reported bounds so outlines/badges are not
+	// clipped by its layer buffer.
+	constexpr int gump_layer_margin = 4;
+
+	bool is_text_gump(const Gump* g) {
+		return dynamic_cast<const Scroll_gump*>(g) != nullptr || dynamic_cast<const Sign_gump*>(g) != nullptr
+			   || dynamic_cast<const Book_gump*>(g) != nullptr;
+	}
+
+	int z_tier_offset_for(const Gump* g) {
+		if (g->is_modal()) {
+			return gump_layer_modal_tier_offset;
+		}
+		if (is_text_gump(g)) {
+			return gump_layer_text_tier_offset;
+		}
+		return 0;
+	}
+
+	// Pick the UI layer kind (and thus the config/video/ui/* size + scaler
+	// override) for a gump's overlay layer: HUD gumps (shortcut bar,
+	// face-stats), text gumps (scroll/sign/book), modal gumps, and ordinary
+	// gumps each get their own.
+	Image_window::UiLayerKind ui_kind_for(Gump* g, bool is_hud) {
+		if (is_hud) {
+			return Image_window::UiLayerHudGumps;
+		}
+		if (is_text_gump(g)) {
+			return Image_window::UiLayerTextGumps;
+		}
+		if (g->is_modal()) {
+			return Image_window::UiLayerModalGumps;
+		}
+		return Image_window::UiLayerGumps;
+	}
+}    // namespace
+
+void Gump_manager::render_gump_to_layer(Gump* g, int z) {
+	if (!g) {
+		return;
+	}
+	const bool is_hud = dynamic_cast<ShortcutBar_gump*>(g) != nullptr || dynamic_cast<Face_stats*>(g) != nullptr;
+	const int  parts  = is_hud ? g->hud_part_count() : 1;
+	for (int part = 0; part < parts; ++part) {
+		render_gump_part_to_layer(g, z, part, is_hud);
+	}
+	// If a previously-used second layer is no longer needed, hide it.
+	if (parts < 2 && g->render_layer2 >= 0) {
+		gwin->layer_set_visible(g->render_layer2, false);
+	}
+}
+
+void Gump_manager::render_gump_part_to_layer(Gump* g, int z, int part, bool is_hud) {
+	int&      layer  = (part == 0) ? g->render_layer : g->render_layer2;
+	TileRect& bounds = (part == 0) ? g->layer_bounds : g->layer_bounds2;
+
+	// Tight game-coordinate content rect for this part, then the padded buffer.
+	TileRect content = (g->hud_part_count() > 1) ? g->hud_part_rect(part) : g->get_dirty();
+	// An empty content rect means this part has nothing to draw (e.g. the
+	// right-hand face-stats column when there are four or fewer party members);
+	// hide its layer. This must be checked before enlarge(), which would inflate
+	// a 0x0 rect into a non-empty buffer.
+	if (content.w <= 0 || content.h <= 0) {
+		if (layer >= 0) {
+			gwin->layer_set_visible(layer, false);
+		}
+		return;
+	}
+	TileRect b = content;
+	b.enlarge(gump_layer_margin);
+	if (b.w <= 0 || b.h <= 0) {
+		if (layer >= 0) {
+			gwin->layer_set_visible(layer, false);
+		}
+		return;
+	}
+	// (Re)create the layer if missing or the bounds changed size.
+	if (layer < 0 || bounds.w != b.w || bounds.h != b.h) {
+		if (layer >= 0) {
+			gwin->destroy_layer(layer);
+			layer = -1;
+		}
+		layer = gwin->create_layer(b.w, b.h, 255, 0, z);
+		if (layer < 0) {
+			return;
+		}
+		gwin->layer_set_ui_kind(layer, ui_kind_for(g, is_hud));
+	}
+	bounds = b;
+	gwin->layer_set_z(layer, z);
+
+	Image_buffer8* lbuf = gwin->get_layer_ibuf(layer);
+	if (!lbuf) {
+		return;
+	}
+	// Clear the buffer to transparent and paint the gump 0-based (shifted by
+	// -b.x,-b.y). Content outside this part's bounds is clipped away by the
+	// buffer, so the two mode-3 groups each land in their own layer.
+	lbuf->clear_clip();
+	lbuf->fill8(255);    // Fully transparent.
+	Image_buffer8* prev = gwin->push_render_target(lbuf);
+	g->paint_shifted(-b.x, -b.y);
+	gwin->pop_render_target(prev);
+
+	Image_window* iwin = gwin->get_win();
+	const float   f    = iwin->get_ui_scale_factor(ui_kind_for(g, is_hud));
+	int           csx;
+	int           csy;
+	iwin->game_to_screen(b.x + b.w / 2, b.y + b.h / 2, gwin->get_fastmouse(), csx, csy);
+	float dw = static_cast<float>(b.w) * f;
+	float dh = static_cast<float>(b.h) * f;
+	float dx = static_cast<float>(csx) - dw / 2.0f;
+	float dy = static_cast<float>(csy) - dh / 2.0f;
+	// HUD gumps (shortcut bar, face-stats) follow the gumps size setting via
+	// get_ui_scale_factor: Full = a fixed display size, Auto = the game area's
+	// native size (matches the main game layer), 1/2/3 interpolate.
+	if (is_hud) {
+		const float dispw = static_cast<float>(iwin->get_display_width());
+		const float disph = static_cast<float>(iwin->get_display_height());
+		// Anchor detection in GAME coordinates (content vs the game area).
+		const int gsx         = iwin->get_start_x();
+		const int gsy         = iwin->get_start_y();
+		const int gex         = iwin->get_end_x();
+		const int gey         = iwin->get_end_y();
+		const int lmg         = content.x - gsx;
+		const int rmg         = gex - (content.x + content.w);
+		const int tmg         = content.y - gsy;
+		const int bmg         = gey - (content.y + content.h);
+		const int tolg        = 8;    // game pixels
+		const int xanc_forced = g->hud_part_xanchor(part);
+		const int yanc_forced = g->hud_part_yanchor(part);
+		int       xanc        = xanc_forced;
+		int       yanc        = yanc_forced;
+		if (xanc < 0) {
+			const int d = lmg > rmg ? lmg - rmg : rmg - lmg;
+			xanc        = (d <= tolg) ? 1 : (lmg < rmg ? 0 : 2);
+		}
+		if (yanc < 0) {
+			const int d = tmg > bmg ? tmg - bmg : bmg - tmg;
+			yanc        = (d <= tolg) ? 1 : (tmg < bmg ? 0 : 2);
+		}
+		if (xanc == 1) {
+			dx = (dispw - dw) / 2.0f;    // centered on the display
+		} else if (xanc == 0) {
+			dx = static_cast<float>(b.x - gsx) * f;    // game-area left edge
+		} else {
+			dx = dispw - static_cast<float>(gex - b.x) * f;    // game-area right edge
+		}
+		if (yanc == 1) {
+			dy = (disph - dh) / 2.0f;
+		} else if (yanc == 0) {
+			dy = static_cast<float>(b.y - gsy) * f;    // game-area top edge
+		} else {
+			dy = disph - static_cast<float>(gey - b.y) * f;    // game-area bottom edge
+		}
+	}
+	if (g->is_modal() && !g->is_draggable()) {
+		const float dispw = static_cast<float>(iwin->get_display_width());
+		const float disph = static_cast<float>(iwin->get_display_height());
+		if (dw <= dispw) {
+			dx = dx < 0.0f ? 0.0f : (dx > dispw - dw ? dispw - dw : dx);
+		} else {
+			dx = (dispw - dw) / 2.0f;
+		}
+		if (dh <= disph) {
+			dy = dy < 0.0f ? 0.0f : (dy > disph - dh ? disph - dh : dy);
+		} else {
+			dy = (disph - dh) / 2.0f;
+		}
+	}
+	gwin->layer_set_dest(layer, static_cast<int>(dx), static_cast<int>(dy), static_cast<int>(dw), static_cast<int>(dh));
+	gwin->layer_set_visible(layer, true);
+	// The shortcut bar always gets the translucency index table. It only
+	// affects pixels whose palette index is in the translucent/xform range
+	// (the entry is non-zero there): those render with a FIXED alpha/colour
+	// instead of the live, colour-cycling palette. This covers the fully
+	// translucent bar as well as a single missing-item icon shown dimmed in
+	// an otherwise solid bar. Normal opaque icon pixels have a zero table
+	// entry and stay fully opaque, so the solid bar looks unchanged.
+	ShortcutBar_gump* sb = dynamic_cast<ShortcutBar_gump*>(g);
+	if (sb) {
+		gwin->layer_set_index_argb(layer, Shape_manager::get_instance()->get_translucency_argb());
+	} else {
+		gwin->layer_set_index_argb(layer, nullptr);
+	}
+	gwin->layer_set_dirty(layer);
+}
+
+bool Gump_manager::map_game_to_gump(const Gump* g, int gx, int gy, int& lx, int& ly) const {
+	if (!g || g->render_layer < 0 || !gwin->layer_is_visible(g->render_layer)) {
+		lx = gx;
+		ly = gy;
+		return true;
+	}
+	int sx;
+	int sy;
+	gwin->get_win()->game_to_screen(gx, gy, gwin->get_fastmouse(), sx, sy);
+	int        llx;
+	int        lly;
+	const bool inside = gwin->screen_to_layer(g->render_layer, sx, sy, llx, lly);
+	const int  lx0    = llx + g->layer_bounds.x;
+	const int  ly0    = lly + g->layer_bounds.y;
+	// Two-part HUD gump (Face_stats mode 3): if the point is not inside the
+	// first part's layer, try the second part's layer before giving up.
+	if (!inside && g->render_layer2 >= 0 && gwin->layer_is_visible(g->render_layer2)) {
+		int        llx2;
+		int        lly2;
+		const bool inside2 = gwin->screen_to_layer(g->render_layer2, sx, sy, llx2, lly2);
+		if (inside2) {
+			lx = llx2 + g->layer_bounds2.x;
+			ly = lly2 + g->layer_bounds2.y;
+			return true;
+		}
+	}
+	// Always output the (possibly extrapolated) gump-local coordinate so a
+	// drag can continue past the gump's edge; the bool only reports whether
+	// the point is actually within the gump's layer (used for hit-testing).
+	lx = lx0;
+	ly = ly0;
+	return inside;
+}
+
+void Gump_manager::render_gumps_to_layer(bool modal) {
+	// The dimmed backdrop behind modal gumps is drawn straight to the window
+	// (it is full-screen and does not scale).
+	if (modal && background) {
+		background->paint();
+	}
+	int idx = 0;
+	for (Gump_list* gmp = open_gumps; gmp; gmp = gmp->next, ++idx) {
+		Gump* g = gmp->gump;
+		if (g->is_modal() != modal) {
+			continue;
+		}
+		if (g->uses_render_layer()) {
+			render_gump_to_layer(g, gump_layer_z_base + z_tier_offset_for(g) + idx);
+		} else {
+			g->paint();
+		}
+	}
+}
+
 /*
  *  Showing gumps.
  */
@@ -114,7 +368,14 @@ Gump* Gump_manager::find_gump(
 		if (!gump) {
 			continue;
 		}
-		if (gump->has_point(x, y) && (pers || !gump->is_persistent())) {
+		// Each gump has its own (scaled) layer, so map the point through this
+		// gump's layer to get the coordinate its shape was painted at.
+		int lx;
+		int ly;
+		if (!map_game_to_gump(gump, x, y, lx, ly)) {
+			continue;
+		}
+		if (gump->has_point(lx, ly) && (pers || !gump->is_persistent())) {
 			found = gump;
 		}
 	}
@@ -316,10 +577,46 @@ void Gump_manager::add_gump(
 	const ShapeID s_id(shapenum, 0, paperdoll ? SF_PAPERDOL_VGA : SF_GUMPS_VGA);
 	Shape_frame*  shape = s_id.get_shape();
 
-	if (x + shape->get_xright() > gwin->get_width() || y + shape->get_ybelow() > gwin->get_height()) {
-		cnt = 0;
-		x   = gwin->get_width() / 10;
-		y   = gwin->get_width() / 10;
+	// Keep the initial (non-saved) position fully on-screen.
+	{
+		Image_window* iwin  = gwin->get_win();
+		const float   f     = iwin->get_ui_scale_factor(Image_window::UiLayerGumps);
+		const int     gleft = x - shape->get_xleft();
+		const int     gtop  = y - shape->get_yabove();
+		const int     gw    = shape->get_width();
+		const int     gh    = shape->get_height();
+		int           csx;
+		int           csy;
+		iwin->game_to_screen(gleft + gw / 2, gtop + gh / 2, gwin->get_fastmouse(), csx, csy);
+		const float dw    = static_cast<float>(gw) * f;
+		const float dh    = static_cast<float>(gh) * f;
+		const float dispw = static_cast<float>(iwin->get_display_width());
+		const float disph = static_cast<float>(iwin->get_display_height());
+		float       ncsx  = static_cast<float>(csx);
+		float       ncsy  = static_cast<float>(csy);
+		if (dw <= dispw) {
+			ncsx = ncsx < dw / 2.0f ? dw / 2.0f : (ncsx > dispw - dw / 2.0f ? dispw - dw / 2.0f : ncsx);
+		} else {
+			ncsx = dispw / 2.0f;    // Wider than the display: centre it.
+		}
+		if (dh <= disph) {
+			ncsy = ncsy < dh / 2.0f ? dh / 2.0f : (ncsy > disph - dh / 2.0f ? disph - dh / 2.0f : ncsy);
+		} else {
+			ncsy = disph / 2.0f;
+		}
+		if (static_cast<int>(ncsx) != csx || static_cast<int>(ncsy) != csy) {
+			// Convert the clamped centre back to game coords and shift x,y by
+			// that game-space delta so the scaled gump lands on-screen.
+			int ngx;
+			int ngy;
+			int ogx;
+			int ogy;
+			iwin->screen_to_game(static_cast<int>(ncsx), static_cast<int>(ncsy), gwin->get_fastmouse(), ngx, ngy);
+			iwin->screen_to_game(csx, csy, gwin->get_fastmouse(), ogx, ogy);
+			x += ngx - ogx;
+			y += ngy - ogy;
+			cnt = 0;    // Restart the stagger since we wrapped back on-screen.
+		}
 	}
 
 	Gump* new_gump = nullptr;
@@ -460,12 +757,15 @@ bool Gump_manager::double_clicked(
 			}
 			return true;
 		}
+		int gx = x;
+		int gy = y;
+		map_game_to_gump(gump, x, y, gx, gy);
 		// Find object in gump.
-		obj = gump->find_object(x, y);
+		obj = gump->find_object(gx, gy);
 		if (!obj) {    // Maybe it's a spell.
-			Gump_button* btn = gump->on_button(x, y);
+			Gump_button* btn = gump->on_button(gx, gy);
 			if (btn) {
-				btn->double_clicked(x, y);
+				btn->double_clicked(gx, gy);
 			} else if (gwin->get_double_click_closes_gumps()) {
 				gump->close();
 				gwin->paint();
@@ -495,10 +795,13 @@ bool Gump_manager::handle_mouse_wheel(float y, float x, int mx, int my) {
 	if (!gump) {
 		return false;
 	}
+	int gx = mx;
+	int gy = my;
+	map_game_to_gump(gump, mx, my, gx, gy);
 	if (y > 0) {
-		gump->mousewheel_up(mx, my);
+		gump->mousewheel_up(gx, gy);
 	} else if (y < 0) {
-		gump->mousewheel_down(mx, my);
+		gump->mousewheel_down(gx, gy);
 	}
 	// Always consume the event when cursor is over a gump so the
 	// game-world cheat-scroll never fires through an open gump.
@@ -518,14 +821,10 @@ void Gump_manager::update_gumps() {
  *  Paint the gumps
  */
 void Gump_manager::paint(bool modal) {
-	if (modal && background) {
-		background->paint();
+	if (!open_gumps && !(modal && background)) {
+		return;
 	}
-	for (Gump_list* gmp = open_gumps; gmp; gmp = gmp->next) {
-		if (gmp->gump->is_modal() == modal) {
-			gmp->gump->paint();
-		}
-	}
+	render_gumps_to_layer(modal);
 }
 
 /*
@@ -567,6 +866,8 @@ bool Gump_manager::handle_modal_gump_event(Modal_gump* gump, SDL_Event& event) {
 
 	int           gx;
 	int           gy;
+	int           rgx;
+	int           rgy;
 	SDL_Keycode   keysym_unicode = 0;
 	SDL_Keycode   chr            = 0;
 	SDL_Renderer* renderer       = SDL_GetRenderer(gwin->get_win()->get_screen_window());
@@ -583,6 +884,7 @@ bool Gump_manager::handle_modal_gump_event(Modal_gump* gump, SDL_Event& event) {
 	case SDL_EVENT_MOUSE_BUTTON_DOWN:
 		SDL_ConvertEventToRenderCoordinates(renderer, &event);
 		gwin->get_win()->screen_to_game(event.button.x, event.button.y, gwin->get_fastmouse(), gx, gy);
+		map_game_to_gump(gump, gx, gy, rgx, rgy);
 
 #ifdef DEBUG
 		cout << "(x,y) rel. to gump is (" << (gx - gump->get_x()) << ", " << (gy - gump->get_y()) << ")" << endl;
@@ -591,36 +893,48 @@ bool Gump_manager::handle_modal_gump_event(Modal_gump* gump, SDL_Event& event) {
 			break;
 		}
 		if (event.button.button == 1) {
-			gump->mouse_down(gx, gy, SDL_MouseButton_to_Gump(event.button.button));
+			gump->mouse_down(rgx, rgy, SDL_MouseButton_to_Gump(event.button.button));
+			// If this began a modal drag, keep the drag anchor in the same
+			// coordinate space as mouse motion (raw game coords) to avoid the
+			// initial one-frame jump.
+			gump->sync_drag_anchor(gx, gy);
 		} else if (event.button.button == 2) {
-			if (!gump->mouse_down(gx, gy, SDL_MouseButton_to_Gump(event.button.button)) && gwin->get_mouse3rd()) {
+			if (!gump->mouse_down(rgx, rgy, SDL_MouseButton_to_Gump(event.button.button)) && gwin->get_mouse3rd()) {
 				gump->key_down(SDLK_RETURN, SDLK_RETURN);
 			}
 		} else if (event.button.button == 3) {
 			rightclick = true;
-			gump->mouse_down(gx, gy, SDL_MouseButton_to_Gump(event.button.button));
+			gump->mouse_down(rgx, rgy, SDL_MouseButton_to_Gump(event.button.button));
 		} else {
-			gump->mouse_down(gx, gy, SDL_MouseButton_to_Gump(event.button.button));
+			gump->mouse_down(rgx, rgy, SDL_MouseButton_to_Gump(event.button.button));
 		}
 		break;
-	case SDL_EVENT_MOUSE_BUTTON_UP:
+	case SDL_EVENT_MOUSE_BUTTON_UP: {
 		SDL_ConvertEventToRenderCoordinates(renderer, &event);
 		gwin->get_win()->screen_to_game(event.button.x, event.button.y, gwin->get_fastmouse(), gx, gy);
+		map_game_to_gump(gump, gx, gy, rgx, rgy);
 		if (g_shortcutBar && g_shortcutBar->handle_event(&event)) {
 			break;
 		}
+		const bool raw_drag_coords = (event.button.button == 1 && gump->is_dragging());
 		if (event.button.button != 3) {
-			gump->mouse_up(gx, gy, SDL_MouseButton_to_Gump(event.button.button));
+			if (raw_drag_coords) {
+				gump->mouse_up(gx, gy, SDL_MouseButton_to_Gump(event.button.button));
+			} else {
+				gump->mouse_up(rgx, rgy, SDL_MouseButton_to_Gump(event.button.button));
+			}
 		} else if (rightclick) {
 			rightclick = false;
-			if (!gump->mouse_up(gx, gy, SDL_MouseButton_to_Gump(event.button.button)) && gumpman->can_right_click_close()) {
+			if (!gump->mouse_up(rgx, rgy, SDL_MouseButton_to_Gump(event.button.button)) && gumpman->can_right_click_close()) {
 				return false;
 			}
 		}
 		break;
+	}
 	case SDL_EVENT_FINGER_MOTION: {
 		SDL_ConvertEventToRenderCoordinates(renderer, &event);
 		gwin->get_win()->screen_to_game(event.button.x, event.button.y, gwin->get_fastmouse(), gx, gy);
+		map_game_to_gump(gump, gx, gy, rgx, rgy);
 		static int   numFingers = 0;
 		SDL_Finger** fingers    = SDL_GetTouchFingers(event.tfinger.touchID, &numFingers);
 		if (fingers) {
@@ -628,12 +942,18 @@ bool Gump_manager::handle_modal_gump_event(Modal_gump* gump, SDL_Event& event) {
 		}
 		if (numFingers > 1) {
 			if (event.tfinger.dy < 0) {
-				if (!gump->mouse_down(gx, gy, SDL_MouseButton_to_Gump(event.button.button))) {
-					gump->mousewheel_up(Mouse::mouse()->get_mousex(), Mouse::mouse()->get_mousey());
+				if (!gump->mouse_down(rgx, rgy, SDL_MouseButton_to_Gump(event.button.button))) {
+					int wx;
+					int wy;
+					map_game_to_gump(gump, Mouse::mouse()->get_mousex(), Mouse::mouse()->get_mousey(), wx, wy);
+					gump->mousewheel_up(wx, wy);
 				}
 			} else if (event.tfinger.dy > 0) {
-				if (!gump->mouse_down(gx, gy, SDL_MouseButton_to_Gump(event.button.button))) {
-					gump->mousewheel_down(Mouse::mouse()->get_mousex(), Mouse::mouse()->get_mousey());
+				if (!gump->mouse_down(rgx, rgy, SDL_MouseButton_to_Gump(event.button.button))) {
+					int wx;
+					int wy;
+					map_game_to_gump(gump, Mouse::mouse()->get_mousex(), Mouse::mouse()->get_mousey(), wx, wy);
+					gump->mousewheel_down(wx, wy);
 				}
 			}
 		}
@@ -641,10 +961,13 @@ bool Gump_manager::handle_modal_gump_event(Modal_gump* gump, SDL_Event& event) {
 	}
 	// Mousewheel scrolling with SDL2.
 	case SDL_EVENT_MOUSE_WHEEL: {
+		int wx;
+		int wy;
+		map_game_to_gump(gump, Mouse::mouse()->get_mousex(), Mouse::mouse()->get_mousey(), wx, wy);
 		if (event.wheel.y > 0) {
-			gump->mousewheel_up(Mouse::mouse()->get_mousex(), Mouse::mouse()->get_mousey());
+			gump->mousewheel_up(wx, wy);
 		} else if (event.wheel.y < 0) {
-			gump->mousewheel_down(Mouse::mouse()->get_mousex(), Mouse::mouse()->get_mousey());
+			gump->mousewheel_down(wx, wy);
 		}
 		break;
 	}
@@ -654,12 +977,17 @@ bool Gump_manager::handle_modal_gump_event(Modal_gump* gump, SDL_Event& event) {
 		}
 		SDL_ConvertEventToRenderCoordinates(renderer, &event);
 		gwin->get_win()->screen_to_game(event.motion.x, event.motion.y, gwin->get_fastmouse(), gx, gy);
+		map_game_to_gump(gump, gx, gy, rgx, rgy);
 
 		Mouse::mouse()->move(gx, gy);
 		Mouse::mouse_update = true;
 		// Dragging with left button?
 		if (event.motion.state & SDL_BUTTON_LMASK) {
-			gump->mouse_drag(gx, gy);
+			if (gump->is_dragging()) {
+				gump->mouse_drag(gx, gy);
+			} else {
+				gump->mouse_drag(rgx, rgy);
+			}
 		}
 		break;
 	case SDL_EVENT_QUIT:
@@ -756,11 +1084,19 @@ bool Gump_manager::do_modal_gump(
 		Mouse::mouse()->hide();    // Turn off mouse.
 		Mouse::mouse_update = false;
 		SDL_Event event;
+		bool      got_event = false;
 		while (!escaped && !gump->is_done() && SDL_PollEvent(&event)) {
-			escaped = !handle_modal_gump_event(gump, event);
+			escaped   = !handle_modal_gump_event(gump, event);
+			got_event = true;
 		}
 
-		if (gump->run() || gwin->is_dirty()) {
+		// A layer-backed gump is redrawn from scratch each frame, so any event
+		// that might have changed it must trigger a full repaint. The gump's
+		// own paint() calls (made while handling the event) otherwise land
+		// directly in the game window as an unscaled duplicate while the scaled
+		// overlay layer stays stale (looking like the click "did nothing").
+		const bool ran = gump->run();
+		if (ran || gwin->is_dirty() || got_event) {
 			gwin->paint();    // Paint each cycle.
 			if (paint) {
 				paint->paint();

@@ -151,6 +151,8 @@ protected:
 		}
 	}
 
+	void center_rect_on_screen(const TileRect& rect);
+
 public:
 	const Gump_elems& get_elems() const {
 		return elems;
@@ -256,12 +258,73 @@ public:
 		return false;
 	}
 
+	virtual bool uses_render_layer() const {
+		return true;
+	}
+
 	virtual bool     has_point(int x, int y) const;
 	virtual TileRect get_rect() const;
 
 	// Is the gump partially or completely off screen
 	// Only check shape rectangle, not against the actual shape
 	bool isOffscreen(bool partially = true) const;
+
+	// Each open gump is drawn into its own overlay layer so it can be scaled
+	// (like the mouse pointer) independently of the game area. The handle and
+	// the game-coordinate bounds the layer buffer was built for are cached
+	// here; Gump_manager owns the create/render/destroy lifecycle.
+	int      render_layer = -1;
+	TileRect layer_bounds{0, 0, 0, 0};
+
+	// Optional SECOND overlay layer + bounds, for HUD gumps that render as two
+	// independently anchored parts (Face_stats mode 3: portraits split to the
+	// left and right screen edges). Unused (-1) for everything else.
+	int      render_layer2 = -1;
+	TileRect layer_bounds2{0, 0, 0, 0};
+
+	// Multi-part HUD rendering. Most gumps are a single part (get_dirty()).
+	// A gump that returns >1 here also implements hud_part_rect() to give the
+	// tight game-coordinate bounds of each part; each part is drawn into its
+	// own layer and anchored to its own screen edge.
+	virtual int hud_part_count() const {
+		return 1;
+	}
+
+	virtual TileRect hud_part_rect(int part) {
+		ignore_unused_variable_warning(part);
+		return get_dirty();
+	}
+
+	// Forced anchor for a HUD part on each axis: -1 = auto-detect from the
+	// content's position in the game area, 0 = start (left / top), 1 = center,
+	// 2 = end (right / bottom). Default auto.
+	virtual int hud_part_xanchor(int part) const {
+		ignore_unused_variable_warning(part);
+		return -1;
+	}
+
+	virtual int hud_part_yanchor(int part) const {
+		ignore_unused_variable_warning(part);
+		return -1;
+	}
+
+	int get_render_layer() const {
+		return render_layer;
+	}
+
+	// Release this gump's overlay layer (safe if none). Called on destruction.
+	void free_render_layer();
+
+	// Paint the gump with its top-left temporarily shifted by (dx,dy).
+	void paint_shifted(int dx, int dy) {
+		const int ox = x;
+		const int oy = y;
+		x += dx;
+		y += dy;
+		paint();
+		x = ox;
+		y = oy;
+	}
 
 	void screen_to_local(int& sx, int& sy) const override {
 		sx -= x;

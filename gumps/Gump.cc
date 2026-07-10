@@ -55,8 +55,22 @@ Gump::Gump(
 		: Gump_Base(shnum, 0, shfile), container(cont), x(initx), y(inity), handles_kbd(false) {
 	if (container) {
 		if (container->validGumpXY()) {
-			x = container->getGumpX();
-			y = container->getGumpY();
+			if (Game_window::get_instance() == gwin && gwin->get_win()) {
+				int cgx;
+				int cgy;
+				gwin->get_win()->screen_to_game(container->getGumpX(), container->getGumpY(), false, cgx, cgy);
+				Shape_frame* s = get_shape();
+				if (s) {
+					x = cgx - s->get_width() / 2 + s->get_xleft();
+					y = cgy - s->get_height() / 2 + s->get_yabove();
+				} else {
+					x = cgx;
+					y = cgy;
+				}
+			} else {
+				x = container->getGumpX();
+				y = container->getGumpY();
+			}
 		}
 	}
 }
@@ -69,8 +83,8 @@ Gump::Gump(
 		Container_game_object* cont,     // Container it represents.
 		int                    shnum,    // Shape #.
 		ShapeFile              shfile)
-		: Gump_Base(shnum, shnum == -1 ? -1 : 0, shfile), container(cont), handles_kbd(false) {
-	set_pos();
+		: Gump_Base(shnum, shnum == -1 ? -1 : 0, shfile), container(cont), x(0), y(0), handles_kbd(false) {
+	center_rect_on_screen(Gump::get_rect());
 }
 
 /*
@@ -96,18 +110,56 @@ Gump::Gump(Container_game_object* cont, int initx, int inity, Gump* from)
  */
 
 Gump::~Gump() {
+	free_render_layer();
 	for (auto* elem : elems) {
 		delete elem;
 	}
 	if (container) {    // Probabbly dont need to check.. but would crash the
 						// game if it was NULL.
-		container->setGumpXY(x, y);
+		// Store the display coordinates of the gump's shape centre
+		if (Game_window::get_instance() == gwin && gwin->get_win()) {
+			int          cgx = x;
+			int          cgy = y;
+			Shape_frame* s   = get_shape();
+			if (s) {
+				cgx = x - s->get_xleft() + s->get_width() / 2;
+				cgy = y - s->get_yabove() + s->get_height() / 2;
+			}
+			int dcx;
+			int dcy;
+			gwin->get_win()->game_to_screen(cgx, cgy, false, dcx, dcy);
+			container->setGumpXY(dcx, dcy);
+		} else {
+			container->setGumpXY(x, y);
+		}
 	}
+}
+
+/*
+ *  Release this gump's overlay layer, if any. Guard against gwin having
+ *  already been torn down at program exit.
+ */
+void Gump::free_render_layer() {
+	if (render_layer >= 0 && Game_window::get_instance() == gwin) {
+		gwin->destroy_layer(render_layer);
+	}
+	render_layer = -1;
+	layer_bounds = TileRect(0, 0, 0, 0);
+	if (render_layer2 >= 0 && Game_window::get_instance() == gwin) {
+		gwin->destroy_layer(render_layer2);
+	}
+	render_layer2 = -1;
+	layer_bounds2 = TileRect(0, 0, 0, 0);
 }
 
 /*
  *   Set centered.
  */
+
+void Gump::center_rect_on_screen(const TileRect& rect) {
+	x = (gwin->get_width() - rect.w) / 2 - rect.x;
+	y = (gwin->get_height() - rect.h) / 2 - rect.y;
+}
 
 void Gump::set_pos() {
 	// reset coords to 0 while getting rect
@@ -116,8 +168,7 @@ void Gump::set_pos() {
 	auto rect = get_rect();
 	// mark old position dirty
 	gwin->add_dirty(rect);
-	x = (gwin->get_width() - rect.w) / 2 - rect.x;
-	y = (gwin->get_height() - rect.h) / 2 - rect.y;
+	center_rect_on_screen(rect);
 
 	// mark new position dirty
 	gwin->add_dirty(get_rect());

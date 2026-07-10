@@ -383,10 +383,13 @@ void ActionTryKeys(const int* params) {
 		return;
 	}
 	// Look for obj. in open gump.
-	Gump*        gump = gwin->get_gump_man()->find_gump(x, y);
+	Gump* gump = gwin->get_gump_man()->find_gump(x, y);
+	int   gx;
+	int   gy;
+	gwin->get_gump_man()->map_game_to_gump(gump, x, y, gx, gy);
 	Game_object* obj;
 	if (gump) {
-		obj = gump->find_object(x, y);
+		obj = gump->find_object(gx, gy);
 	} else {    // Search rest of world.
 		obj = gwin->find_object(x, y);
 	}

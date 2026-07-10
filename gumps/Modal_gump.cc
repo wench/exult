@@ -146,6 +146,17 @@ bool Modal_gump::mouse_drag(int mx, int my) {
 	return false;
 }
 
+bool Modal_gump::is_dragging() const {
+	return drag_mx != INT_MIN && drag_my != INT_MIN;
+}
+
+void Modal_gump::sync_drag_anchor(int mx, int my) {
+	if (is_dragging()) {
+		drag_mx = mx;
+		drag_my = my;
+	}
+}
+
 static Modal_gump::DragType dragType = Modal_gump::DragType::Unknown;
 
 Modal_gump::DragType Modal_gump::GetDragType() {

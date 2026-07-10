@@ -671,6 +671,9 @@
     <ClCompile Include="..\..\gumps\Text_gump.cc">
       <Filter>gumps</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\gumps\UIOptions_gump.cc">
+      <Filter>gumps</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\gumps\VideoOptions_gump.cc">
       <Filter>gumps</Filter>
     </ClCompile>
@@ -1364,6 +1367,9 @@
       <Filter>gumps</Filter>
     </ClInclude>
     <ClInclude Include="..\..\gumps\Text_gump.h">
+      <Filter>gumps</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gumps\UIOptions_gump.h">
       <Filter>gumps</Filter>
     </ClInclude>
     <ClInclude Include="..\..\gumps\VideoOptions_gump.h">

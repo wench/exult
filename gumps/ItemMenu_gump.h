@@ -46,6 +46,24 @@ public:
 	// Paint it and its contents.
 	void paint() override;
 
+	// The menu (background + buttons) lives in this gump's overlay layer, but
+	// the transparent-menu shape has no useful bounds, so size the layer from
+	// the buttons; otherwise the layer is too small and the menu is clipped
+	// away (invisible).
+	TileRect get_rect() const override;
+
+	// Paint the world-object selection outlines. These are drawn in world
+	// coordinates and so must go to the game window, NOT this gump's (scaled,
+	// menu-positioned) overlay layer. do_modal_gump() paints this each frame
+	// via the Paintable returned by get_outline_painter().
+	void paint_object_outlines();
+
+	// Adapter passed to do_modal_gump() as its over-everything Paintable so the
+	// outlines land on the game window under the menu layer.
+	Paintable* get_outline_painter() {
+		return &outline_painter;
+	}
+
 	void close() override {
 		done = true;
 	}
@@ -92,5 +110,20 @@ private:
 	Game_object*                              objectSelected;
 	Position2d                                objectSelectedClickXY;
 	Actions                                   objectAction;
+
+	// Paints the world-object outlines straight to the game window each modal
+	// frame (see paint_object_outlines()), instead of into the gump's layer.
+	class Outline_painter : public Paintable {
+		Itemmenu_gump* menu;
+
+	public:
+		explicit Outline_painter(Itemmenu_gump* m) : menu(m) {}
+
+		void paint() override {
+			menu->paint_object_outlines();
+		}
+	};
+
+	Outline_painter outline_painter{this};
 };
 #endif

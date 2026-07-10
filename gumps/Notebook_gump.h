@@ -60,6 +60,10 @@ class Notebook_gump : public Gump {
 	// Add new note.
 	static void add_new(const std::string& text, int gflag = -1);
 	bool        paint_page(const TileRect& box, One_note* note, int& offset, int pagenum);
+	// Actual drawing of the notebook; call paint() (which routes stray,
+	// non-layer-pass paints to an off-screen buffer to avoid duplicating the
+	// gump into the game view).
+	void paint_contents();
 
 	bool need_next_page() const {
 		return curpage % 2 == 1 && curpage < static_cast<int>(page_info.size()) - 1 && page_info[curpage + 1].offset > 0

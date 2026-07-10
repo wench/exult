@@ -426,6 +426,131 @@ public:
 		return win;
 	}
 
+	int create_layer(int w, int h, unsigned char transparent = 255, int fixed_scale = 0, int z = 0) {
+		return win->create_layer(w, h, transparent, fixed_scale, z);
+	}
+
+	void destroy_layer(int handle) {
+		win->destroy_layer(handle);
+	}
+
+	Image_buffer8* get_layer_ibuf(int handle) {
+		return static_cast<Image_buffer8*>(win->get_layer_ibuf(handle));
+	}
+
+	void layer_set_dirty(int handle) {
+		win->layer_set_dirty(handle);
+	}
+
+	void layer_set_visible(int handle, bool visible) {
+		win->layer_set_visible(handle, visible);
+	}
+
+	bool layer_is_visible(int handle) {
+		return win->layer_is_visible(handle);
+	}
+
+	void layer_set_z(int handle, int z) {
+		win->layer_set_z(handle, z);
+	}
+
+	void layer_set_dest(int handle, int x, int y, int w, int h) {
+		win->layer_set_dest(handle, x, y, w, h);
+	}
+
+	void layer_clear_dest(int handle) {
+		win->layer_clear_dest(handle);
+	}
+
+	void layer_set_ui_kind(int handle, Image_window::UiLayerKind kind) {
+		win->layer_set_ui_kind(handle, kind);
+	}
+
+	void layer_set_index_argb(int handle, const uint32* argb256) {
+		win->layer_set_index_argb(handle, argb256);
+	}
+
+	void layer_set_alpha(int handle, unsigned char a) {
+		win->layer_set_alpha(handle, a);
+	}
+
+	// Overlay-layer ("UI") scaling config (see Image_window::set_ui_config).
+	void set_ui_config(int width, int height, int scaler, Image_window::FillMode fmode, int fill_scaler) {
+		win->set_ui_config(width, height, scaler, fmode, fill_scaler);
+	}
+
+	void set_ui_layer_config(
+			Image_window::UiLayerKind kind, int width, int height, int scaler, Image_window::FillMode fmode, int fill_scaler) {
+		win->set_ui_layer_config(kind, width, height, scaler, fmode, fill_scaler);
+	}
+
+	void set_ui_layer_palette(Image_window::UiLayerKind kind, int mode) {
+		win->set_ui_layer_palette(kind, mode);
+	}
+
+	int get_ui_layer_palette_mode(Image_window::UiLayerKind kind) const {
+		return win->get_ui_layer_palette_mode(kind);
+	}
+
+	void set_ui_layer_kind_mask(uint32 mask) {
+		win->set_ui_layer_kind_mask(mask);
+	}
+
+	uint32 get_ui_layer_kind_mask() const {
+		return win->get_ui_layer_kind_mask();
+	}
+
+	void set_ui_layer_kind_enabled(Image_window::UiLayerKind kind, bool enabled) {
+		win->set_ui_layer_kind_enabled(kind, enabled);
+	}
+
+	bool is_ui_layer_kind_enabled(Image_window::UiLayerKind kind) const {
+		return win->is_ui_layer_kind_enabled(kind);
+	}
+
+	class Scoped_ui_layer_mask {
+		Game_window* gw         = nullptr;
+		uint32       saved_mask = 0;
+
+	public:
+		Scoped_ui_layer_mask(Game_window* gwin, uint32 mask) : gw(gwin) {
+			if (gw) {
+				saved_mask = gw->get_ui_layer_kind_mask();
+				gw->set_ui_layer_kind_mask(mask);
+			}
+		}
+
+		~Scoped_ui_layer_mask() {
+			if (gw) {
+				gw->set_ui_layer_kind_mask(saved_mask);
+			}
+		}
+
+		Scoped_ui_layer_mask(const Scoped_ui_layer_mask&)            = delete;
+		Scoped_ui_layer_mask& operator=(const Scoped_ui_layer_mask&) = delete;
+	};
+
+	int get_ui_width() const {
+		return win->get_ui_width();
+	}
+
+	int get_ui_height() const {
+		return win->get_ui_height();
+	}
+
+	float get_ui_scale_factor() const {
+		return win->get_ui_scale_factor();
+	}
+
+	bool screen_to_layer(int handle, int sx, int sy, int& lx, int& ly) {
+		return win->screen_to_layer(handle, sx, sy, lx, ly);
+	}
+
+	// Redirect all shape/text drawing to buf (e.g. a layer's buffer).
+	// Returns the previous render target; restore it with pop_render_target.
+	Image_buffer8* push_render_target(Image_buffer8* buf);
+	void           pop_render_target(Image_buffer8* prev);
+
 	inline Time_queue* get_tqueue() const {
 		return tqueue;
 	}

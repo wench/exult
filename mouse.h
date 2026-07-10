@@ -33,17 +33,26 @@ class Game_window;
  */
 class Mouse {
 protected:
-	Shape_file                    pointers;           // Pointers from 'pointers.shp'.
-	Game_window*                  gwin;               // Where to draw.
-	Image_window8*                iwin;               // From gwin.
-	std::unique_ptr<Image_buffer> backup;             // Stores image below mouse shape.
-	TileRect                      box;                // Area backed up.
-	TileRect                      dirty;              // Dirty area from mouse move.
-	int                           mousex, mousey;     // Last place where mouse was.
-	int                           cur_framenum;       // Frame # of current shape.
-	Shape_frame*                  cur;                // Current shape.
-	bool                          onscreen;           // true if mouse is drawn on screen.
-	static short                  short_arrows[8];    // Frame #'s of short arrows, indexed
+	Shape_file                    pointers;          // Pointers from 'pointers.shp'.
+	Game_window*                  gwin;              // Where to draw.
+	Image_window8*                iwin;              // From gwin.
+	std::unique_ptr<Image_buffer> backup;            // Stores image below mouse shape.
+	TileRect                      box;               // Area backed up.
+	TileRect                      dirty;             // Dirty area from mouse move.
+	int                           mousex, mousey;    // Last place where mouse was.
+	int                           cur_framenum;      // Frame # of current shape.
+	Shape_frame*                  cur;               // Current shape.
+	bool                          onscreen;          // true if mouse is drawn on screen.
+	// The cursor is drawn on its own overlay layer, composited on top of
+	// everything else (see Image_window layers).
+	int            mouse_layer      = -1;    // Layer handle (-1 = none).
+	int            layer_w          = 0;     // Layer size (max cursor extent).
+	int            layer_h          = 0;
+	int            hot_x            = 0;    // Cursor hotspot within the layer.
+	int            hot_y            = 0;
+	int            last_layer_frame = -1;         // Frame currently drawn in the layer.
+	unsigned char* last_layer_trans = nullptr;    // Remap currently drawn.
+	static short   short_arrows[8];               // Frame #'s of short arrows, indexed
 	//   by direction (0-7, 0=east).
 	static short med_arrows[8];               // Medium arrows.
 	static short long_arrows[8];              // Frame #'s of long arrows.
@@ -57,6 +66,11 @@ protected:
 	static int fast_offset_y;
 
 	void Init();
+
+	// Overlay-layer helpers.
+	bool ensure_mouse_layer();                          // Lazily create the layer.
+	void draw_cursor_to_layer(unsigned char* trans);    // Paint cur into the layer.
+	void position_mouse_layer();                        // Place the layer at the cursor.
 
 public:
 	enum Mouse_shapes {        // List of shapes' frame #'s.
@@ -130,13 +144,7 @@ public:
 
 	void show(unsigned char* trans = nullptr);    // Paint it.
 
-	void hide() {    // Restore area under mouse.
-		if (onscreen) {
-			onscreen = false;
-			iwin->put(backup.get(), box.x, box.y);
-			dirty = box;    // Init. dirty to box.
-		}
-	}
+	void hide();    // Stop showing the cursor.
 
 	void set_shape(int framenum) {    // Set to desired shape.
 		if (framenum != cur_framenum) {
@@ -207,6 +215,10 @@ public:
 	bool is_onscreen() {
 		return onscreen;
 	}
+
+	// Per-axis on-screen scale of the mouse-pointer overlay layer. Dragged
+	// items use this so they match the cursor's size/scale.
+	void get_pointer_scale(float& sx, float& sy) const;
 
 	inline int get_mousex() const {
 		return mousex;

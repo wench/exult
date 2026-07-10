@@ -538,12 +538,54 @@ void Face_stats::create_buttons() {
 
 	region.x = region.y = region.w = region.h = 0;
 
+	bool have_region = false;
 	for (i = 0; i < 8; i++) {
 		if (party[i]) {
 			const TileRect r = party[i]->get_rect();
-			region           = region.add(r);
+			region           = have_region ? region.add(r) : r;
+			have_region      = true;
 		}
 	}
+}
+
+/*
+ *  Multi-part HUD rendering: mode 3 splits the portraits into a left group
+ *  (party[0..3]) and a right group (party[4..7]), each anchored to its own
+ *  screen edge. Every other mode is a single part.
+ */
+int Face_stats::hud_part_count() const {
+	return mode == 3 ? 2 : 1;
+}
+
+TileRect Face_stats::hud_part_rect(int part) {
+	if (mode != 3) {
+		return region;
+	}
+	const int lo = (part == 0) ? 0 : 4;
+	const int hi = (part == 0) ? 4 : 8;
+	TileRect  r(0, 0, 0, 0);
+	bool      have = false;
+	for (int i = lo; i < hi; i++) {
+		if (party[i]) {
+			const TileRect pr = party[i]->get_rect();
+			r                 = have ? r.add(pr) : pr;
+			have              = true;
+		}
+	}
+	if (!have) {
+		// This part has no portraits (e.g. the right column when there are
+		// four or fewer party members). Return an empty rect so the caller
+		// hides this part's layer instead of duplicating the other column.
+		return TileRect(0, 0, 0, 0);
+	}
+	// Always reserve four portrait heights (from the top portrait down) so the
+	// column is positioned as if there were four heads, regardless of how many
+	// party members are present; the whole column is then centered vertically.
+	const int four = 4 * PORTRAIT_HEIGHT;
+	if (r.h < four) {
+		r.h = four;
+	}
+	return r;
 }
 
 bool Face_stats::has_point(int x, int y) const {
@@ -602,6 +644,9 @@ Face_stats* Face_stats::self = nullptr;
 void Face_stats::HideGump() {
 	if (self) {
 		gumpman->remove_gump(self);
+		// remove_gump() detaches from gump manager, but a previously rendered
+		// overlay layer can still remain visible until explicitly released.
+		self->free_render_layer();
 	}
 }
 

@@ -235,17 +235,24 @@ class Text_effect : public Time_sensitive, public Game_singletons {
 	TileRect         pos;
 	short            width, height;    // Dimensions of rectangle.
 	int              num_ticks;        // # ticks passed.
-	void             add_dirty();
-	void             init();
-	TileRect         Figure_text_pos();
+	// Each text snippet is drawn onto its own layer so it can be scaled
+	// by the text-effect UI size while staying anchored over its object.
+	int      text_layer = -1;
+	int      layer_w    = 0;
+	int      layer_h    = 0;
+	void     add_dirty();
+	void     init();
+	void     free_layer();    // Destroy this text's layer.
+	TileRect Figure_text_pos();
 
 public:
 	Text_effect(const std::string& m, Game_object* it, Game_window* gwin_);
 	Text_effect(const std::string& m, int t_x, int t_y, Game_window* gwin_);
 	// At timeout, remove from screen.
 	void handle_event(unsigned long curtime, uintptr udata) override;
-	// Render.
+	// Render (legacy direct paint into the current target).
 	virtual void paint();
+	void         paint_to_layer();
 
 	// Check for matching item.
 	bool is_text(Game_object* it) {

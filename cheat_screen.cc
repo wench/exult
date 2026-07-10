@@ -164,9 +164,12 @@ void CheatScreen::show_screen() {
 	Mouse::mouse()->set_shape(Mouse::hand);
 
 	buttons_down.clear();
-
 	// Run the Menu
-	RunMenu(RootMenu());
+	{
+		const uint32                      mouse_only = 1u << static_cast<int>(Image_window::UiLayerMousePointer);
+		Game_window::Scoped_ui_layer_mask scene_layers(gwin, mouse_only);
+		RunMenu(RootMenu());
+	}
 
 	Mouse::mouse()->set_speed_cursor();
 	Mouse::mouse()->hide();
@@ -1072,7 +1075,7 @@ void CheatScreen::Hotspot::PositionLeftOf(const Hotspot* hotspot) {
 		x = hotspot->x - getWidth();
 	} else {
 		// position to left of right edge of screen or 320 which is smaller
-		x = std::min(320,cscreen->maxx) - getWidth();
+		x = std::min(320, cscreen->maxx) - getWidth();
 	}
 }
 

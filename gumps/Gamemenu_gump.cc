@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "InputOptions_gump.h"
 #include "Newfile_gump.h"
 #include "Text_button.h"
+#include "UIOptions_gump.h"
 #include "VideoOptions_gump.h"
 #include "Yesno_gump.h"
 #include "exult.h"
@@ -55,6 +56,10 @@ public:
 
 	static auto AudioOptions() {
 		return get_text_msg(0x5E2 - msg_file_start);
+	}
+
+	static auto UIOptions() {
+		return get_text_msg(0x5E7 - msg_file_start);
 	}
 
 	static auto GameDisplay() {
@@ -90,13 +95,15 @@ void Gamemenu_gump::createButtons() {
 	}
 
 	// Resize the gump to default
-	SetProceduralBackground(TileRect(0, 0, 100, yForRow(7)), -1);
+	SetProceduralBackground(TileRect(0, 0, 100, yForRow(8)), -1);
 	if (!gwin->is_in_exult_menu()) {
 		buttons[id_load_save] = std::make_unique<Gamemenu_button>(
 				this, &Gamemenu_gump::loadsave, Strings::LoadSaveGame(), margin, yForRow(y++), preferred_button_width, 11);
 	}
 	buttons[id_video_options] = std::make_unique<Gamemenu_button>(
 			this, &Gamemenu_gump::video_options, Strings::VideoOptions(), margin, yForRow(y++), preferred_button_width, 11);
+	buttons[id_ui_options] = std::make_unique<Gamemenu_button>(
+			this, &Gamemenu_gump::ui_options, Strings::UIOptions(), margin, yForRow(y++), preferred_button_width, 11);
 	buttons[id_audio_options] = std::make_unique<Gamemenu_button>(
 			this, &Gamemenu_gump::audio_options, Strings::AudioOptions(), margin, yForRow(y++), preferred_button_width, 11);
 	buttons[id_game_engine_options] = std::make_unique<Gamemenu_button>(
@@ -156,14 +163,18 @@ void Gamemenu_gump::video_options() {
 	gwin->paint();
 	gwin->show();
 	delete vid_opts;
-
-	gclock->reset_palette();
 }
 
 void Gamemenu_gump::audio_options() {
 	auto* aud_opts = new AudioOptions_gump();
 	gumpman->do_modal_gump(aud_opts, Mouse::hand);
 	delete aud_opts;
+}
+
+void Gamemenu_gump::ui_options() {
+	auto* ui_opts = new UIOptions_gump();
+	gumpman->do_modal_gump(ui_opts, Mouse::hand);
+	delete ui_opts;
 }
 
 void Gamemenu_gump::game_display_options() {

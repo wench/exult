@@ -59,8 +59,10 @@ class ShortcutBar_gump : public Gump {
 public:
 	ShortcutBar_gump(int placex = 0, int placey = 0);
 	~ShortcutBar_gump() override;
-	int  handle_event(SDL_Event* event);
-	void paint() override;
+	int      handle_event(SDL_Event* event);
+	void     paint() override;
+	TileRect get_rect() const override;
+	bool     has_point(int x, int y) const override;
 
 	// Don't close on end_gump_mode
 	bool is_persistent() const override {
@@ -74,6 +76,12 @@ public:
 
 	// Show the hand cursor
 	bool no_handcursor() const override {
+		return true;
+	}
+
+	// HUD gump: drawn via its own overlay layer so it follows the UI size
+	// setting (fixed on-screen size, translucency preserved via index_argb).
+	bool uses_render_layer() const override {
 		return true;
 	}
 
@@ -98,7 +106,10 @@ public:
 		has_changed = true;
 	}
 
-	void        check_for_updates(int shnum);
+	void check_for_updates(int shnum);
+	// True when the bar is drawn in the translucent style (config + on-screen).
+	// Used by the layer renderer to composite the whole bar semi-transparently.
+	bool        wants_translucent() const;
 	static void HideGump();
 	static void ShowGump();
 	static bool Visible();

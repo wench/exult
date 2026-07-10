@@ -66,6 +66,10 @@ public:
 
 	bool mouse_drag(int mx, int my) override;
 
+	bool is_dragging() const;
+
+	void sync_drag_anchor(int mx, int my);
+
 public:
 	enum class DragType {
 		Unknown,
