@@ -202,7 +202,7 @@ string get_system_path(const string& path) {
 
 	switch_slashes(new_path);
 #ifdef _WIN32
-	if (new_path.back() == '/' || new_path.back() == '\\') {
+	if (!new_path.empty() && (new_path.back() == '/' || new_path.back() == '\\')) {
 #	ifdef EXTRA_DEBUG
 		std::cerr << "Warning, trailing slash in path: \"" << new_path << "\"" << std::endl;
 #	endif
