@@ -2207,7 +2207,7 @@ void Game_window::show_items(
 		if (!mobjxy.empty() && Notebook_gump::get_instance() == nullptr) {
 			// Make sure menu is visible on the screen
 			Itemmenu_gump itemgump(&mobjxy, x, y);
-			Game_window::get_instance()->get_gump_man()->do_modal_gump(&itemgump, Mouse::hand);
+			Game_window::get_instance()->get_gump_man()->do_modal_gump(&itemgump, Mouse::hand, itemgump.get_outline_painter());
 			obj = nullptr;
 		}
 	}

@@ -167,6 +167,14 @@ Itemmenu_gump::~Itemmenu_gump() {
 }
 
 void Itemmenu_gump::paint() {
+	Modal_gump::paint();
+	for (auto& btn : buttons) {
+		btn->paint();
+	}
+	gwin->set_painted();
+}
+
+void Itemmenu_gump::paint_object_outlines() {
 	for (auto& objPos : objects) {
 		const auto& obj = objPos.first;
 		obj->paint_outline(CHARMED_PIXEL);
@@ -174,11 +182,24 @@ void Itemmenu_gump::paint() {
 	if (objectSelected) {
 		objectSelected->paint_outline(PROTECT_PIXEL);
 	}
-	Modal_gump::paint();
-	for (auto& btn : buttons) {
-		btn->paint();
+}
+
+TileRect Itemmenu_gump::get_rect() const {
+	// The transparent-menu shape has no useful extent; size the gump (and thus
+	// its overlay layer) to the bounding box of the buttons so nothing is
+	// clipped.
+	bool     have = false;
+	TileRect r(0, 0, 0, 0);
+	for (const auto& btn : buttons) {
+		if (btn) {
+			r    = have ? r.add(btn->get_rect()) : btn->get_rect();
+			have = true;
+		}
 	}
-	gwin->set_painted();
+	if (!have) {
+		return Modal_gump::get_rect();
+	}
+	return r;
 }
 
 bool Itemmenu_gump::mouse_down(int mx, int my, MouseButton button) {
@@ -215,6 +236,10 @@ bool Itemmenu_gump::mouse_up(int mx, int my, MouseButton button) {
 		return false;
 	}
 	if (pushed->get_pushed() != button) {
+		// Clear `pushed` so mouse_down()'s "already pushed" guard doesn't swallow
+		// every later click and freeze the menu.
+		pushed->unpush(button);
+		pushed = nullptr;
 		return button == MouseButton::Left;
 	}
 	bool res = false;
@@ -271,7 +296,7 @@ void Itemmenu_gump::postCloseActions() {
 		// Make sure menu is visible on the screen
 		// This will draw a selection menu for the object
 		Itemmenu_gump itemgump(objectSelected, objectSelectedClickXY.x, objectSelectedClickXY.y, x, y);
-		gwin->get_gump_man()->do_modal_gump(&itemgump, Mouse::hand);
+		gwin->get_gump_man()->do_modal_gump(&itemgump, Mouse::hand, itemgump.get_outline_painter());
 		break;
 	}
 	case item_menu:
