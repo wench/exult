@@ -886,10 +886,10 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::PalEffectMenu(Actor* actor) {
 	// ramp remap
 	command               = std::make_shared<MenuCommand>();
 	unsigned int numramps = 0;
+	gwin->get_pal()->get_ramps(numramps);
 	if (numramps) {
 		numramps--;
 	}
-	gwin->get_pal()->get_ramps(numramps);
 	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
 			false, 0, numramps, false, Strings::PaletteEffect::Prompts::enterFromRamp, Strings::INVALID_VALUE, 255));
 	command->inputs[0]->hotspots.emplace_back(0, offsety2, 0, Strings::PaletteEffect::Prompts::or255forall);
@@ -981,6 +981,9 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::PalEffectMenu(Actor* actor) {
 			snprintf(
 					buf, sizeof(buf), "%s%s%i", Strings::PaletteEffect::Display::PaletteEffect(),
 					Strings::PaletteEffect::Display::ShiftBy(), pt & 0xff);
+		}
+		else {
+			buf[0] = 0;
 		}
 		font->paint_text_fixedwidth(ibuf, buf, offsetx, maxy - offsety1 - 119, 8, fontcolor.colors);
 
