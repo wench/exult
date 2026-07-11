@@ -3014,7 +3014,7 @@ static void apply_ui_layer_config() {
 		string s;
 		config->value(base + "/scale_method", s, Image_window::get_name_for_scaler(fallback.scaler));
 		cfg.scaler = Image_window::get_scaler_for_name(s.c_str());
-		if (cfg.scaler == Image_window::NoScaler) {
+		if (cfg.scaler < 0) {
 			cfg.scaler = fallback.scaler;
 		}
 
@@ -3030,7 +3030,7 @@ static void apply_ui_layer_config() {
 		string fs;
 		config->value(base + "/fill_scaler", fs, Image_window::get_name_for_scaler(fallback.fill_scaler));
 		cfg.fill_scaler = Image_window::get_scaler_for_name(fs.c_str());
-		if (cfg.fill_scaler == Image_window::NoScaler) {
+		if (cfg.fill_scaler < 0) {
 			cfg.fill_scaler = fallback.fill_scaler;
 		}
 
@@ -3073,7 +3073,7 @@ static void apply_ui_layer_config() {
 		string s;
 		config->value("config/video/ui/scale_method", s, Image_window::get_name_for_scaler(Image_window::point));
 		global_cfg.scaler = Image_window::get_scaler_for_name(s.c_str());
-		if (global_cfg.scaler == Image_window::NoScaler) {
+		if (global_cfg.scaler < 0) {
 			global_cfg.scaler = Image_window::point;
 		}
 		string fit_default;
@@ -3087,7 +3087,7 @@ static void apply_ui_layer_config() {
 		string fs;
 		config->value("config/video/ui/fill_scaler", fs, Image_window::get_name_for_scaler(Image_window::point));
 		global_cfg.fill_scaler = Image_window::get_scaler_for_name(fs.c_str());
-		if (global_cfg.fill_scaler == Image_window::NoScaler) {
+		if (global_cfg.fill_scaler < 0) {
 			global_cfg.fill_scaler = Image_window::point;
 		}
 		string pl;

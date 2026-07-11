@@ -628,11 +628,14 @@ void UIOptions_gump::load_settings() {
 		config->value(base + "/height", cfg.height, fallback.height);
 		normalize_dims(cfg.width, cfg.height);
 
+		const int fb_scaler      = fallback.scaler < 0 ? 0 : fallback.scaler;
+		const int fb_fill_scaler = fallback.fill_scaler < 0 ? 0 : fallback.fill_scaler;
+
 		string scaler_name;
-		config->value(base + "/scale_method", scaler_name, Image_window::get_name_for_scaler(fallback.scaler));
+		config->value(base + "/scale_method", scaler_name, Image_window::get_name_for_scaler(fb_scaler));
 		cfg.scaler = Image_window::get_scaler_for_name(scaler_name.c_str());
-		if (cfg.scaler == Image_window::NoScaler) {
-			cfg.scaler = fallback.scaler;
+		if (cfg.scaler < 0) {
+			cfg.scaler = fb_scaler;
 		}
 
 		string fallback_fillmode;
@@ -645,10 +648,10 @@ void UIOptions_gump::load_settings() {
 		}
 
 		string fill_scaler_name;
-		config->value(base + "/fill_scaler", fill_scaler_name, Image_window::get_name_for_scaler(fallback.fill_scaler));
+		config->value(base + "/fill_scaler", fill_scaler_name, Image_window::get_name_for_scaler(fb_fill_scaler));
 		cfg.fill_scaler = Image_window::get_scaler_for_name(fill_scaler_name.c_str());
-		if (cfg.fill_scaler == Image_window::NoScaler) {
-			cfg.fill_scaler = fallback.fill_scaler;
+		if (cfg.fill_scaler < 0) {
+			cfg.fill_scaler = fb_fill_scaler;
 		}
 
 		string palette_str;
