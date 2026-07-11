@@ -361,7 +361,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
 
 			snprintf(
 					buf, sizeof(buf), "%s%2i - %s", Strings::NPCMenu::CurrentActivity_(), actor->get_schedule_type(),
-					Strings::ScheduleActivity[actor->get_schedule_type()]);
+					Strings::ScheduleActivity(actor->get_schedule_type()));
 			font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 36, 8, fontcolor.colors);
 
 			snprintf(buf, sizeof(buf), "%s: %i", Strings::NPCMenu::Exprience(), actor->get_property(Actor::exp));
@@ -392,10 +392,10 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCMenu(Actor* actor) {
 			if (actor->get_flag(Obj_flags::charmed)) {
 				snprintf(
 						buf, sizeof(buf), "%s%s (%s%s)", Strings::NPCMenu::Alignment(),
-						Strings::Alignment[actor->get_effective_alignment()], Strings::NPCMenu::orig(),
-						Strings::Alignment[actor->get_alignment()]);
+						Strings::Alignment(actor->get_effective_alignment()), Strings::NPCMenu::orig(),
+						Strings::Alignment(actor->get_alignment()));
 			} else {
-				snprintf(buf, sizeof(buf), "%s%s", Strings::NPCMenu::Alignment(), Strings::Alignment[actor->get_alignment()]);
+				snprintf(buf, sizeof(buf), "%s%s", Strings::NPCMenu::Alignment(), Strings::Alignment(actor->get_alignment()));
 			}
 			font->paint_text_fixedwidth(ibuf, buf, offsetx, offsety1 + 72, 8, fontcolor.colors);
 
@@ -589,7 +589,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCFlagMenu(Actor* actor) {
 			int                          flagnum = flag.flag_number;
 			std::shared_ptr<MenuCommand> command = flag.command;
 			SDL_Keycode                  keycode = flag.keycode;
-			const char*                  label   = Strings::NPCFlagsMenu::MenuItems[flag.label_index];
+			const char*                  label   = Strings::NPCFlagsMenu::MenuItems(flag.label_index);
 
 			if (!command && ((flagtype & ~Mask) != NotAFlag)) {
 				command             = std::make_shared<ToggleCommand>(false, flag.false_true_strings);
@@ -656,7 +656,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::NPCFlagMenu(Actor* actor) {
 	do_column(flags_right, offsetx1 + 208);
 
 	auto menu                  = std::make_shared<Menu>(std::move(items));
-	menu->events.paint_display = [](MenuCommand*) -> bool {
+	menu->events.paint_display = [](MenuCommand*) noexcept -> bool {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 		// return true if mobile to supress painting of the NPCMenu display
 		return true;
@@ -715,7 +715,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::BusinessMenu(Actor* actor) {
 		for (int a = 0; a <= num_acts; a++) {
 			int row = a % colsize;
 			int col = a / colsize;
-			snprintf(buf, sizeof(buf), "%2i:%s", a, Strings::ScheduleActivity[a]);
+			snprintf(buf, sizeof(buf), "%2i:%s", a, Strings::ScheduleActivity(a));
 			buf[std::size(buf) - 1] = 0;
 			font->paint_text_fixedwidth(
 					ibuf, buf, (maxx * col) / numcols - (colsize <= 10 ? 8 : 0), rowheight * row, 8, fontcolor.colors);
@@ -826,7 +826,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::BusinessMenu(Actor* actor) {
 #endif
 		snprintf(
 				buf, sizeof(buf), activity_msg, activity_msg_label, actor->get_schedule_type(),
-				Strings::ScheduleActivity[actor->get_schedule_type()]);
+				Strings::ScheduleActivity(actor->get_schedule_type()));
 		font->paint_text_fixedwidth(ibuf, buf, offsetx2, offsety3, 8, fontcolor.colors);
 
 		const Actor::Schedule_list* scheds = actor->get_schedules();
@@ -853,7 +853,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::BusinessMenu(Actor* actor) {
 				if (types[i] != -1) {
 					snprintf(
 							buf, sizeof(buf), "%2i (%4i,%4i,%2i) - %s", types[i], tile[i].tx, tile[i].ty, tile[i].tz,
-							Strings::ScheduleActivity[types[i]]);
+							Strings::ScheduleActivity(types[i]));
 					font->paint_text_fixedwidth(ibuf, buf, offsetx + 56, (36 - offsety1) + i * 8, 8, fontcolor.colors);
 				}
 			}
@@ -896,7 +896,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::PalEffectMenu(Actor* actor) {
 	command->inputs[0]->hotspots.back().PositionLeftOf();
 	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
 			false, 0, numramps, false, Strings::PaletteEffect::Prompts::enterToRampnumberIndex, Strings::INVALID_VALUE));
-	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) noexcept -> std::shared_ptr<MenuCommand> {
 		auto from = static_cast<InputHandlers::Integer*>(self->inputs[0].get());
 		auto to   = static_cast<InputHandlers::Integer*>(self->inputs[1].get());
 		if (from->value == 255) {
@@ -928,7 +928,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::PalEffectMenu(Actor* actor) {
 	command = std::make_shared<MenuCommand>();
 	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(
 			false, 0, Shape_manager::get_instance()->get_xforms_cnt(), false, Strings::PaletteEffect::Prompts::enterXFORMIndex));
-	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) noexcept -> std::shared_ptr<MenuCommand> {
 		auto x = static_cast<InputHandlers::Integer*>(self->inputs[0].get());
 		actor->set_palette_transform(ShapeID::PT_xForm | x->value % int(Shape_manager::get_instance()->get_xforms_cnt()));
 		return {};
@@ -940,7 +940,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::PalEffectMenu(Actor* actor) {
 	command = std::make_shared<MenuCommand>();
 	command->inputs.push_back(
 			std::make_shared<InputHandlers::Integer>(false, 0, 255, false, Strings::PaletteEffect::Prompts::entershiftamount));
-	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+	command->events.Activate = [=](MenuCommand* self, SDL_Keycode) noexcept -> std::shared_ptr<MenuCommand> {
 		auto s = static_cast<InputHandlers::Integer*>(self->inputs[0].get());
 		actor->set_palette_transform(ShapeID::PT_Shift | (s->value & 0xff));
 		return {};
@@ -950,7 +950,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::PalEffectMenu(Actor* actor) {
 
 	// clear
 	command                  = std::make_shared<MenuCommand>();
-	command->events.Activate = [=](MenuCommand*, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+	command->events.Activate = [=](MenuCommand*, SDL_Keycode) noexcept -> std::shared_ptr<MenuCommand> {
 		actor->set_palette_transform(0);
 		return {};
 	};
@@ -981,8 +981,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::PalEffectMenu(Actor* actor) {
 			snprintf(
 					buf, sizeof(buf), "%s%s%i", Strings::PaletteEffect::Display::PaletteEffect(),
 					Strings::PaletteEffect::Display::ShiftBy(), pt & 0xff);
-		}
-		else {
+		} else {
 			buf[0] = 0;
 		}
 		font->paint_text_fixedwidth(ibuf, buf, offsetx, maxy - offsety1 - 119, 8, fontcolor.colors);

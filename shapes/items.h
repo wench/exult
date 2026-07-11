@@ -255,12 +255,12 @@ struct StringsBase {
 				lc = current_lc;
 				if constexpr (COUNT == 2) {
 					// Simple easy optimization for the common case where the array is size 2
-					cached_array = new std::array<TReturn, COUNT>{(*this)[0], (*this)[1]};
+					cached_array = new std::array<TReturn, COUNT>{(*this)(0), (*this)(1)};
 
 				} else {
 					cached_array = new std::array<TReturn, COUNT>();
 					for (size_t i = 0; i < COUNT; i++) {
-						(*cached_array)[i] = (*this)[i];
+						(*cached_array)[i] = (*this)(i);
 					}
 				}
 			}
