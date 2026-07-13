@@ -647,7 +647,7 @@ begin
       if PrevItemAChecked <> WizardIsComponentSelected('downloads\audio') then
         DownloadPage.Add('https://downloads.sourceforge.net/project/exult/exult-data/exult_audio.zip', 'exult_audio.zip','72e10efa8664a645470ceb99f6b749ce99c3d5fd1c8387c63640499cfcdbbc68');
       if (PrevItemAChecked <> WizardIsComponentSelected('downloads\3rdpartymods\ultima6')) AND (iBGVerified = 1) then
-        DownloadPage.Add('https://exult.info/snapshots/Ultima6.zip', 'Ultima6.zip', '');
+        DownloadPage.Add('https://exult.info/snapshots/Ultima6-1.3.zip', 'Ultima6-1.3.zip', '');
       if (PrevItemAChecked <> WizardIsComponentSelected('downloads\3rdpartymods\glimmerscape')) AND (iSIVerified = 1) then
         DownloadPage.Add('https://exult.info/snapshots/Glimmerscape_SI_mod_by_Donfrow.zip', 'Glimmerscape_SI_mod_by_Donfrow.zip', '');
       DownloadPage.Show;
@@ -741,7 +741,7 @@ begin
         InstallMod('{tmp}\sifixes.zip','SIFixes mod for Serpent Isle','sifixes\data',sSImods);
       end;
       if (PrevItemAChecked <> WizardIsComponentSelected('downloads\3rdpartymods\ultima6')) AND (iBGVerified = 1) then begin
-        InstallMod('{tmp}\Ultima6.zip','Ultima VI Remake for The Black Gate','Ultima6v1.3\patch',sBGmods);
+        InstallMod('{tmp}\Ultima6-1.3.zip','Ultima VI Remake for The Black Gate','Ultima6v1.3\patch',sBGmods);
       end;
       if (PrevItemAChecked <> WizardIsComponentSelected('downloads\3rdpartymods\glimmerscape')) AND (iSIVerified = 1) then begin      
         InstallMod('{tmp}\Glimmerscape_SI_mod_by_Donfrow.zip','Glimmerscape by Donfrow for Serpent Isle','glimmerscape\data',sSImods);
