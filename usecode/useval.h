@@ -19,7 +19,7 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef USEVAL_H
+ #ifndef USEVAL_H
 #define USEVAL_H 1
 
 #include "databuf.h"
@@ -31,6 +31,7 @@
 #include <iostream>
 #include <new>
 #include <string>    // STL string
+#include <type_traits>
 #include <vector>    // STL container
 
 class Usecode_class_symbol;
@@ -54,7 +55,7 @@ public:
 private:
 	struct ClassRef {
 		Usecode_value* elems;
-		short          cnt;
+		int            cnt;
 	};
 
 	Val_type type = int_type;    // Type stored here.
@@ -75,6 +76,11 @@ private:
 
 	void destroy() noexcept {
 		switch (type) {
+		case int_type:
+			// Note: this can go away in c++20 or later.
+			using Long = long;
+			intval.~Long();
+			break;
 		case array_type:
 			arrayval.~Usecode_vector();
 			break;
@@ -85,6 +91,15 @@ private:
 		case pointer_type:
 			ptrval.~Game_object_shared();
 			break;
+		case class_sym_type:
+			// Note: this can go away in c++20 or later.
+			using Sym = Usecode_class_symbol*;
+			clssym.~Sym();
+			break;
+		case class_obj_type:
+			// Note: this can go away in c++20 or later.
+			clsrefval.~ClassRef();
+			break;
 		default:
 			break;
 		}
@@ -92,7 +107,11 @@ private:
 
 	template <typename T, typename... U>
 	void construct(T& var, U&&... newval) {
-		new (&var) T(std::forward<U>(newval)...);
+		if constexpr (std::is_aggregate_v<T>) {
+			new (&var) T{std::forward<U>(newval)...};
+		} else {
+			new (&var) T(std::forward<U>(newval)...);
+		}
 	}
 
 	template <typename T, typename U>

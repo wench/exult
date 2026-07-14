@@ -183,7 +183,8 @@ int Usecode_value::find_elem(const Usecode_value& val) {
  *  Output: This.
  */
 
-Usecode_value& Usecode_value::concat(Usecode_value& val2    // Concat. val2 onto end.
+Usecode_value& Usecode_value::concat(
+		Usecode_value& val2    // Concat. val2 onto end.
 ) {
 	if (type != array_type) {    // Not an array?  Create one.
 		// Current value becomes 1st elem.
@@ -453,7 +454,7 @@ bool Usecode_value::restore(IDataSource* in) {
 	type      = static_cast<Val_type>(in->read1());
 	switch (type) {
 	case int_type:
-		intval = in->read4();
+		construct(intval, in->read4());
 		return true;
 	case pointer_type:
 		// TODO: proper deserialization.
@@ -462,12 +463,11 @@ bool Usecode_value::restore(IDataSource* in) {
 		// Maybe add a new type "serialized_pointer" to prevent "accidents"?
 		return true;
 	case class_sym_type: {
-		const int len = in->read2();
-		char*     nm  = new char[len + 1];
+		const int   len = in->read2();
+		std::string nm;
 		in->read(nm, len);
-		nm[len]           = 0;
 		Game_window* gwin = Game_window::get_instance();
-		clssym            = gwin->get_usecode()->get_class(nm);
+		construct(clssym, gwin->get_usecode()->get_class(nm.c_str()));
 		return true;
 	}
 	case string_type: {
@@ -490,9 +490,9 @@ bool Usecode_value::restore(IDataSource* in) {
 		// This will duplicate the instance variables, and they will no
 		// longer point to the same instance.
 		// Need to deserialize this properly.
-		const int len   = in->read2();
-		clsrefval.cnt   = len;    // Stores class, class vars.
-		clsrefval.elems = new Usecode_value[clsrefval.cnt];
+		const int len = in->read2();
+		// Stores class, class vars.
+		construct(clsrefval, new Usecode_value[len], len);
 		for (int i = 0; i < len; i++) {
 			if (!clsrefval.elems[i].restore(in)) {
 				return false;
@@ -515,14 +515,18 @@ ostream& operator<<(ostream& out, Usecode_value& val) {
  */
 void Usecode_value::class_new(Usecode_class_symbol* cls, int nvars) {
 	assert(type == int_type);
-	type               = class_obj_type;
-	clsrefval.cnt      = nvars + 1;    // Stores class, class vars.
-	clsrefval.elems    = new Usecode_value[clsrefval.cnt];
+	type          = class_obj_type;
+	const int len = nvars + 1;
+	construct(clsrefval, new Usecode_value[len], len);
 	clsrefval.elems[0] = Usecode_value(cls);
 }
 
 void Usecode_value::class_delete() {
 	assert(type == class_obj_type);
 	delete[] clsrefval.elems;
-	*this = Usecode_value(0);
+	clsrefval.~ClassRef();
+	type = int_type;
+	// Explicitly making this undefined, as-if it is a null pointer.
+	undefined = true;
+	construct(intval, 0);
 }
