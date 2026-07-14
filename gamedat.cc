@@ -1782,6 +1782,8 @@ void GameDat::MakeEmergencySave(const char* savename) {
 GameDat::GameDat() {}
 
 void GameDat::writetoMemory(bool nopaint, bool screenshot) {
+	// Make sure no dragging is occurring while saving
+	gwin->stop_dragging();
 #ifdef DEBUG
 	std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
 #endif
@@ -2051,8 +2053,8 @@ void GameDat::Autosave_Event::handle_event(unsigned long curtime, uintptr udata)
 		return;
 	}
 
-	// If don't move is set delay autosave till flag is cleared
-	if (gwin->main_actor_dont_move()) {
+	// If don't move is set or dragging delay autosave
+	if (gwin->main_actor_dont_move() || gwin->is_dragging()) {
 		auto tqueue = gwin->get_tqueue();
 		auto lock   = tqueue->get_lock();
 		// Queue the autosave event to happen again next frame
