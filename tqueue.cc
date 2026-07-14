@@ -90,7 +90,7 @@ void Time_queue::add(
 	data.insert(insertionPoint, newent);
 }
 
-bool operator<(const Queue_entry& q1, const Queue_entry& q2) {
+bool operator<(const Queue_entry& q1, const Queue_entry& q2) noexcept {
 	return q1.time < q2.time;
 }
 

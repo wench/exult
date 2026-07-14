@@ -70,7 +70,7 @@ public:
 		}
 	}
 
-	bool operator<(const Light_info& other) const {
+	bool operator<(const Light_info& other) const noexcept {
 		return static_cast<unsigned short>(frame) < static_cast<unsigned short>(other.frame);
 	}
 

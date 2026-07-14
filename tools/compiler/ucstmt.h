@@ -48,7 +48,7 @@ struct Uc_loop_data {
 	Basic_block* exit;
 	std::string  name;
 
-	bool operator==(const std::string& nm) const {
+	bool operator==(const std::string& nm) const noexcept {
 		return name == nm;
 	}
 };

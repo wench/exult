@@ -119,7 +119,7 @@ public:
 		}
 	}
 
-	bool operator<(const Frame_name_info& other) const {
+	bool operator<(const Frame_name_info& other) const noexcept {
 		auto qual1  = static_cast<unsigned short>(quality);
 		auto qual2  = static_cast<unsigned short>(other.quality);
 		auto frame1 = static_cast<unsigned short>(frame);

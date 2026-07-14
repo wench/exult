@@ -86,7 +86,7 @@ public:
 		}
 	}
 
-	bool operator<(const Content_rules& other) const {
+	bool operator<(const Content_rules& other) const noexcept {
 		auto shp1 = static_cast<unsigned short>(shape);
 		auto shp2 = static_cast<unsigned short>(other.shape);
 		return shp1 < shp2;

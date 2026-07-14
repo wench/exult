@@ -93,7 +93,7 @@ public:
 		}
 	}
 
-	bool operator<(const Effective_hp_info& other) const {
+	bool operator<(const Effective_hp_info& other) const noexcept {
 		auto qual1  = static_cast<unsigned short>(quality);
 		auto qual2  = static_cast<unsigned short>(other.quality);
 		auto frame1 = static_cast<unsigned short>(frame);

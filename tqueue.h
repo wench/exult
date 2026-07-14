@@ -76,7 +76,7 @@ struct Queue_entry {
 	}
 };
 
-bool operator<(const Queue_entry& q1, const Queue_entry& q2);
+bool operator<(const Queue_entry& q1, const Queue_entry& q2) noexcept;
 
 /*
  *  Time-based queue.  The entries are kept sorted in increasing order
