@@ -1508,13 +1508,13 @@ void Usecode_internal::create_script(
  *  Report unhandled intrinsic.
  */
 
-static void Usecode_Trace(const char* name, int intrinsic, int num_parms, Usecode_value parms[12]) {
+static void Usecode_Trace(const char* name, int intrinsic, tcb::span<Usecode_value> parms) {
 	const boost::io::ios_flags_saver flags(cout);
 	const boost::io::ios_fill_saver  fill(cout);
 	cout << hex << "    [0x" << setfill('0') << setw(2) << intrinsic << "]: " << name << "(";
-	for (int i = 0; i < num_parms; i++) {
+	for (size_t i = 0; i < parms.size(); i++) {
 		parms[i].print(cout);
-		if (i != num_parms - 1) {
+		if (i != parms.size() - 1) {
 			cout << ", ";
 		}
 	}
@@ -1531,7 +1531,7 @@ static void Usecode_TraceReturn(Usecode_value& v) {
 Usecode_value no_ret;
 
 Usecode_value Usecode_internal::Execute_Intrinsic(
-		UsecodeIntrinsicFn func, const char* name, int intrinsic, int num_parms, Usecode_value parms[12]) {
+		UsecodeIntrinsicFn func, const char* name, int intrinsic, tcb::span<Usecode_value> parms) {
 #ifdef XWIN
 #	ifdef USECODE_DEBUGGER
 	if (usecode_debugging) {
@@ -1546,17 +1546,17 @@ Usecode_value Usecode_internal::Execute_Intrinsic(
 	ignore_unused_variable_warning(name, intrinsic);
 #else
 	if (intrinsic_trace) {
-		Usecode_Trace(name, intrinsic, num_parms, parms);
+		Usecode_Trace(name, intrinsic, parms);
 		cout.flush();
-		Usecode_value u = (this->*func)(num_parms, parms);
+		Usecode_value u = (this->*func)(parms);
 		Usecode_TraceReturn(u);
 		return u;
 	}
 #endif
-	return (this->*func)(num_parms, parms);
+	return (this->*func)(parms);
 }
 
-using UsecodeIntrinsicFn = Usecode_value (Usecode_internal::*)(int num_parms, Usecode_value parms[12]);
+using UsecodeIntrinsicFn = Usecode_value (Usecode_internal::*)(tcb::span<Usecode_value> parms);
 
 // missing from mingw32 header files, so included manually
 #ifndef TO_STRING
@@ -1595,7 +1595,7 @@ Usecode_value Usecode_internal::call_intrinsic(
 	static_assert(std::size(intrinsics_bg) <= std::numeric_limits<uint16>::max());
 	static_assert(std::size(intrinsics_si) <= std::numeric_limits<uint16>::max());
 	static_assert(std::size(intrinsics_sib) <= std::numeric_limits<uint16>::max());
-	Usecode_value parms[13];    // Get parms.
+	std::vector<Usecode_value> parms(std::max(num_parms, 13));    // Get parms.
 	for (int i = 0; i < num_parms; i++) {
 		const Usecode_value val = pop();
 		parms[i]                = val;
@@ -1614,7 +1614,7 @@ Usecode_value Usecode_internal::call_intrinsic(
 		auto&                    table_entry = table[intrinsic];
 		const UsecodeIntrinsicFn func        = table_entry.func;
 		const char*              name        = table_entry.name;
-		return Execute_Intrinsic(func, name, intrinsic, num_parms, parms);
+		return Execute_Intrinsic(func, name, intrinsic, parms);
 	}
 	return no_ret;
 }
@@ -1736,7 +1736,7 @@ Usecode_internal::Usecode_internal() : stack(new Usecode_value[1024]) {
 }
 
 /*
- *  Read in usecode from static and patch. Called by Usecode_internal constructor but can be called again later to reload usecode 
+ *  Read in usecode from static and patch. Called by Usecode_internal constructor but can be called again later to reload usecode
  */
 void Usecode_internal::read_usecode() {
 	// Read in usecode.

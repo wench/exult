@@ -26,6 +26,7 @@
 #define UCINTERNAL_H
 
 #include "common_types.h"
+#include "span.h"
 #include "tiles.h"
 #include "ucdebugging.h"
 #include "ucmachine.h"
@@ -56,7 +57,7 @@ class Usecode_class_symbol;
 
 Barge_object* Get_barge(Game_object* obj);
 
-#define USECODE_INTRINSIC_DECL(NAME) Usecode_value UI_##NAME(int num_parms, Usecode_value parms[12])
+#define USECODE_INTRINSIC_DECL(NAME) Usecode_value UI_##NAME(tcb::span<Usecode_value> parms)
 
 /*
  *  Here's our virtual machine for running usecode.
@@ -120,7 +121,7 @@ class Usecode_internal : public Usecode_machine {
 	/*
 	 *  Built-in usecode functions:
 	 */
-	using UsecodeIntrinsicFn = Usecode_value (Usecode_internal::*)(int num_parms, Usecode_value parms[12]);
+	using UsecodeIntrinsicFn = Usecode_value (Usecode_internal::*)(tcb::span<Usecode_value> parms);
 
 	int get_face_shape(Usecode_value& arg1, Actor*& npc, int& frame);
 
@@ -177,7 +178,7 @@ class Usecode_internal : public Usecode_machine {
 	static IntrinsicTableEntry intrinsics_sib[];
 
 	Usecode_value Execute_Intrinsic(
-			UsecodeIntrinsicFn func, const char* name, int intrinsic, int num_parms, Usecode_value parms[12]);
+			UsecodeIntrinsicFn func, const char* name, int intrinsic, tcb::span<Usecode_value> parms);
 	USECODE_INTRINSIC_DECL(NOP);
 	USECODE_INTRINSIC_DECL(UNKNOWN);
 	USECODE_INTRINSIC_DECL(get_random);
