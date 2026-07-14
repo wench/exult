@@ -2175,7 +2175,7 @@ void Miner_schedule::now_what() {
 					shnum = 760;
 					frnum = rand() % 10;
 				}
-				const Game_object_shared newobj = std::make_shared<Ireg_game_object>(shnum, frnum, 0, 0);
+				const auto newobj = std::make_shared<Ireg_game_object>(shnum, frnum, 0, 0);
 				newobj->move(pos);
 				newobj->set_flag(Obj_flags::is_temporary);
 				state = find_ore;
@@ -4143,7 +4143,7 @@ void Sew_schedule::now_what() {
 		}
 		const Tile_coord t = Map_chunk::find_spot(spinwheel_obj->get_tile(), 1, 654, 0);
 		if (t.tx != -1) {    // Space to create thread?
-			const Game_object_shared newobj = std::make_shared<Ireg_game_object>(654, rand() % 10, 0, 0);
+			const auto newobj = std::make_shared<Ireg_game_object>(654, rand() % 10, 0, 0);
 			spindle                         = Game_object_weak(newobj);
 			newobj->move(t);
 			Audio::get_ptr()->play_sound_effect(drop_sfx_id(), t, sfx_vol());
@@ -4196,7 +4196,7 @@ void Sew_schedule::now_what() {
 			} else {
 				framenum = rand() % 5;    // BG uses all 5 frames of cloth.
 			}
-			const Game_object_shared newobj = std::make_shared<Ireg_game_object>(851, framenum, 0, 0);
+			const auto newobj = std::make_shared<Ireg_game_object>(851, framenum, 0, 0);
 			cloth                           = Game_object_weak(newobj);
 			newobj->move(t);
 			Audio::get_ptr()->play_sound_effect(drop_sfx_id(), newobj.get(), sfx_vol());
@@ -4273,10 +4273,11 @@ void Sew_schedule::now_what() {
 			} else {
 				rframes = 5 + (rand() % 5);
 			}
-			cloth_remnants_obj = std::make_shared<Ireg_game_object>(851, rframes, 0, 0);
-			cloth_remnants_obj->move(t);
+			const auto newobj = std::make_shared<Ireg_game_object>(851, rframes, 0, 0);
+			newobj->move(t);
+			cloth_remnants_obj = newobj;
 			Audio::get_ptr()->play_sound_effect(drop_sfx_id(), t, sfx_vol());
-			gwin->add_dirty(cloth_remnants_obj.get());
+			gwin->add_dirty(newobj.get());
 		}
 		cloth_remnants = Game_object_weak(cloth_remnants_obj);
 		state          = place_shears;

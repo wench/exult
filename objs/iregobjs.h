@@ -75,9 +75,7 @@ public:
 	// Move to new abs. location.
 	void move(int newtx, int newty, int newlift, int newmap = -1) override;
 
-	void move(const Tile_coord& t, int newmap = -1) {
-		move(t.tx, t.ty, t.tz, newmap);
-	}
+	using Game_object::move;
 
 	// Remove/delete this object.
 	void remove_this(Game_object_shared* keep = nullptr) override;

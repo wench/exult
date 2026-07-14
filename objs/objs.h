@@ -219,9 +219,7 @@ public:
 	// Move to new abs. location.
 	virtual void move(int newtx, int newty, int newlift, int newmap = -1);
 
-	void move(const Tile_coord& t, int newmap = -1) {
-		move(t.tx, t.ty, t.tz, newmap);
-	}
+	void move(const Tile_coord& t, int newmap = -1);
 
 	virtual void change_frame(int frnum);    // Change frame & set to repaint.
 	// Swap positions.

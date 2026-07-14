@@ -560,6 +560,10 @@ void Game_object::move(int newtx, int newty, int newlift, int newmap) {
 	gwin->add_dirty(this);    // And repaint new area.
 }
 
+void Game_object::move(const Tile_coord& t, int newmap) {
+	move(t.tx, t.ty, t.tz, newmap);
+}
+
 /*
  *  Change the frame and set to repaint areas.
  */

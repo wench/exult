@@ -410,9 +410,7 @@ public:
 		}
 	}
 
-	void move(const Tile_coord& t, int newmap = -1) {
-		move(t.tx, t.ty, t.tz, newmap);
-	}
+	using Game_object::move;
 
 	Actor_action* get_action() const {    // Return action.
 		return action;
