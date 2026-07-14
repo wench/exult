@@ -1623,6 +1623,9 @@ void Field_object::hatch(
 		Game_object* obj,    // Object (actor) that came near it.
 		bool /* must */      // If 1, skip dice roll.
 ) {
+	if (obj == nullptr) {
+		return;
+	}
 	if (field_effect(obj->as_actor())) {    // Apply field.
 		remove_this(nullptr);               // Delete sleep/poison if applied.
 	}

@@ -615,8 +615,9 @@ void Paperdoll_gump::paint_object(
 		return;
 	}
 
+	Actor* actor = container->as_actor();
 	int f = item->get_paperdoll_frame(frame);
-	if (item->is_gender_based() && (!container->as_actor()->get_type_flag(Actor::tf_sex) && !info->is_npc_female())) {
+	if (actor != nullptr && item->is_gender_based() && (!actor->get_type_flag(Actor::tf_sex) && !info->is_npc_female())) {
 		f++;
 	}
 
@@ -648,7 +649,8 @@ void Paperdoll_gump::paint_body(const TileRect& box, const Paperdoll_npc* info) 
  */
 void Paperdoll_gump::paint_belt(const TileRect& box, const Paperdoll_npc* info) {
 	ShapeID s(10, 0, SF_PAPERDOL_VGA);
-	if (!container->as_actor()->get_type_flag(Actor::tf_sex) && !info->is_npc_female()) {
+	Actor* actor = container->as_actor();
+	if (actor != nullptr && !actor->get_type_flag(Actor::tf_sex) && !info->is_npc_female()) {
 		s.set_frame(1);
 	}
 	s.paint_shape(box.x + beltm.x, box.y + beltm.y, info->is_translucent());
@@ -921,8 +923,9 @@ Game_object* Paperdoll_gump::check_object(
 		return nullptr;
 	}
 
+	Actor* actor = container->as_actor();
 	int f = item->get_paperdoll_frame(frame);
-	if (item->is_gender_based() && (!info->is_npc_female() && !container->as_actor()->get_type_flag(Actor::tf_sex))) {
+	if (actor != nullptr && item->is_gender_based() && (!info->is_npc_female() && !actor->get_type_flag(Actor::tf_sex))) {
 		f++;
 	}
 
@@ -958,13 +961,12 @@ bool Paperdoll_gump::check_body(int mx, int my, const Paperdoll_npc* info) {
  *  Checks for the belt
  */
 bool Paperdoll_gump::check_belt(int mx, int my, const Paperdoll_npc* info) {
-	if (info->is_npc_female() || container->as_actor()->get_type_flag(Actor::tf_sex)) {
+	Actor* actor = container->as_actor();
+	if (info->is_npc_female() || (actor != nullptr && actor->get_type_flag(Actor::tf_sex))) {
 		return check_shape(mx - beltf.x, my - beltf.y, 10, 0, SF_PAPERDOL_VGA);
 	} else {
 		return check_shape(mx - beltm.x, my - beltm.y, 10, 1, SF_PAPERDOL_VGA);
 	}
-
-	return false;
 }
 
 /*

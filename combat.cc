@@ -1370,7 +1370,8 @@ bool Combat_schedule::attack_target(
 		}
 		// Avatar/Party was hit, in case the background music is CSDanger, play
 		// attack music.
-		if (target == gwin->get_main_actor() || (target->as_actor() && target->as_actor()->is_in_party())) {
+		Actor* target_actor = target->as_actor();
+		if (target == gwin->get_main_actor() || (target_actor != nullptr && target_actor->is_in_party())) {
 			MyMidiPlayer* player = Audio::get_ptr()->get_midi();
 			if (player && player->get_current_track() == CSDanger) {
 				start_music_combat(CSAttacked1, false);
