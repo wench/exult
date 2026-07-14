@@ -575,6 +575,10 @@ void Conversation::show_npc_message(const char* msg) {
 		eman->set_sprites_always(false);
 		gwin->get_tqueue()->resume(SDL_GetTicks());
 	}
+	// Make sure we don't write into a freed face_info slot.
+	if (last_face_shown < 0 || size_t(last_face_shown) >= face_info.size() || !face_info[last_face_shown]) {
+		return;
+	}
 	Npc_face_info* info    = face_info[last_face_shown];
 	const int      font    = info->large_face ? 7 : 0;    // Use red for Guardian, snake.
 	const int      text_bg = gwin->get_text_bg();
@@ -638,12 +642,30 @@ void Conversation::show_npc_message(const char* msg) {
 		info->cur_text = string(msg, -height);
 		int  x;
 		int  y;
-		char c;
+		char c = 0;
 		gwin->paint();
 		gwin->set_painted();
-		Get_click(x, y, Mouse::hand, &c, false, this, true);
+		if (info->large_face) {
+			// Only dismiss Guardian/Serpents by SPACE, ESC
+			// or a mouse click.
+			for (;;) {
+				c = 0;
+				if (!Get_click(x, y, Mouse::hand, &c, false, this, true)) {
+					break;    // ESC.
+				}
+				if (c == 0 || c == ' ') {
+					break;    // Mouse click or space.
+				}
+			}
+		} else {
+			Get_click(x, y, Mouse::hand, &c, false, this, true);
+		}
 		gwin->paint();
 		msg += -height;
+		// Stop if the face is gone so we don't dereference freed memory on the next pass.
+		if (last_face_shown < 0 || size_t(last_face_shown) >= face_info.size() || face_info[last_face_shown] != info) {
+			return;
+		}
 	}
 	// All fit?  Store height painted.
 	info->last_text_height = height;
