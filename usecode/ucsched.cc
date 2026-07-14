@@ -110,7 +110,8 @@ Usecode_script::~Usecode_script() {
  *  scripts for this object unless 'dont_halt' is set.
  */
 
-void Usecode_script::start(long d    // Start after this many msecs.
+void Usecode_script::start(
+		long d    // Start after this many msecs.
 ) {
 	Game_window* gwin = Game_window::get_instance();
 	const int    cnt  = code->get_array_size();    // Check initial elems.
@@ -284,8 +285,11 @@ inline void Usecode_script::activate_egg(Usecode_internal* usecode, Game_object*
 	if (!e || !e->is_egg()) {
 		return;
 	}
-	Egg_object* egg  = e->as_egg();
-	const int   type = egg->get_type();
+	Egg_object* egg = e->as_egg();
+	if (!egg) {
+		return;
+	}
+	const int type = egg->get_type();
 	// Guess:  Only certain types:
 	if (type == Egg_object::monster || type == Egg_object::button || type == Egg_object::missile) {
 		egg->hatch(Usecode_internal::gwin->get_main_actor(), true);
@@ -590,11 +594,12 @@ int Usecode_script::exec(
 			}
 			// Watch for eggs:
 			Usecode_internal::Usecode_events ev = Usecode_internal::internal_exec;
-			if (optr
-				&& optr->is_egg()
+			if (optr != nullptr && optr->is_egg()) {
+				Egg_object* egg = optr->as_egg();
 				// Fixes the Blacksword's 'Fire' power in BG:
-				&& optr->as_egg()->get_type() < Egg_object::fire_field) {
-				ev = Usecode_internal::egg_proximity;
+				if (egg != nullptr && egg->get_type() < Egg_object::fire_field) {
+					ev = Usecode_internal::egg_proximity;
+				}
 			}
 			// And for telekenesis spell fun:
 			else if (fun == usecode->telekenesis_fun) {

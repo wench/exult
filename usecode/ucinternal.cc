@@ -19,10 +19,11 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include <limits>
 #ifdef HAVE_CONFIG_H
 #	include <config.h>
 #endif
+
+#include "ucinternal.h"
 
 #include "Audio.h"
 #include "Face_stats.h"
@@ -60,12 +61,14 @@
 #include "touchui.h"
 #include "tqueue.h"
 #include "ucfunction.h"
-#include "ucinternal.h"
 #include "ucsched.h"
 #include "ucsymtbl.h"
 #include "usefuns.h"
 #include "useval.h"
 #include "utils.h"
+
+#include <algorithm>
+#include <limits>
 
 #if (defined(USE_EXULTSTUDIO) && defined(USECODE_DEBUGGER))
 #	include "debugmsg.h"
@@ -667,7 +670,7 @@ int Usecode_internal::get_face_shape(Usecode_value& arg1, Actor*& npc, int& fram
 		Actor*     ava      = gwin->get_main_actor();
 		const bool sishapes = Shape_manager::get_instance()->have_si_shapes();
 		Skin_data* skin     = Shapeinfo_lookup::GetSkinInfoSafe(
-                ava->get_skin_color(), npc ? (npc->get_type_flag(Actor::tf_sex)) : (ava->get_type_flag(Actor::tf_sex)), sishapes);
+				ava->get_skin_color(), npc ? (npc->get_type_flag(Actor::tf_sex)) : (ava->get_type_flag(Actor::tf_sex)), sishapes);
 		if (gwin->get_main_actor()->get_flag(Obj_flags::tattooed)) {
 			shape = skin->alter_face_shape;
 			frame = skin->alter_face_frame;
@@ -723,7 +726,8 @@ void Usecode_internal::show_npc_face(
  *  Remove an NPC's face.
  */
 
-void Usecode_internal::remove_npc_face(Usecode_value& arg1    // Shape (NPC #).
+void Usecode_internal::remove_npc_face(
+		Usecode_value& arg1    // Shape (NPC #).
 ) {
 	show_pending_text();
 	Actor*    npc;
@@ -746,8 +750,9 @@ void Usecode_internal::set_item_shape(Usecode_value& item_arg, Usecode_value& sh
 	}
 	// See if light turned on/off.
 	const bool light_changed = item->get_info().is_light_source() != ShapeID::get_info(shape).is_light_source();
-	if (item->get_owner()) {    // Inside something?
-		item->get_owner()->change_member_shape(item, shape);
+	auto*      owner         = item->get_owner();
+	if (owner != nullptr) {    // Inside something?
+		owner->change_member_shape(item, shape);
 		if (light_changed) {    // Maybe we should repaint all.
 			gwin->paint();      // Repaint finds all lights.
 		} else {
@@ -1413,11 +1418,10 @@ bool Usecode_internal::path_run_usecode(
 	}
 	const Tile_coord src = npc->get_tile();
 	Tile_coord       dest(
-            locval.get_elem(0).get_int_value(), locval.get_elem(1).get_int_value(),
-            sz == 3 ? locval.get_elem(2).get_int_value() : 0);
-	if (dest.tz < 0) {    // ++++Don't understand this.
-		dest.tz = 0;
-	}
+			locval.get_elem(0).get_int_value(), locval.get_elem(1).get_int_value(),
+			sz == 3 ? locval.get_elem(2).get_int_value() : 0);
+	dest.tz = std::max<short>(dest.tz, 0);
+
 	if (find_free) {
 		/* Now works with SI lightning platform */
 		// Allow rise of 3 (for SI lightning).
@@ -1639,7 +1643,8 @@ void Usecode_internal::click_to_continue() {
  *  Set book/scroll to display.
  */
 
-void Usecode_internal::set_book(Text_gump* b    // Book/scroll.
+void Usecode_internal::set_book(
+		Text_gump* b    // Book/scroll.
 ) {
 	if (touchui != nullptr) {
 		Gump_manager* gumpman = gwin->get_gump_man();
@@ -1722,8 +1727,6 @@ int Usecode_internal::get_user_choice_num() {
 Usecode_machine* Usecode_machine::create() {
 	return new Usecode_internal();
 }
-
-
 
 /*
  *  Create machine from a 'usecode' file.

@@ -388,7 +388,8 @@ inline void Chunk_cache::set_tflags(int tx, int ty, int maxz) {
  *  Output: Highest lift that's blocked by an object, or -1 if none.
  */
 
-inline int Chunk_cache::get_highest_blocked(int lift    // Look below this lift.
+inline int Chunk_cache::get_highest_blocked(
+		int lift    // Look below this lift.
 ) {
 	int i;    // Look downwards.
 	for (i = lift - 1; i >= 0 && !TEST_TFLAGS(i); i--)
@@ -416,7 +417,8 @@ int Chunk_cache::get_highest_blocked(
  *  Output: Highest lift that's blocked by an object, or -1 if none.
  */
 
-inline int Chunk_cache::get_lowest_blocked(int lift    // Look above this lift.
+inline int Chunk_cache::get_lowest_blocked(
+		int lift    // Look above this lift.
 ) {
 	int i;    // Look upward.
 	for (i = lift; i <= tflags_maxz && !TEST_TFLAGS(i); i++)
@@ -729,9 +731,9 @@ void Map_chunk::set_terrain(Chunk_terrain* ter) {
 				int                      shapenum = id.get_shapenum();
 				int                      framenum = id.get_framenum();
 				const Shape_info&        info     = id.get_info();
-				const Game_object_shared obj      = info.is_animated()
-															? std::make_shared<Animated_object>(shapenum, framenum, tilex, tiley)
-															: std::make_shared<Terrain_game_object>(shapenum, framenum, tilex, tiley);
+				const Game_object_shared obj = info.is_animated()
+													   ? std::make_shared<Animated_object>(shapenum, framenum, tilex, tiley)
+													   : std::make_shared<Terrain_game_object>(shapenum, framenum, tilex, tiley);
 				add(obj.get());
 			}
 		}
@@ -886,7 +888,8 @@ inline Map_chunk* Map_chunk::add_outside_dependencies(
  *  Newobj's chunk field is set to this chunk.
  */
 
-void Map_chunk::add(Game_object* newobj    // Object to add.
+void Map_chunk::add(
+		Game_object* newobj    // Object to add.
 ) {
 	newobj->chunk = this;    // Set object's chunk.
 	Ordering_info            ord(gwin, newobj);
@@ -1395,8 +1398,8 @@ void Map_chunk::try_all_eggs(
 		Object_iterator next(chunk->objects);
 		Game_object*    each;
 		while ((each = next.get_next()) != nullptr) {
-			if (each->is_egg()) {
-				Egg_object* egg = each->as_egg();
+			Egg_object* egg = each->as_egg();
+			if (egg != nullptr) {
 				// Music eggs are causing problems.
 				if (egg->get_type() != Egg_object::jukebox &&
 					// And don't teleport a 2nd time.
