@@ -244,6 +244,9 @@ public:
 	static ScalerType get_scaler_for_name(const char* scaler);
 
 	static inline const char* get_name_for_scaler(int num) {
+		if (num < 0 || static_cast<size_t>(num) >= Scalers.size()) {
+			return "point";
+		}
 		return Scalers[num].name;
 	}
 

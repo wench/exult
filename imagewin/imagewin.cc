@@ -295,6 +295,9 @@ Image_window::ScalerType Image_window::get_scaler_for_name(const char* scaler) {
 }
 
 const char* Image_window::get_displayname_for_scaler(int num) {
+	if (num < 0 || static_cast<size_t>(num) >= Scalers.size()) {
+		return get_name_for_scaler(num);    // Safe default name.
+	}
 	return Scalers[num].displayname_msg_index ? get_text_msg(Scalers[num].displayname_msg_index) : get_name_for_scaler(num);
 }
 

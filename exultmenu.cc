@@ -548,9 +548,13 @@ BaseGameInfo* ExultMenu::run() {
 			last_page = num_choices - num_choices % pagesize;
 			logox     = centerx - exultlogo->get_width() / 2;
 			logoy     = centery - exultlogo->get_height() / 2;
-			if (!menu) {
-				menu = create_main_menu(first_game);
-			}
+		}
+		// Ensure the menu exists before it is used. The scene is active at this
+		// point, so create_main_menu() lays out with the correct dimensions.
+		// Kept independent of the scene check so 'menu' is never dereferenced
+		// while empty (fixes a potential null deref of handle_events()).
+		if (!menu) {
+			menu = create_main_menu(first_game);
 		}
 		// Interferes with the menu.
 		sman->paint_shape(logox, logoy, exultlogo);
