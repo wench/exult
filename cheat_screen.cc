@@ -1288,7 +1288,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::RootMenu() {
 #if !defined(SDL_PLATFORM_IOS) && !defined(ANDROID) && !defined(CHEAT_SCREEN_TEST_MOBILE)
 	// for small screens taking the liberty of leaving that out
 	command                  = std::make_shared<LeftRightIntegerCommand>(1, 20, clock->get_time_rate());
-	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) -> std::shared_ptr<MenuCommand> {
+	command->events.Activate = [this](MenuCommand* self, SDL_Keycode) noexcept -> std::shared_ptr<MenuCommand> {
 		clock->set_time_rate(static_cast<LeftRightIntegerCommand*>(self)->currentval);
 		return {};
 	};
@@ -1570,7 +1570,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::GlobalFlagMenu(unsigned num) {
 		snprintf(buf, sizeof(buf), "%d ", num);
 		std::string_view flag_name;
 
-		if (num < static_cast<unsigned>(global_flag_names.size()) && !global_flag_names[num].empty()) {
+		if (num < global_flag_names.size() && !global_flag_names[num].empty()) {
 			flag_name = global_flag_names[num];
 		} else {
 			flag_name = Strings::AdvancedFlagsMenu::unnamed();
@@ -1640,7 +1640,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::GlobalFlagMenu(unsigned num) {
 	auto menu = std::make_shared<Menu>(std::move(items));
 	menu->setData<unsigned>(num);
 
-	menu->events.paint_display = [=](MenuCommand*) -> bool {
+	menu->events.paint_display = [=](MenuCommand*) noexcept -> bool {
 #if defined(SDL_PLATFORM_IOS) || defined(ANDROID) || defined(CHEAT_SCREEN_TEST_MOBILE)
 		font->paint_text_fixedwidth(ibuf, Strings::AdvancedFlagsMenu::GlobalFlags, 15, 0, 8, fontcolor.colors);
 		return true;
@@ -1714,7 +1714,7 @@ std::shared_ptr<CheatScreen::Menu> CheatScreen::TeleportMenu() {
 	command->inputs.push_back(std::make_shared<InputHandlers::KeyOnly>(Strings::TeleportMenu::Longitude, std::move(hotspots)));
 	command->inputs.push_back(std::make_shared<InputHandlers::Integer>(false, 0, 193, false, Strings::ENTER_LONGITUDE));
 
-	command->events.begin_phase = [=](MenuCommand* self) {
+	command->events.begin_phase = [=](MenuCommand* self) noexcept {
 		// Check phase 0 input and update maximum accepted for input[1]
 		if (self->phase == 1) {
 			auto latkeypress = static_cast<InputHandlers::KeyOnly*>(self->inputs[0].get());
@@ -2005,7 +2005,7 @@ void CheatScreen::WaitButtonsUp(bool silent) {
 						continue;
 					}
 
-					button_name = Strings::MouseButton[button - 1];
+					button_name = Strings::MouseButton(button - 1);
 				} break;
 
 				default: {
