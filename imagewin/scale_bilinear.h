@@ -1,3 +1,4 @@
+
 /*
  *  Copyright (C) 2009-2022 Exult Team
  *
@@ -18,7 +19,9 @@
  */
 
 #ifndef INCL_SCALE_BILINEAR_H
-#define INCL_SCALE_BILINEAR_H 1
+#define INCL_SCALE_BILINEAR_H
+
+#include <algorithm>
 
 /**
  ** Note: This file should only be included by source files that use the
@@ -70,6 +73,10 @@ void Scale_2xBilinear(
 		int                 dline_pixels,    // Pixels (words)/line for dest.
 		const Manip_pixels& manip            // Manipulator methods.
 ) {
+	// Validate inputs to avoid undefined pointer arithmetic or null derefs.
+	if (!source || !dest || sline_pixels <= 0 || dline_pixels <= 0 || srcw <= 0 || srch <= 0 || sheight <= 0) {
+		return;
+	}
 	Source_pixel* from   = source + srcy * sline_pixels + srcx;
 	Dest_pixel*   to     = dest + 2 * srcy * dline_pixels + 2 * srcx;
 	Dest_pixel*   to_odd = to + dline_pixels;
@@ -89,9 +96,7 @@ void Scale_2xBilinear(
 	}
 
 	int from_width = sline_pixels - srcx;
-	if (srcw + 1 < from_width) {
-		from_width = srcw + 1;
-	}
+	from_width     = std::min(srcw + 1, from_width);
 
 	fill_rgb_row(from, from_width, rgb_row_cur, srcw + 1, manip);
 
@@ -172,6 +177,10 @@ void Scale_2xBilinearPlus(
 		int                 dline_pixels,    // Pixels (words)/line for dest.
 		const Manip_pixels& manip            // Manipulator methods.
 ) {
+	// Validate inputs to avoid undefined pointer arithmetic or null derefs.
+	if (!source || !dest || sline_pixels <= 0 || dline_pixels <= 0 || srcw <= 0 || srch <= 0 || sheight <= 0) {
+		return;
+	}
 	Source_pixel* from   = source + srcy * sline_pixels + srcx;
 	Dest_pixel*   to     = dest + 2 * srcy * dline_pixels + 2 * srcx;
 	Dest_pixel*   to_odd = to + dline_pixels;

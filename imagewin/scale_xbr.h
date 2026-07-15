@@ -269,6 +269,10 @@ void Scale_xBR(
 		int                 dline_pixels,    // Pixels (words)/line for dest.
 		const Manip_pixels& manip            // Manipulator methods.
 ) {
+	// Validate inputs to avoid undefined pointer arithmetic or null derefs.
+	if (!source || !dest || sline_pixels <= 0 || dline_pixels <= 0 || srcw <= 0 || srch <= 0 || sheight <= 0) {
+		return;
+	}
 	// the following are static because we don't want to be freeing and
 	// reallocating space on each call, as new[]s are usually very
 	// expensive; we do allow it to grow though

@@ -122,6 +122,10 @@ int main(int argc, char** argv) {
 	printf("The image file uses %d colours\n", mock_map_palette->ncolors);
 
 	FILE* f = fopen(argv[2], "ra");
+	if (!f) {
+		fprintf(stderr, "Error: could not open file %s\n", argv[2]);
+		return 1;
+	}
 
 	// we can now prepare the mapping
 	int   mapping[MAX_COLOURS];

@@ -75,7 +75,7 @@ void Shape_draw::show(
 			// Using GdkPixbuf scaling :
 			const bool zoom_bilinear = ExultStudio::get_instance()->get_shape_bilinear();
 			GdkPixbuf* zoom_pixbuf   = gdk_pixbuf_scale_simple(
-                    pixbuf, (w * zoom_scale) / 2, (h * zoom_scale) / 2, (zoom_bilinear ? GDK_INTERP_BILINEAR : GDK_INTERP_NEAREST));
+					pixbuf, (w * zoom_scale) / 2, (h * zoom_scale) / 2, (zoom_bilinear ? GDK_INTERP_BILINEAR : GDK_INTERP_NEAREST));
 			gdk_cairo_set_source_pixbuf(drawgc, zoom_pixbuf, (x * zoom_scale) / 2, (y * zoom_scale) / 2);
 			cairo_rectangle(drawgc, (x * zoom_scale) / 2, (y * zoom_scale) / 2, (w * zoom_scale) / 2, (h * zoom_scale) / 2);
 			cairo_fill(drawgc);
@@ -146,6 +146,10 @@ void Shape_draw::draw_shape_outline(
 void Shape_draw::draw_shape_centered(
 		int shapenum,    // -1 to not draw shape.
 		int framenum, int& x, int& y) {
+	// Guard: ensure image buffer is available before using it.
+	if (iwin == nullptr) {
+		return;
+	}
 	iwin->fill8(255);    // Background (transparent) color.
 	if (shapenum < 0 || shapenum >= ifile->get_num_shapes()) {
 		return;
@@ -895,7 +899,7 @@ GdkPixbuf* ExultStudio::shape_image(Vga_file* shpfile, int shnum, int frnum, boo
 		// Using GdkPixbuf scaling :
 		const bool zoom_bilinear = ExultStudio::get_instance()->get_shape_bilinear();
 		GdkPixbuf* zoom_pixbuf   = gdk_pixbuf_scale_simple(
-                pixbuf, (w * zoom_scale) / 2, (h * zoom_scale) / 2, (zoom_bilinear ? GDK_INTERP_BILINEAR : GDK_INTERP_NEAREST));
+				pixbuf, (w * zoom_scale) / 2, (h * zoom_scale) / 2, (zoom_bilinear ? GDK_INTERP_BILINEAR : GDK_INTERP_NEAREST));
 		g_object_unref(pixbuf);
 		pixbuf = zoom_pixbuf;
 	}
