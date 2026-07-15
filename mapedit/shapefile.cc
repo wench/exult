@@ -59,7 +59,6 @@ using std::vector;
  */
 
 Shape_file_info::~Shape_file_info() {
-	delete groups;
 	delete browser;
 }
 
@@ -315,12 +314,12 @@ void Npcs_file_info::setup() {
  */
 
 Flex_file_info::Flex_file_info(
-		const char*       bnm,    // Basename,
-		const char*       pnm,    // Full pathname,
-		Flex*             fl,     // Flex file (we'll own it).
-		Shape_group_file* g       // Group file (or 0).
+		const char*                       bnm,    // Basename,
+		const char*                       pnm,    // Full pathname,
+		Flex*                             fl,     // Flex file (we'll own it).
+		std::unique_ptr<Shape_group_file> g       // Group file (or 0).
 		)
-		: Shape_file_info(bnm, pnm, g), flex(fl), write_flat(false) {
+		: Shape_file_info(bnm, pnm, std::move(g)), flex(fl), write_flat(false) {
 	entries.resize(flex->number_of_objects());
 	lengths.resize(entries.size());
 }
@@ -540,7 +539,8 @@ static bool Create_file(
  *  Output: ->file info, or 0 if error.
  */
 
-Shape_file_info* Shape_file_set::create(const char* basename    // Like 'shapes.vga'.
+Shape_file_info* Shape_file_set::create(
+		const char* basename    // Like 'shapes.vga'.
 ) {
 	// Already have it open?
 	for (auto* file : files) {
@@ -552,48 +552,53 @@ Shape_file_info* Shape_file_set::create(const char* basename    // Like 'shapes.
 	if (strcasecmp(basename, "fonts_original.vga") == 0) {
 		string group_name(basename);
 		group_name += ".grp";
-		auto*                                    groups   = new Shape_group_file(group_name.c_str());
-		const char*                              exultflx = BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX);
+		auto        groups   = std::make_unique<Shape_group_file>(group_name.c_str());
+		const char* exultflx = BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX);
+
 		std::vector<std::pair<std::string, int>> sources;
 		sources.emplace_back(exultflx, EXULT_FLX_FONTS_ORIGINAL_VGA);
 		sources.emplace_back(PATCH_ORIGINAL_FONTS, -1);    // Patch file
-		return append(new Image_file_info(basename, exultflx, new Vga_file(sources, U7_SHAPE_FONTS), groups));
+		return append(new Image_file_info(basename, exultflx, new Vga_file(sources, U7_SHAPE_FONTS), std::move(groups)));
 	} else if (strcasecmp(basename, "fonts_serif.vga") == 0) {
 		string group_name(basename);
 		group_name += ".grp";
-		auto*                                    groups   = new Shape_group_file(group_name.c_str());
-		const char*                              exultflx = BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX);
+		auto        groups   = std::make_unique<Shape_group_file>(group_name.c_str());
+		const char* exultflx = BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX);
+
 		std::vector<std::pair<std::string, int>> sources;
 		sources.emplace_back(exultflx, EXULT_FLX_FONTS_SERIF_VGA);
 		sources.emplace_back(PATCH_SERIF_FONTS, -1);    // Patch file
-		return append(new Image_file_info(basename, exultflx, new Vga_file(sources, U7_SHAPE_FONTS), groups));
+		return append(new Image_file_info(basename, exultflx, new Vga_file(sources, U7_SHAPE_FONTS), std::move(groups)));
 	} else if (strcasecmp(basename, "shortcutbar.vga") == 0) {
 		string group_name(basename);
 		group_name += ".grp";
-		auto*                                    groups   = new Shape_group_file(group_name.c_str());
-		const char*                              exultflx = BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX);
+		auto        groups   = std::make_unique<Shape_group_file>(group_name.c_str());
+		const char* exultflx = BUNDLE_CHECK(BUNDLE_EXULT_FLX, EXULT_FLX);
+
 		std::vector<std::pair<std::string, int>> sources;
 		sources.emplace_back(exultflx, EXULT_FLX_SHORTCUTBAR_VGA);
 		sources.emplace_back(PATCH_SHORTCUTBAR_VGA, -1);    // Patch file
-		return append(new Image_file_info(basename, exultflx, new Vga_file(sources), groups));
+		return append(new Image_file_info(basename, exultflx, new Vga_file(sources), std::move(groups)));
 	} else if (strcasecmp(basename, "bg_paperdol.vga") == 0) {
 		string group_name(basename);
 		group_name += ".grp";
-		auto*                                    groups     = new Shape_group_file(group_name.c_str());
-		const char*                              exultbgflx = BUNDLE_CHECK(BUNDLE_EXULT_BG_FLX, EXULT_BG_FLX);
+		auto        groups     = std::make_unique<Shape_group_file>(group_name.c_str());
+		const char* exultbgflx = BUNDLE_CHECK(BUNDLE_EXULT_BG_FLX, EXULT_BG_FLX);
+
 		std::vector<std::pair<std::string, int>> sources;
 		sources.emplace_back(exultbgflx, EXULT_BG_FLX_BG_PAPERDOL_VGA);
 		sources.emplace_back(PATCH_BG_PAPERDOL, -1);    // Patch file
-		return append(new Image_file_info(basename, exultbgflx, new Vga_file(sources, U7_SHAPE_PAPERDOL), groups));
+		return append(new Image_file_info(basename, exultbgflx, new Vga_file(sources, U7_SHAPE_PAPERDOL), std::move(groups)));
 	} else if (strcasecmp(basename, "bg_mr_faces.vga") == 0) {
 		string group_name(basename);
 		group_name += ".grp";
-		auto*                                    groups     = new Shape_group_file(group_name.c_str());
-		const char*                              exultbgflx = BUNDLE_CHECK(BUNDLE_EXULT_BG_FLX, EXULT_BG_FLX);
+		auto        groups     = std::make_unique<Shape_group_file>(group_name.c_str());
+		const char* exultbgflx = BUNDLE_CHECK(BUNDLE_EXULT_BG_FLX, EXULT_BG_FLX);
+
 		std::vector<std::pair<std::string, int>> sources;
 		sources.emplace_back(exultbgflx, EXULT_BG_FLX_BG_MR_FACES_VGA);
 		sources.emplace_back(PATCH_BG_MR_FACES, -1);    // Patch file
-		return append(new Image_file_info(basename, exultbgflx, new Vga_file(sources, U7_SHAPE_FACES), groups));
+		return append(new Image_file_info(basename, exultbgflx, new Vga_file(sources, U7_SHAPE_FACES), std::move(groups)));
 	}
 	// Look in 'static', 'patch'.
 	const string sstr    = string("<STATIC>/") + basename;
@@ -620,15 +625,16 @@ Shape_file_info* Shape_file_set::create(const char* basename    // Like 'shapes.
 	const char* fullname = pexists ? ppath : spath;
 	string      group_name(basename);    // Create groups file.
 	group_name += ".grp";
-	auto* groups = new Shape_group_file(group_name.c_str());
+	auto groups = std::make_unique<Shape_group_file>(group_name.c_str());
 	if (strcasecmp(basename, "shapes.vga") == 0) {
-		return append(new Image_file_info(basename, fullname, new Shapes_vga_file(spath, U7_SHAPE_SHAPES, ppath), groups));
+		return append(
+				new Image_file_info(basename, fullname, new Shapes_vga_file(spath, U7_SHAPE_SHAPES, ppath), std::move(groups)));
 	} else if (strcasecmp(basename, "gumps.vga") == 0) {
-		return append(new Image_file_info(basename, fullname, new Vga_file(spath, U7_SHAPE_GUMPS, ppath), groups));
+		return append(new Image_file_info(basename, fullname, new Vga_file(spath, U7_SHAPE_GUMPS, ppath), std::move(groups)));
 	} else if (strcasecmp(basename, "faces.vga") == 0) {
-		return append(new Image_file_info(basename, fullname, new Vga_file(spath, U7_SHAPE_FACES, ppath), groups));
+		return append(new Image_file_info(basename, fullname, new Vga_file(spath, U7_SHAPE_FACES, ppath), std::move(groups)));
 	} else if (strcasecmp(basename, "sprites.vga") == 0) {
-		return append(new Image_file_info(basename, fullname, new Vga_file(spath, U7_SHAPE_SPRITES, ppath), groups));
+		return append(new Image_file_info(basename, fullname, new Vga_file(spath, U7_SHAPE_SPRITES, ppath), std::move(groups)));
 	} else if (strcasecmp(basename, "paperdol.vga") == 0) {
 		// For BG, build multi-source: SI's paperdol + bg_paperdol from exult_bg.flx + patch, mirroring Paperdoll_source_parser.
 		ExultStudio* studio = ExultStudio::get_instance();
@@ -638,18 +644,18 @@ Shape_file_info* Shape_file_set::create(const char* basename    // Like 'shapes.
 			const char* exultbgflx = BUNDLE_CHECK(BUNDLE_EXULT_BG_FLX, EXULT_BG_FLX);
 			sources.emplace_back(exultbgflx, EXULT_BG_FLX_BG_PAPERDOL_VGA);
 			sources.emplace_back(PATCH_PAPERDOL, -1);    // Patch file
-			return append(new Image_file_info(basename, fullname, new Vga_file(sources, U7_SHAPE_PAPERDOL), groups));
+			return append(new Image_file_info(basename, fullname, new Vga_file(sources, U7_SHAPE_PAPERDOL), std::move(groups)));
 		}
-		return append(new Image_file_info(basename, fullname, new Vga_file(spath, U7_SHAPE_PAPERDOL, ppath), groups));
+		return append(new Image_file_info(basename, fullname, new Vga_file(spath, U7_SHAPE_PAPERDOL, ppath), std::move(groups)));
 	} else if (strcasecmp(basename, "fonts.vga") == 0) {
-		return append(new Image_file_info(basename, fullname, new Vga_file(spath, U7_SHAPE_FONTS, ppath), groups));
+		return append(new Image_file_info(basename, fullname, new Vga_file(spath, U7_SHAPE_FONTS, ppath), std::move(groups)));
 	} else if (strcasecmp(basename, "u7chunks") == 0) {
 		auto file = U7open_in(fullname);
-		return append(new Chunks_file_info(basename, fullname, std::move(file), groups));
+		return append(new Chunks_file_info(basename, fullname, std::move(file), std::move(groups)));
 	} else if (strcasecmp(basename, "npcs") == 0) {
-		return append(new Npcs_file_info(basename, fullname, groups));
+		return append(new Npcs_file_info(basename, fullname, std::move(groups)));
 	} else if (strcasecmp(basename, "combos.flx") == 0 || strcasecmp(basename, "palettes.flx") == 0) {
-		return append(new Flex_file_info(basename, fullname, new FlexFile(fullname), groups));
+		return append(new Flex_file_info(basename, fullname, new FlexFile(fullname), std::move(groups)));
 	} else if (strcasecmp(".pal", basename + strlen(basename) - 4) == 0) {
 		// Single palette?
 		auto pIn = U7open_in(fullname);
@@ -660,15 +666,12 @@ Shape_file_info* Shape_file_set::create(const char* basename    // Like 'shapes.
 		auto& in = *pIn;
 		in.seekg(0, std::ios::end);    // Figure size.
 		const int sz = in.tellg();
-		delete groups;
 		return append(new Flex_file_info(basename, fullname, sz));
 	} else {    // Not handled above?
 		// Get image file for this path.
 		auto* ifile = new Vga_file(spath, U7_SHAPE_UNK, ppath);
 		if (ifile->is_good()) {
-			return append(new Image_file_info(basename, fullname, ifile, groups));
-		} else {
-			delete groups;
+			return append(new Image_file_info(basename, fullname, ifile, std::move(groups)));
 		}
 		delete ifile;
 	}

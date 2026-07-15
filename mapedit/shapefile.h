@@ -5,7 +5,7 @@
  **/
 
 #ifndef INCL_SHAPEFILE
-#define INCL_SHAPEFILE 1
+#define INCL_SHAPEFILE
 
 /*
 Copyright (C) 2002-2022 The Exult Team
@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <istream>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 class Vga_file;
@@ -44,17 +45,17 @@ class Flex;
  */
 class Shape_file_info {
 protected:
-	std::string       basename;    // Base filename.
-	std::string       pathname;    // Full pathname.
-	Shape_group_file* groups;      // Groups within ifile.
-	bool              modified;    // Ifile was modified.
-	Object_browser*   browser;     // Widget for seeing this file.
+	std::string                       basename;    // Base filename.
+	std::string                       pathname;    // Full pathname.
+	std::unique_ptr<Shape_group_file> groups;      // Groups within ifile.
+	bool                              modified;    // Ifile was modified.
+	Object_browser*                   browser;     // Widget for seeing this file.
 public:
 	friend class Shape_file_set;
 
 	// We will own files and groups.
-	Shape_file_info(const char* bnm, const char* pnm, Shape_group_file* g)
-			: basename(bnm), pathname(pnm), groups(g), modified(false), browser(nullptr) {}
+	Shape_file_info(const char* bnm, const char* pnm, std::unique_ptr<Shape_group_file> g)
+			: basename(bnm), pathname(pnm), groups(std::move(g)), modified(false), browser(nullptr) {}
 
 	virtual ~Shape_file_info();
 
@@ -67,7 +68,7 @@ public:
 	}
 
 	Shape_group_file* get_groups() {
-		return groups;
+		return groups.get();
 	}
 
 	void set_modified() {
@@ -111,7 +112,8 @@ class Image_file_info : public Shape_file_info {
 	Vga_file* ifile;    // Contains the images.
 public:
 	// We will own ifile.
-	Image_file_info(const char* bnm, const char* pnm, Vga_file* i, Shape_group_file* g) : Shape_file_info(bnm, pnm, g), ifile(i) {}
+	Image_file_info(const char* bnm, const char* pnm, Vga_file* i, std::unique_ptr<Shape_group_file> g)
+			: Shape_file_info(bnm, pnm, std::move(g)), ifile(i) {}
 
 	~Image_file_info() override;
 
@@ -132,8 +134,8 @@ class Chunks_file_info : public Shape_file_info {
 	std::unique_ptr<std::istream> file;    // For 'chunks'; ifile is nullptr.
 public:
 	// We will own file.
-	Chunks_file_info(const char* bnm, const char* pnm, std::unique_ptr<std::istream> f, Shape_group_file* g)
-			: Shape_file_info(bnm, pnm, g), file(std::move(f)) {}
+	Chunks_file_info(const char* bnm, const char* pnm, std::unique_ptr<std::istream> f, std::unique_ptr<Shape_group_file> g)
+			: Shape_file_info(bnm, pnm, std::move(g)), file(std::move(f)) {}
 
 	~Chunks_file_info() override;
 
@@ -165,7 +167,8 @@ class Npcs_file_info : public Shape_file_info {
 	std::vector<Estudio_npc> npcs;    // Shared NPC info.
 public:
 	// We will own file.
-	Npcs_file_info(const char* bnm, const char* pnm, Shape_group_file* g) : Shape_file_info(bnm, pnm, g) {
+	Npcs_file_info(const char* bnm, const char* pnm, std::unique_ptr<Shape_group_file> g)
+			: Shape_file_info(bnm, pnm, std::move(g)) {
 		setup();
 	}
 
@@ -189,7 +192,7 @@ class Flex_file_info : public Shape_file_info {
 	bool                                          write_flat;    // Write flat file if just 1 entry.
 public:
 	// We will own flex.
-	Flex_file_info(const char* bnm, const char* pnm, Flex* fl, Shape_group_file* g);
+	Flex_file_info(const char* bnm, const char* pnm, Flex* fl, std::unique_ptr<Shape_group_file> g);
 	// Create for single-palette.
 	Flex_file_info(const char* bnm, const char* pnm, unsigned size);
 
