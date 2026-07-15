@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "ignore_unused_variable_warning.h"
+#include "shapegroup.h"
 
 #include <istream>
 #include <memory>
@@ -34,7 +35,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <vector>
 
 class Vga_file;
-class Shape_group_file;
 class Object_browser;
 class Shape_group;
 class Shape;
