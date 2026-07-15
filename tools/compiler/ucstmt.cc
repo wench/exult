@@ -296,7 +296,6 @@ void Uc_breakable_statement::gen(
 
 Uc_while_statement::~Uc_while_statement() {
 	delete expr;
-	delete stmt;
 }
 
 /*
@@ -367,7 +366,6 @@ void Uc_while_statement::gen(
 
 Uc_dowhile_statement::~Uc_dowhile_statement() {
 	delete expr;
-	delete stmt;
 }
 
 /*
@@ -432,7 +430,6 @@ void Uc_dowhile_statement::gen(
  */
 
 Uc_infinite_loop_statement::~Uc_infinite_loop_statement() {
-	delete stmt;
 }
 
 /*
