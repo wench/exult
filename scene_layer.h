@@ -44,10 +44,11 @@ public:
 	explicit Scene_layer(int width = 320, int height = 200) : scene_w(width > 0 ? width : 320), scene_h(height > 0 ? height : 200) {
 		Game_window*  gwin = Game_window::get_instance();
 		Image_window* iwin = gwin->get_win();
-		// Follow the main game video settings so the scene scales exactly like
-		// the game area (rather than a fixed scaler). No per-scene config.
+		// Follow the main game video scaler, but always use fill mode "Fill" regardless
+		// of the configured game fill mode, so screens use the entire screen
+		// instead of a potentiall small aspect-correct/letterboxed rectangle.
 		gwin->set_ui_layer_config(
-				Image_window::UiLayerFullScreenScene, scene_w, scene_h, iwin->get_scaler(), iwin->get_fill_mode(),
+				Image_window::UiLayerFullScreenScene, scene_w, scene_h, iwin->get_scaler(), Image_window::Fill,
 				iwin->get_fill_scaler());
 		handle = gwin->create_layer(scene_w, scene_h, transparent_index, 0, scene_layer_z);
 		if (handle >= 0) {
