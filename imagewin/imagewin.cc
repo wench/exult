@@ -1004,86 +1004,89 @@ void Image_window::show(int x, int y, int w, int h) {
 		h = buffer_h - y;
 	}
 
-	// Phase 1 blit from draw_surface to inter_surface
-	if (draw_surface != inter_surface) {
-		const ScalerInfo& sel_scaler = Scalers[scaler];
+	// No scaling if ibuf and draw_surface are not the same size
+	if (ibuf->width + 2 * guard_band == draw_surface->w && ibuf->height + 2 * guard_band == draw_surface->h) {
+		// Phase 1 blit from draw_surface to inter_surface
+		if (draw_surface != inter_surface) {
+			const ScalerInfo& sel_scaler = Scalers[scaler];
 
-		const SDL_PixelFormatDetails* inter_surface_format = SDL_GetPixelFormatDetails(inter_surface->format);
-		// Need to apply an offset to compensate for the guard_band
-		if (inter_surface == display_surface) {
-			inter_surface->pixels = static_cast<uint8*>(inter_surface->pixels) - inter_surface->pitch * guard_band * scale
-									- inter_surface_format->bytes_per_pixel * guard_band * scale;
-		}
-
-		if (sel_scaler.arb) {
-			if (!sel_scaler.arb->Scale(
-						draw_surface, x + guard_band, y + guard_band, w, h, inter_surface, scale * (x + guard_band),
-						scale * (y + guard_band), scale * w, scale * h, false)) {
-				Scalers[point].arb->Scale(
-						draw_surface, x + guard_band, y + guard_band, w, h, inter_surface, scale * (x + guard_band),
-						scale * (y + guard_band), scale * w, scale * h, false);
+			const SDL_PixelFormatDetails* inter_surface_format = SDL_GetPixelFormatDetails(inter_surface->format);
+			// Need to apply an offset to compensate for the guard_band
+			if (inter_surface == display_surface) {
+				inter_surface->pixels = static_cast<uint8*>(inter_surface->pixels) - inter_surface->pitch * guard_band * scale
+										- inter_surface_format->bytes_per_pixel * guard_band * scale;
 			}
-		} else {
-			scalefun show_scaled;
-			if (inter_surface_format->bits_per_pixel == 16 || inter_surface_format->bits_per_pixel == 15) {
-				const int r = inter_surface_format->Rmask;
-				const int g = inter_surface_format->Gmask;
-				const int b = inter_surface_format->Bmask;
 
-				show_scaled = (r == 0xf800 && g == 0x7e0 && b == 0x1f) || (b == 0xf800 && g == 0x7e0 && r == 0x1f)
-									  ? (sel_scaler.fun8to565 != nullptr ? sel_scaler.fun8to565 : sel_scaler.fun8to16)
-							  : (r == 0x7c00 && g == 0x3e0 && b == 0x1f) || (b == 0x7c00 && g == 0x3e0 && r == 0x1f)
-									  ? (sel_scaler.fun8to555 != nullptr ? sel_scaler.fun8to555 : sel_scaler.fun8to16)
-									  : sel_scaler.fun8to16;
-			} else if (inter_surface_format->bits_per_pixel == 32) {
-				show_scaled = sel_scaler.fun8to32;
+			if (sel_scaler.arb) {
+				if (!sel_scaler.arb->Scale(
+							draw_surface, x + guard_band, y + guard_band, w, h, inter_surface, scale * (x + guard_band),
+							scale * (y + guard_band), scale * w, scale * h, false)) {
+					Scalers[point].arb->Scale(
+							draw_surface, x + guard_band, y + guard_band, w, h, inter_surface, scale * (x + guard_band),
+							scale * (y + guard_band), scale * w, scale * h, false);
+				}
 			} else {
-				show_scaled = sel_scaler.fun8to8;
+				scalefun show_scaled;
+				if (inter_surface_format->bits_per_pixel == 16 || inter_surface_format->bits_per_pixel == 15) {
+					const int r = inter_surface_format->Rmask;
+					const int g = inter_surface_format->Gmask;
+					const int b = inter_surface_format->Bmask;
+
+					show_scaled = (r == 0xf800 && g == 0x7e0 && b == 0x1f) || (b == 0xf800 && g == 0x7e0 && r == 0x1f)
+										  ? (sel_scaler.fun8to565 != nullptr ? sel_scaler.fun8to565 : sel_scaler.fun8to16)
+								  : (r == 0x7c00 && g == 0x3e0 && b == 0x1f) || (b == 0x7c00 && g == 0x3e0 && r == 0x1f)
+										  ? (sel_scaler.fun8to555 != nullptr ? sel_scaler.fun8to555 : sel_scaler.fun8to16)
+										  : sel_scaler.fun8to16;
+				} else if (inter_surface_format->bits_per_pixel == 32) {
+					show_scaled = sel_scaler.fun8to32;
+				} else {
+					show_scaled = sel_scaler.fun8to8;
+				}
+
+				(this->*show_scaled)(x, y, w, h);
 			}
 
-			(this->*show_scaled)(x, y, w, h);
+			// Undo guard_band offset
+			if (inter_surface == display_surface) {
+				inter_surface->pixels = static_cast<uint8*>(inter_surface->pixels) + inter_surface->pitch * guard_band * scale
+										+ inter_surface_format->bytes_per_pixel * guard_band * scale;
+			}
+
+			x *= scale;
+			y *= scale;
+			w *= scale;
+			h *= scale;
 		}
 
-		// Undo guard_band offset
-		if (inter_surface == display_surface) {
-			inter_surface->pixels = static_cast<uint8*>(inter_surface->pixels) + inter_surface->pitch * guard_band * scale
-									+ inter_surface_format->bytes_per_pixel * guard_band * scale;
+		// Phase 2 blit from inter_surface to display_surface
+		if (inter_surface != display_surface && fill_scaler != SDLScaler) {
+			const ScalerInfo& sel_scaler = Scalers[fill_scaler];
+
+			// Just scale entire surfaces
+			if (inter_surface == draw_surface) {
+				x = guard_band;
+				y = guard_band;
+				w = get_full_width();
+				h = get_full_height();
+			} else {
+				x = guard_band * scale;
+				y = guard_band * scale;
+				w = inter_width;
+				h = inter_height;
+			}
+
+			if (!sel_scaler.arb
+				|| !sel_scaler.arb->Scale(
+						inter_surface, x, y, w, h, display_surface, 0, 0, display_surface->w, display_surface->h, false)) {
+				Scalers[point].arb->Scale(
+						inter_surface, x, y, w, h, display_surface, 0, 0, display_surface->w, display_surface->h, false);
+			}
+
+			x = 0;
+			y = 0;
+			w = display_surface->w;
+			h = display_surface->h;
 		}
-
-		x *= scale;
-		y *= scale;
-		w *= scale;
-		h *= scale;
-	}
-
-	// Phase 2 blit from inter_surface to display_surface
-	if (inter_surface != display_surface && fill_scaler != SDLScaler) {
-		const ScalerInfo& sel_scaler = Scalers[fill_scaler];
-
-		// Just scale entire surfaces
-		if (inter_surface == draw_surface) {
-			x = guard_band;
-			y = guard_band;
-			w = get_full_width();
-			h = get_full_height();
-		} else {
-			x = guard_band * scale;
-			y = guard_band * scale;
-			w = inter_width;
-			h = inter_height;
-		}
-
-		if (!sel_scaler.arb
-			|| !sel_scaler.arb->Scale(
-					inter_surface, x, y, w, h, display_surface, 0, 0, display_surface->w, display_surface->h, false)) {
-			Scalers[point].arb->Scale(
-					inter_surface, x, y, w, h, display_surface, 0, 0, display_surface->w, display_surface->h, false);
-		}
-
-		x = 0;
-		y = 0;
-		w = display_surface->w;
-		h = display_surface->h;
 	}
 	// Phase 3 blit high res draw surface on top of display_surface
 	// Phase 4 notify SDL
