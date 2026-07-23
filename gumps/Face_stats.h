@@ -75,6 +75,14 @@ public:
 	int      hud_part_count() const override;
 	TileRect hud_part_rect(int part) override;
 
+	int hud_part_xanchor(int part) const override {
+		if (mode != 3) {
+			ignore_unused_variable_warning(part);
+			return -1;
+		}
+		return part == 0 ? 0 : 2;
+	}
+
 	// Mode 3 is vertically CENTERED as a reserved four-head column on each side.
 	int hud_part_yanchor(int part) const override {
 		ignore_unused_variable_warning(part);

@@ -232,16 +232,16 @@ void Gump_manager::render_gump_part_to_layer(Gump* g, int z, int part, bool is_h
 		if (xanc == 1) {
 			dx = (dispw - dw) / 2.0f;    // centered on the display
 		} else if (xanc == 0) {
-			dx = static_cast<float>(b.x - gsx) * f;    // game-area left edge
+			dx = (xanc_forced >= 0) ? 0.0f : static_cast<float>(b.x - gsx) * f;
 		} else {
-			dx = dispw - static_cast<float>(gex - b.x) * f;    // game-area right edge
+			dx = (xanc_forced >= 0) ? (dispw - dw) : (dispw - static_cast<float>(gex - b.x) * f);
 		}
 		if (yanc == 1) {
 			dy = (disph - dh) / 2.0f;
 		} else if (yanc == 0) {
-			dy = static_cast<float>(b.y - gsy) * f;    // game-area top edge
+			dy = (yanc_forced >= 0) ? 0.0f : static_cast<float>(b.y - gsy) * f;
 		} else {
-			dy = disph - static_cast<float>(gey - b.y) * f;    // game-area bottom edge
+			dy = (yanc_forced >= 0) ? (disph - dh) : (disph - static_cast<float>(gey - b.y) * f);
 		}
 	}
 	if (g->is_modal() && !g->is_draggable()) {
