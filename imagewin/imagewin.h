@@ -302,12 +302,14 @@ protected:
 	bool          fullscreen;      // Rendering fullscreen.
 	int           game_width;
 	int           game_height;
-	int           saved_game_width;    // Normally this is the same as game_width and is
-									   // used by the PaintIntoGuardBand code so it can
-									   // change and restore the value of game_width
-	int saved_game_height;             // Normally this is the same as game_height and is
-									   // used by the PaintIntoGuardBand code so it can
-									   // change and restore the value of game_height
+	int           saved_game_width;         // Normally this is the same as game_width and is
+											// used by the PaintIntoGuardBand code so it can
+											// change and restore the value of game_width
+	int saved_game_height;                  // Normally this is the same as game_height and is
+											// used by the PaintIntoGuardBand code so it can
+											// change and restore the value of game_height
+	bool guardband_paint_active = false;    // True while BeginPaintIntoGuardBand temporary
+											// ibuf/game-size adjustments are active.
 	// While a full-screen "scene" layer drives the display through the normal
 	// blit path (intro, endgame, cheat screen), scene_mode is on: the guard band
 	// is bypassed (the scene buffer has none) and every show() re-uploads the

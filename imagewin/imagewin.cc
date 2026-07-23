@@ -1088,9 +1088,37 @@ void Image_window::show(int x, int y, int w, int h) {
 			h = display_surface->h;
 		}
 	}
+	// When using the fill scaler path, 'inter_surface' may differ from the
+	// display size (e.g. AspectCorrectCentre), so uploading it directly may not
+	// match the display texture dimensions. Resolve to display_surface first.
+	if (fill_scaler == SDLScaler && inter_surface != display_surface) {
+		int sx;
+		int sy;
+		int sw;
+		int sh;
+		if (inter_surface == draw_surface) {
+			sx = guard_band;
+			sy = guard_band;
+			sw = get_full_width();
+			sh = get_full_height();
+		} else {
+			sx = guard_band * scale;
+			sy = guard_band * scale;
+			sw = inter_width;
+			sh = inter_height;
+		}
+		if (!Scalers[point].arb
+			|| !Scalers[point].arb->Scale(
+					inter_surface, sx, sy, sw, sh, display_surface, 0, 0, display_surface->w, display_surface->h, false)) {
+			const SDL_Rect src = {sx, sy, sw, sh};
+			const SDL_Rect dst = {0, 0, display_surface->w, display_surface->h};
+			SDL_BlitSurfaceScaled(inter_surface, &src, display_surface, &dst, SDL_SCALEMODE_NEAREST);
+		}
+	}
+
 	// Phase 3 blit high res draw surface on top of display_surface
 	// Phase 4 notify SDL
-	UpdateRect(fill_scaler == SDLScaler ? inter_surface : display_surface);
+	UpdateRect(display_surface);
 }
 
 /*
@@ -1136,10 +1164,9 @@ void Image_window::BeginPaintIntoGuardBand(int* x, int* y, int* w, int* h) {
 	}
 
 	// adjust ibuf and game dimension things so we can draw into the right and
-	// bottom guardband to avoid blacklines when scalers read the gurdband
-	// Only do this is guardband painting should be used and if the adjustments
-	//  haven't already been done
-	if (ShouldPaintIntoGuardband() && (game_width == saved_game_width || game_height == saved_game_height)) {
+	// bottom guardband to avoid blacklines when scalers read the guardband.
+	// Only apply these temporary changes once until EndPaintIntoGuardBand().
+	if (ShouldPaintIntoGuardband() && !guardband_paint_active) {
 		// Adjust clip rect on the buffer
 		int cx, cy, cw, ch;
 		ibuf->get_clip(cx, cy, cw, ch);
@@ -1180,27 +1207,28 @@ void Image_window::BeginPaintIntoGuardBand(int* x, int* y, int* w, int* h) {
 		ibuf->height = draw_surface->h - 3 * guard_band / 2;
 		// set the new clipping rectangle after updating the buffer dimensions
 		ibuf->set_clip(cx, cy, cw, ch);
+		guardband_paint_active = true;
 	}
 	// clip the rectangle
 	if (*x + *w > ibuf->width) {
 		*w = ibuf->width - *x;
 	}
 	if (*y + *h > ibuf->height) {
-		*h = ibuf->height - *h;
+		*h = ibuf->height - *y;
 	}
 }
 
 void Image_window::EndPaintIntoGuardBand() {
-	if (!ShouldPaintIntoGuardband()) {
+	if (!guardband_paint_active) {
 		return;
 	}
-	// Restore ibuf and game screen dimensions if needed
-	if (game_width != saved_game_width || game_height != saved_game_height) {
-		ibuf->width  = draw_surface->w - 2 * guard_band;
-		ibuf->height = draw_surface->h - 2 * guard_band;
-		game_width   = saved_game_width;
-		game_height  = saved_game_height;
-	}
+	// Restore ibuf and game screen dimensions after temporary guardband paint
+	// expansion, regardless of whether game_width/game_height were modified.
+	ibuf->width            = draw_surface->w - 2 * guard_band;
+	ibuf->height           = draw_surface->h - 2 * guard_band;
+	game_width             = saved_game_width;
+	game_height            = saved_game_height;
+	guardband_paint_active = false;
 }
 
 void Image_window::FillGuardband() {
@@ -1345,10 +1373,11 @@ bool Image_window::get_draw_dims(int sw, int sh, int scale, FillMode fillmode, i
 			ih = (sh * iw * 5) / (sw * 6);
 		}
 	} else if (fillmode >= Centre && fillmode < (1 << 16)) {
-		const int factor        = 2 + ((fillmode - Centre) / 2);
-		const int aspect_factor = (fillmode & 1) ? 5 : 6;
+		const int  factor        = 2 + ((fillmode - Centre) / 2);
+		const int  aspect_factor = (fillmode & 1) ? 5 : 6;
+		const bool auto_game     = (gw == 0 || gh == 0);
 
-		if (gw == 0 || gh == 0) {
+		if (auto_game) {
 			gw = (sw * 2) / (factor * scale);
 			gh = (sh * aspect_factor) / (3 * factor * scale);
 		}
@@ -1356,12 +1385,20 @@ bool Image_window::get_draw_dims(int sw, int sh, int scale, FillMode fillmode, i
 		iw = (sw * 2) / factor;
 		ih = (sh * aspect_factor) / (3 * factor);
 
-		if (gw * scale > iw) {
-			gw = iw / scale;
-		}
+		if (auto_game) {
+			if (gw * scale > iw) {
+				gw = iw / scale;
+			}
 
-		if (gh * scale > ih) {
-			gh = ih / scale;
+			if (gh * scale > ih) {
+				gh = ih / scale;
+			}
+		} else {
+			// For an explicit game area (e.g. fixed 320x200), keep the logical
+			// size stable and expand the intermediate surface as needed so the
+			// view remains visible in centered/aspect-correct modes.
+			iw = std::max(iw, gw * scale);
+			ih = std::max(ih, gh * scale);
 		}
 	} else {
 		const int fw = fillmode & 0xFFFF;
