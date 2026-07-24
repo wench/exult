@@ -245,7 +245,7 @@ bool Npc_preset_file::write() {
 		}
 		modified = false;
 		return true;
-	} catch (std::exception& e) {
+	} catch (std::exception& ) {
 		return false;
 	}
 }
@@ -290,7 +290,7 @@ bool Npc_preset_file::read(const char* nm) {
 		}
 		modified = false;
 		return true;
-	} catch (std::exception& e) {
+	} catch (std::exception& ) {
 		return false;
 	}
 }
