@@ -142,6 +142,7 @@ private:
 	Shape_file_info*                 paperdolfile;        // 'paperdol.vga'.
 	Object_browser*                  browser;
 	std::unique_ptr<unsigned char[]> palbuf;    // 3*256 rgb's, each 0-63.
+	std::vector<Xform_palette>       xforms;    // 'xform.tbl'
 	// Barge editor:
 	GtkWidget* bargewin;    // Barge window.
 	int        barge_ctx;
@@ -344,6 +345,10 @@ public:
 		waiting_client     = client;
 	}
 
+	const auto& GetXform() const {
+		return xforms;
+	}
+
 	Shape_group_file* get_cur_groups();
 
 	Shape_preset_file* get_cur_presets() {
@@ -380,6 +385,7 @@ public:
 	void            set_edit_terrain(gboolean terrain);
 	void            set_edit_mode(int md);
 	void            show_unused_shapes(const unsigned char* data, int datalen);
+	void            load_xforms();
 	// Open/create shape files:
 	Shape_file_info* open_shape_file(const char* basename);
 	void             new_shape_file(bool single);
