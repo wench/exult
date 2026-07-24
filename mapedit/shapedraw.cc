@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "ibuf8.h"
 #include "shapefile.h"
 #include "shapeinf.h"
+#include "shapevga.h"
 #include "u7drag.h"
 #include "vgafile.h"
 
@@ -75,7 +76,7 @@ void Shape_draw::show(
 			// Using GdkPixbuf scaling :
 			const bool zoom_bilinear = ExultStudio::get_instance()->get_shape_bilinear();
 			GdkPixbuf* zoom_pixbuf   = gdk_pixbuf_scale_simple(
-					pixbuf, (w * zoom_scale) / 2, (h * zoom_scale) / 2, (zoom_bilinear ? GDK_INTERP_BILINEAR : GDK_INTERP_NEAREST));
+                    pixbuf, (w * zoom_scale) / 2, (h * zoom_scale) / 2, (zoom_bilinear ? GDK_INTERP_BILINEAR : GDK_INTERP_NEAREST));
 			gdk_cairo_set_source_pixbuf(drawgc, zoom_pixbuf, (x * zoom_scale) / 2, (y * zoom_scale) / 2);
 			cairo_rectangle(drawgc, (x * zoom_scale) / 2, (y * zoom_scale) / 2, (w * zoom_scale) / 2, (h * zoom_scale) / 2);
 			cairo_fill(drawgc);
@@ -95,21 +96,26 @@ void Shape_draw::show(
  *  Draw one shape at a particular place.
  */
 
-void Shape_draw::draw_shape(Shape_frame* shape, int x, int y) {
-	shape->paint(iwin, x + shape->get_xleft(), y + shape->get_yabove());
+void Shape_draw::draw_shape(Shape_frame* shape, int x, int y, bool trans) {
+	if (trans) {
+		const auto& xform = ExultStudio::get_instance()->GetXform();
+		shape->paint_rle_translucent(iwin, x + shape->get_xleft(), y + shape->get_yabove(), xform.data(), xform.size());
+	} else {
+		shape->paint(iwin, x + shape->get_xleft(), y + shape->get_yabove());
+	}
 }
 
 /*
  *  Draw one shape at a particular place.
  */
 
-void Shape_draw::draw_shape(int shapenum, int framenum, int x, int y) {
+void Shape_draw::draw_shape(int shapenum, int framenum, int x, int y, bool trans) {
 	if (shapenum < 0 || shapenum >= ifile->get_num_shapes()) {
 		return;
 	}
 	Shape_frame* shape = ifile->get_shape(shapenum, framenum);
 	if (shape) {
-		draw_shape(shape, x, y);
+		draw_shape(shape, x, y, trans);
 	}
 }
 
@@ -145,7 +151,7 @@ void Shape_draw::draw_shape_outline(
 
 void Shape_draw::draw_shape_centered(
 		int shapenum,    // -1 to not draw shape.
-		int framenum, int& x, int& y) {
+		int framenum, int& x, int& y, bool trans) {
 	// Guard: ensure image buffer is available before using it.
 	if (iwin == nullptr) {
 		return;
@@ -174,7 +180,7 @@ void Shape_draw::draw_shape_centered(
 	} else {
 		x = (ZoomDown(alloc.width) - shape->get_width()) / 2;
 		y = (ZoomDown(alloc.height) - shape->get_height()) / 2;
-		draw_shape(shape, x, y);
+		draw_shape(shape, x, y, trans);
 	}
 }
 
@@ -385,9 +391,9 @@ static inline int extract_value(GtkWidget* widget) {
 
 Shape_single::Shape_single(
 		GtkWidget* shp, GtkWidget* shpnm, bool (*shvalid)(int), GtkWidget* frm, int vgnum, Vga_file* vg,
-		const unsigned char* palbuf, GtkWidget* drw, bool hdd)
+		const unsigned char* palbuf, GtkWidget* drw, bool hdd, Shape_single::Trans_type translucent)
 		: Shape_draw(vg, palbuf, drw), shape(shp), shapename(shpnm), shapevalid(shvalid), frame(frm), vganum(vgnum), hide(hdd),
-		  shape_connect(0), frame_connect(0), draw_connect(0), drop_connect(0), hide_connect(0) {
+		  translucent(translucent), shape_connect(0), frame_connect(0), draw_connect(0), drop_connect(0), hide_connect(0) {
 	if (shape && (GTK_IS_SPIN_BUTTON(shape) || GTK_IS_ENTRY(shape))) {
 		shape_connect = g_signal_connect(G_OBJECT(shape), "changed", G_CALLBACK(Shape_single::on_shape_changed), this);
 	}
@@ -501,9 +507,30 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 	if ((shnum == 0) && !(single->shapevalid(0))) {
 		shnum = -1;
 	}
+	bool trans = false;
+	switch (single->translucent) {
+	case Trans_type::trans:
+		trans = true;
+		break;
+
+	case Trans_type::shapeinfo: {
+		// Get it frm Shapeinfo
+		if (auto shapesvga = dynamic_cast<Shapes_vga_file*>(single->ifile)) {
+			// set translucent if the shape info wants it
+			const auto shinfo = shapesvga->get_info(shnum);
+			trans             = shinfo.has_translucency();
+		}
+		break;
+	}
+
+	default:
+		trans = false;
+		break;
+	}
+
 	// make sure there is enough space for bbox if needed
 	int x, y;
-	single->draw_shape_centered(shnum, frnum, x, y);
+	single->draw_shape_centered(shnum, frnum, x, y, trans);
 	single->show(ZoomDown(area.x), ZoomDown(area.y), ZoomDown(area.width), ZoomDown(area.height));
 	single->set_graphic_context(nullptr);
 	return true;
@@ -549,13 +576,13 @@ void Shape_single::on_shape_dropped(int filenum, int shapenum, int framenum, gpo
 
 Shape_gump_single::Shape_gump_single(
 		GtkWidget* shp, GtkWidget* shpnm, bool (*shvalid)(int), GtkWidget* frm, int vgnum, Vga_file* vg,
-		const unsigned char* palbuf, GtkWidget* drw, bool hdd)
-		: Shape_single(shp, shpnm, shvalid, frm, vgnum, vg, palbuf, drw, hdd), container_x_widget(nullptr), container_x_connect(0),
-		  container_y_widget(nullptr), container_y_connect(0), container_w_widget(nullptr), container_w_connect(0),
-		  container_h_widget(nullptr), container_h_connect(0), show_container_widget(nullptr), show_container_connect(0),
-		  show_container_altered(0), checkmark_x_widget(nullptr), checkmark_x_connect(0), checkmark_y_widget(nullptr),
-		  checkmark_y_connect(0), checkmark_shape_widget(nullptr), checkmark_shape_connect(0), show_checkmark_widget(nullptr),
-		  show_checkmark_connect(0), show_checkmark_altered(0) {
+		const unsigned char* palbuf, GtkWidget* drw, bool hdd, Trans_type translucent)
+		: Shape_single(shp, shpnm, shvalid, frm, vgnum, vg, palbuf, drw, hdd, translucent), container_x_widget(nullptr),
+		  container_x_connect(0), container_y_widget(nullptr), container_y_connect(0), container_w_widget(nullptr),
+		  container_w_connect(0), container_h_widget(nullptr), container_h_connect(0), show_container_widget(nullptr),
+		  show_container_connect(0), show_container_altered(0), checkmark_x_widget(nullptr), checkmark_x_connect(0),
+		  checkmark_y_widget(nullptr), checkmark_y_connect(0), checkmark_shape_widget(nullptr), checkmark_shape_connect(0),
+		  show_checkmark_widget(nullptr), show_checkmark_connect(0), show_checkmark_altered(0) {
 	if (draw_connect && g_signal_handler_is_connected(G_OBJECT(draw), draw_connect)) {
 		g_signal_handler_disconnect(G_OBJECT(draw), draw_connect);
 		draw_connect = 0;
@@ -688,7 +715,7 @@ gboolean Shape_gump_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cai
 		shnum = -1;
 	}
 	int x, y;
-	single->draw_shape_centered(shnum, frnum, x, y);
+	single->draw_shape_centered(shnum, frnum, x, y, single->translucent == Shape_single::Trans_type::trans);
 	if (shnum >= 0 && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(single->show_checkmark_widget))
 		&& gtk_widget_is_sensitive(GTK_WIDGET(single->show_checkmark_widget))) {
 		const int checkmark_shnum = extract_value(single->checkmark_shape_widget);
@@ -701,7 +728,7 @@ gboolean Shape_gump_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cai
 					   extract_value(single->checkmark_y_widget) + shape->get_height() - 1 - shape->get_ybelow()
 							   - check->get_height() + 1 + check->get_ybelow(),
 					   check->get_width(), check->get_height()};
-			single->draw_shape(check, x + overlay.x, y + overlay.y);
+			single->draw_shape(check, x + overlay.x, y + overlay, single->translucent == Shape_single::Trans_type::trans);
 		}
 	}
 	single->show(ZoomDown(area.x), ZoomDown(area.y), ZoomDown(area.width), ZoomDown(area.height));
@@ -743,14 +770,16 @@ gboolean Shape_gump_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cai
 Shape_shape_single::Shape_shape_single(
 		GtkWidget* shp, GtkWidget* shpnm, bool (*shvalid)(int), GtkWidget* frm, int vgnum, Vga_file* vg,
 		const unsigned char* palbuf, GtkWidget* drw, bool hdd)
-		: Shape_single(shp, shpnm, shvalid, frm, vgnum, vg, palbuf, drw, hdd), shape_3d_x_widget(nullptr), shape_3d_x_connect(0),
-		  shape_3d_y_widget(nullptr), shape_3d_y_connect(0), shape_3d_z_widget(nullptr), shape_3d_z_connect(0),
-		  show_shape_3d_widget(nullptr), show_shape_3d_connect(0) {
+		: Shape_single(shp, shpnm, shvalid, frm, vgnum, vg, palbuf, drw, hdd, Shape_single::Trans_type::none),
+		  shape_3d_x_widget(nullptr), shape_3d_x_connect(0), shape_3d_y_widget(nullptr), shape_3d_y_connect(0),
+		  shape_3d_z_widget(nullptr), shape_3d_z_connect(0), show_shape_3d_widget(nullptr), show_shape_3d_connect(0),
+		  shape_trans_connect(0) {
 	auto* studio         = ExultStudio::get_instance();
 	shape_3d_x_widget    = studio->get_widget("shinfo_xtiles");
 	shape_3d_y_widget    = studio->get_widget("shinfo_ytiles");
 	shape_3d_z_widget    = studio->get_widget("shinfo_ztiles");
 	show_shape_3d_widget = studio->get_widget("shinfo_tiles_preview");
+	shape_trans_widget   = studio->get_widget("shinfo_transl_check");
 	shape_3d_x_connect
 			= g_signal_connect(G_OBJECT(shape_3d_x_widget), "changed", G_CALLBACK(Shape_shape_single::on_widget_changed), this);
 	shape_3d_y_connect
@@ -759,6 +788,13 @@ Shape_shape_single::Shape_shape_single(
 			= g_signal_connect(G_OBJECT(shape_3d_z_widget), "changed", G_CALLBACK(Shape_shape_single::on_widget_changed), this);
 	show_shape_3d_connect
 			= g_signal_connect(G_OBJECT(show_shape_3d_widget), "toggled", G_CALLBACK(Shape_shape_single::on_widget_changed), this);
+	if (shape_trans_widget) {
+		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(shape_trans_widget))) {
+			translucent = Shape_single::Trans_type::trans;
+		}
+		shape_trans_connect = g_signal_connect(
+				G_OBJECT(shape_trans_widget), "toggled", G_CALLBACK(Shape_shape_single::on_widget_changed), this);
+	}
 }
 
 Shape_shape_single::~Shape_shape_single() {
@@ -778,11 +814,23 @@ Shape_shape_single::~Shape_shape_single() {
 		g_signal_handler_disconnect(G_OBJECT(show_shape_3d_widget), show_shape_3d_connect);
 		show_shape_3d_connect = 0;
 	}
+	if (shape_trans_connect && g_signal_handler_is_connected(G_OBJECT(shape_trans_widget), shape_trans_connect)) {
+		g_signal_handler_disconnect(G_OBJECT(shape_trans_widget), shape_trans_connect);
+		shape_trans_connect = 0;
+	}
 }
 
 void Shape_shape_single::on_widget_changed(GtkWidget* widget, gpointer user_data) {
 	ignore_unused_variable_warning(widget);
 	auto* single = static_cast<Shape_shape_single*>(user_data);
+
+	if (widget && widget == single->shape_trans_widget) {
+		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(single->shape_trans_widget))) {
+			single->translucent = Shape_single::Trans_type::trans;
+		} else {
+			single->translucent = Shape_single::Trans_type::none;
+		}
+	}
 	gtk_widget_queue_draw(single->draw);
 }
 
@@ -792,10 +840,10 @@ void Shape_shape_single::on_widget_state(GtkWidget* widget, GtkStateFlags flags,
 	gtk_widget_queue_draw(single->draw);
 }
 
-void Shape_shape_single::draw_shape(Shape_frame* shape, int x, int y) {
+void Shape_shape_single::draw_shape(Shape_frame* shape, int x, int y, bool trans) {
 	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_shape_3d_widget))) {
 		// draw shape
-		Shape_draw::draw_shape(shape, x, y);
+		Shape_draw::draw_shape(shape, x, y, trans);
 		return;
 	}
 
@@ -828,7 +876,7 @@ void Shape_shape_single::draw_shape(Shape_frame* shape, int x, int y) {
 	// If all bbox are zero, no bbox to draw
 	if (!bbox_x && !bbox_y && !bbox_z) {
 		// draw shape
-		Shape_draw::draw_shape(shape, x, y);
+		Shape_draw::draw_shape(shape, x, y, trans);
 		return;
 	}
 
@@ -840,7 +888,7 @@ void Shape_shape_single::draw_shape(Shape_frame* shape, int x, int y) {
 	info.paint_bbox(x + shape->get_xleft(), y + shape->get_yabove(), 0, iwin, outline_color, 2);
 
 	//  draw shape
-	Shape_draw::draw_shape(shape, x, y);
+	Shape_draw::draw_shape(shape, x, y, trans);
 
 	// finally draw front lines
 	info.paint_bbox(x + shape->get_xleft(), y + shape->get_yabove(), 0, iwin, outline_color, 1);
@@ -899,7 +947,7 @@ GdkPixbuf* ExultStudio::shape_image(Vga_file* shpfile, int shnum, int frnum, boo
 		// Using GdkPixbuf scaling :
 		const bool zoom_bilinear = ExultStudio::get_instance()->get_shape_bilinear();
 		GdkPixbuf* zoom_pixbuf   = gdk_pixbuf_scale_simple(
-				pixbuf, (w * zoom_scale) / 2, (h * zoom_scale) / 2, (zoom_bilinear ? GDK_INTERP_BILINEAR : GDK_INTERP_NEAREST));
+                pixbuf, (w * zoom_scale) / 2, (h * zoom_scale) / 2, (zoom_bilinear ? GDK_INTERP_BILINEAR : GDK_INTERP_NEAREST));
 		g_object_unref(pixbuf);
 		pixbuf = zoom_pixbuf;
 	}

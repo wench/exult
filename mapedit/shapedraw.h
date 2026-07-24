@@ -76,10 +76,10 @@ public:
 		return palette->colors[i];
 	}
 
-	virtual void draw_shape(Shape_frame* shape, int x, int y);
-	void         draw_shape(int shapenum, int framenum, int x, int y);
+	virtual void draw_shape(Shape_frame* shape, int x, int y, bool trans = false);
+	void         draw_shape(int shapenum, int framenum, int x, int y, bool trans = false);
 	void         draw_shape_outline(int shapenum, int framenum, int x, int y, unsigned char color);
-	void         draw_shape_centered(int shapenum, int framenum, int& x, int& y);
+	void         draw_shape_centered(int shapenum, int framenum, int& x, int& y, bool trans = false);
 	virtual void render();    // Update what gets shown.
 	void         set_background_color(guint32 c);
 
@@ -108,6 +108,13 @@ class Shape_shape_single;
 class Shape_gump_single;
 
 class Shape_single : public Shape_draw {
+public:
+	enum class Trans_type {
+		none      = 0,    // Do not draw the shape as Translucent
+		trans     = 1,    // Draw the shape as Translucent
+		shapeinfo = 2,    // For a shape from Shapes.vgs, draw translucent if shapeinfo says it is translucent
+	};
+
 protected:
 	GtkWidget* shape;             // The ShapeID   holding GtkWidget: GtkSpinButton / GtkEntry, or GtkFrame ( NPCEditor NPC Face ).
 	GtkWidget* shapename;         // The ShapeName holding GtkLabel.
@@ -115,6 +122,7 @@ protected:
 	GtkWidget* frame;             // The FrameID   holding GtkWidget: GtkSpinButton / GtkEntry.
 	int        vganum;            // For a Drag and Drop enabled Shape_single :
 	bool       hide;              // Whether the Shape should be hidden.
+	Trans_type translucent;       // How translucent drawing should be handled
 	gulong     shape_connect;     // The Shape Widget g_signal_connect changed ID
 	gulong     frame_connect;     // The Frame Widget g_signal_connect changed ID
 	gulong     draw_connect;      // The Draw  Widget g_signal_connect draw ID
@@ -123,15 +131,18 @@ protected:
 
 public:
 	Shape_single(
-			GtkWidget* shp,                 // The ShapeID   holding GtkWidget.
-			GtkWidget* shpnm,               // The ShapeName holding GtkWidget.
-			bool (*shvld)(int),             // The ShapeUD   validating lambda.
-			GtkWidget*           frm,       // The FrameID   holding GtkWidget.
-			int                  vgnum,     // The D&D U7_SHAPE_xxx VGA file category.
-			Vga_file*            vg,        // The VGA File for the Shape_draw ctor.
-			const unsigned char* palbuf,    // The Palette for the Shape_draw ctor.
-			GtkWidget*           drw,       // The GtkDrawingArea for the Shape_draw ctor.
-			bool                 hdd = false);              // Whether the Shape should be hidden.
+			GtkWidget* shp,                                        // The ShapeID   holding GtkWidget.
+			GtkWidget* shpnm,                                      // The ShapeName holding GtkWidget.
+			bool (*shvld)(int),                                    // The ShapeUD   validating lambda.
+			GtkWidget*           frm,                              // The FrameID   holding GtkWidget.
+			int                  vgnum,                            // The D&D U7_SHAPE_xxx VGA file category.
+			Vga_file*            vg,                               // The VGA File for the Shape_draw ctor.
+			const unsigned char* palbuf,                           // The Palette for the Shape_draw ctor.
+			GtkWidget*           drw,                              // The GtkDrawingArea for the Shape_draw ctor.
+			bool                 hdd         = false,              // Whether the Shape should be hidden.
+			Trans_type           translucent = Trans_type::none    // How translucent drawing should be handled
+
+	);
 	~Shape_single() override;
 	static void     on_shape_changed(GtkWidget* widget, gpointer user_data);
 	static void     on_frame_changed(GtkWidget* widget, gpointer user_data);
@@ -188,7 +199,8 @@ public:
 			Vga_file*            vg,        // The VGA File for the Shape_draw ctor.
 			const unsigned char* palbuf,    // The Palette for the Shape_draw ctor.
 			GtkWidget*           drw,       // The GtkDrawingArea for the Shape_draw ctor.
-			bool                 hdd = false);              // Whether the Shape should be hidden.
+			bool                 hdd         = false,
+			Trans_type           translucent = Trans_type::none);    // Whether the Shape should be hidden.
 	~Shape_gump_single() override;
 	static gboolean on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, gpointer user_data);
 
@@ -217,6 +229,8 @@ protected:
 	gulong     shape_3d_z_connect;
 	GtkWidget* show_shape_3d_widget;
 	gulong     show_shape_3d_connect;
+	GtkWidget* shape_trans_widget;
+	gulong     shape_trans_connect;
 
 public:
 	Shape_shape_single(
@@ -230,7 +244,7 @@ public:
 			GtkWidget*           drw,       // The GtkDrawingArea for the Shape_draw ctor.
 			bool                 hdd = false);              // Whether the Shape should be hidden.
 	~Shape_shape_single() override;
-	void draw_shape(Shape_frame* shape, int x, int y) override;
+	void draw_shape(Shape_frame* shape, int x, int y, bool trans) override;
 
 	Shape_shape_single* get_shape_shape_single() override {
 		return this;
