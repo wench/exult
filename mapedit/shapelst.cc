@@ -152,6 +152,8 @@ void Shape_chooser::render() {
 	// Clear window first.
 	iwin->fill8(255);    // Set to background_color.
 	int curr_y = -row0_voffset;
+	const auto & xforms = ExultStudio::get_instance()->GetXform();
+	bool        is_sprites = this->ifile == ExultStudio::get_instance()->get_spritefile()->get_ifile();
 	for (unsigned rownum = row0; curr_y < winh && rownum < rows.size(); ++rownum) {
 		const Shape_row& row  = rows[rownum];
 		unsigned         cols = get_num_cols(rownum);
@@ -159,10 +161,17 @@ void Shape_chooser::render() {
 			const int    shapenum = info[index].shapenum;
 			const int    framenum = info[index].framenum;
 			Shape_frame* shape    = ifile->get_shape(shapenum, framenum);
+			
 			if (shape) {
 				const int sx = info[index].box.x - hoffset;
 				const int sy = info[index].box.y - voffset;
-				shape->paint(iwin, sx + shape->get_xleft(), sy + shape->get_yabove());
+			// Get the shapeinfo for translucency flag
+			// for sprites, transparency is always true
+				if (((shapes_file && shapes_file->get_info(shapenum).has_translucency()) || is_sprites) && xforms.size()) {
+					shape->paint_rle_translucent(iwin, sx + shape->get_xleft(), sy + shape->get_yabove(),xforms.data(),xforms.size());				
+				} else {
+					shape->paint(iwin, sx + shape->get_xleft(), sy + shape->get_yabove());
+				}
 				last_shape = shapenum;
 			}
 		}
@@ -744,10 +753,8 @@ void Shape_chooser::edit_shape_info() {
 	Shape_info*  info   = nullptr;
 	const char*  name   = nullptr;
 	if (shapes_file) {
-		// Read info. the first time.
-		if (shapes_file->read_info(studio->get_game_type(), true)) {
-			studio->set_shapeinfo_modified();
-		}
+		// Set shape info modified
+		studio->set_shapeinfo_modified();
 		if (!shapes_file->has_info(shnum)) {
 			shapes_file->set_info(shnum, Shape_info());
 		}
