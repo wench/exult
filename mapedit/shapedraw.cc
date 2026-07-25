@@ -43,6 +43,7 @@ using std::endl;
  * Base class Shape_draw : Displays a Shape or many Shapes from a .vga file.
  * -------------------------------------------------------------------------
  */
+Shape_draw* Shape_draw::list_head = nullptr;
 
 /*
  *  Blit onto screen.
@@ -195,7 +196,10 @@ Shape_draw::Shape_draw(
 		)
 		: ifile(i), draw(drw), drawgc(nullptr), drawfg(0), iwin(nullptr), palette(nullptr), drop_callback(nullptr),
 		  drop_user_data(nullptr), dragging(false) {
-	palette = new ExultRgbCmap;
+	// add this to the list
+	list_next = list_head;
+	list_head = this;
+	palette   = new ExultRgbCmap;
 	for (int i = 0; i < 256; i++) {
 		palette->colors[i] = (palbuf[3 * i] << 16) * 4 + (palbuf[3 * i + 1] << 8) * 4 + palbuf[3 * i + 2] * 4;
 	}
@@ -208,6 +212,15 @@ Shape_draw::Shape_draw(
 Shape_draw::~Shape_draw() {
 	delete palette;
 	delete iwin;
+
+	// Remove this from the linked list
+	for (Shape_draw** list = &list_head; *list; list = &(*list)->list_next) {
+		if (this == *list) {
+			*list     = list_next;
+			list_next = nullptr;
+			break;
+		}
+	}
 }
 
 /*

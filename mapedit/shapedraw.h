@@ -48,7 +48,58 @@ protected:
 	Drop_callback  drop_callback;    // Called when a shape is dropped here.
 	void*          drop_user_data;
 	bool           dragging;    // Dragging from here.
+
+private:
+	// Linked List Pointers
+
+	static Shape_draw* list_head;
+	Shape_draw*        list_next;
+
 public:
+	// A simple iterator class for the linked list
+	struct iterator {
+		Shape_draw* node;
+
+		iterator(Shape_draw* node) : node(node) {}
+
+		Shape_draw* operator*() {
+			return node;
+		}
+
+		Shape_draw* operator->() {
+			return node;
+		}
+
+		iterator& operator++(int) {
+			node = node->list_next;
+			return *this;
+		}
+
+		iterator operator++() {
+			iterator ret = *this;
+			node         = node->list_next;
+			return ret;
+		}
+
+		bool operator==(const iterator& other) {
+			return node == other.node;
+		}
+
+		bool operator!=(const iterator& other) {
+			return node != other.node;
+		}
+	};
+
+	static inline const struct {
+		iterator begin() const {
+			return list_head;
+		}
+
+		iterator end() const {
+			return nullptr;
+		}
+	} iteratable;
+
 	static const int outline_color = 249;    // Palette index of outline color
 
 	Shape_draw(Vga_file* i, const unsigned char* palbuf, GtkWidget* drw);
