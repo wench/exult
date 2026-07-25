@@ -1665,6 +1665,8 @@ void ExultStudio::set_game_path(const string& gamename, const string& modname) {
 			paperdolfile = nullptr;
 		}
 	}
+	// Make sure shapeinfo is read
+	static_cast<Shapes_vga_file*>(vgafile->get_ifile())->read_info(game_type, true);
 	Setup_text(game_type == SERPENT_ISLE, expansion, sibeta,
 			   gameinfo->get_game_language());    // Read in shape names.
 	misc_name_map.clear();
