@@ -1648,12 +1648,15 @@ void ExultStudio::set_game_path(const string& gamename, const string& modname) {
 	palbuf[3 * 255]     = (background_color >> 18) & 0x3f;
 	palbuf[3 * 255 + 1] = (background_color >> 10) & 0x3f;
 	palbuf[3 * 255 + 2] = (background_color >> 2) & 0x3f;
-	files               = new Shape_file_set();
-	vgafile             = open_shape_file("shapes.vga");
-	facefile            = open_shape_file("faces.vga");
-	fontfile            = open_shape_file("fonts.vga");
-	gumpfile            = open_shape_file("gumps.vga");
-	spritefile          = open_shape_file("sprites.vga");
+	// Load xforms after palette loaded and background colour has been set
+	load_xforms();
+
+	files      = new Shape_file_set();
+	vgafile    = open_shape_file("shapes.vga");
+	facefile   = open_shape_file("faces.vga");
+	fontfile   = open_shape_file("fonts.vga");
+	gumpfile   = open_shape_file("gumps.vga");
+	spritefile = open_shape_file("sprites.vga");
 	if (game_type == SERPENT_ISLE) {
 		paperdolfile = open_shape_file("paperdol.vga");
 	} else if (game_type == BLACK_GATE) {
@@ -2476,6 +2479,61 @@ void ExultStudio::show_unused_shapes(
 	// FIXME: gtk_text_set_point(text, 0);  // Scroll back to top.
 }
 
+void ExultStudio::load_xforms() {
+	xforms.clear();
+
+	// Find the colour nearest to the background that is index 0xFF
+	uint_fast8_t nearest_bg = 0xff;
+
+	// This code was copied from Palette::find_color()
+	// because Exult studio doesn't compile the Palette class
+	long         best_distance = LONG_MAX;
+	uint_fast8_t bgr = palbuf[255 * 3], bgg = palbuf[255 * 3 + 1], bgb = palbuf[255 * 3 + 2];
+	// Only search for colour nearest to background in non cycled colours
+	for (int i = 0; i < 0xE0; i++) {
+		// Get deltas.
+		const long dr = bgr - palbuf[3 * i];
+		const long dg = bgg - palbuf[3 * i + 1];
+		const long db = bgb - palbuf[3 * i + 2];
+		// Figure distance-squared.
+		const long dist = dr * dr + dg * dg + db * db;
+		if (dist < best_distance) {    // Better than prev?
+			nearest_bg    = i;
+			best_distance = dist;
+			if (dist == 0) {
+				// Found a perfect match so leave
+				break;
+			}
+		}
+	}
+
+	// Load xform tables
+	// Code copied from Shape_manager::load()
+
+	if (U7exists(XFORMTBL) || U7exists(PATCH_XFORMS)) {
+		// Read in translucency tables.
+		U7multifile xformfile(XFORMTBL, PATCH_XFORMS);
+		// Allow loading of all xform tables including the ones Exult can't. Shouldn't make much of a difference
+		// Minimum size of 17 so all expected tables exist
+		xforms.resize(std::max<size_t>(17, xformfile.number_of_objects()));
+		const size_t nxforms = xforms.size();
+		for (size_t i = 0; i < nxforms; i++) {
+			auto ds = xformfile.retrieve(i);
+			if (!ds.good()) {
+				// No XForm data at all. Make this XForm into an
+				// identity transformation.
+				for (size_t j = 0; j < sizeof(xforms[0].colors); j++) {
+					xforms[nxforms - 1 - i].colors[j] = static_cast<uint8>(j);
+				}
+			} else {
+				ds.read(xforms[nxforms - 1 - i].colors, sizeof(xforms[0].colors));
+			}
+			// copy the nearest background xform colour to FF
+			xforms[nxforms - 1 - i].colors[0xff] = xforms[nxforms - 1 - i].colors[nearest_bg];
+		}
+	}
+}
+
 /*
  *  Open a shape (or chunks) file in 'patch' or 'static' directory.
  *
@@ -3116,6 +3174,8 @@ void ExultStudio::save_preferences() {
 	palbuf[3 * 255]     = (background_color >> 18) & 0x3f;
 	palbuf[3 * 255 + 1] = (background_color >> 10) & 0x3f;
 	palbuf[3 * 255 + 2] = (background_color >> 2) & 0x3f;
+	// Xform loading uses background colour so reload them
+	load_xforms();
 	if (browser) {    // Repaint browser.
 		browser->set_background_color(background_color);
 	}
