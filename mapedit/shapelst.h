@@ -122,10 +122,6 @@ class Shape_chooser : public Object_browser, public Shape_draw {
 	void tell_server_shape();    // Tell Exult what shape is selected.
 	void render() override;      // Draw list.
 
-	void set_background_color(guint32 c) override {
-		Shape_draw::set_background_color(c);
-	}
-
 	void setup_info(bool savepos = true) override;
 	void setup_shapes_info();
 	void setup_frames_info();

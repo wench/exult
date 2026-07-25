@@ -3179,6 +3179,10 @@ void ExultStudio::save_preferences() {
 	if (browser) {    // Repaint browser.
 		browser->set_background_color(background_color);
 	}
+	// Update background colour of all Shape_draws
+	for (auto draw : Shape_draw::iteratable) {
+		draw->set_background_color(background_color);
+	}
 }
 
 /*
