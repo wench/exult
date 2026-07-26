@@ -440,17 +440,47 @@ void ExultStudio::on_play_button_toggled(GtkToggleButton* button, gpointer user_
 	studio->update_play_button(playing);
 }
 
-gboolean ExultStudio::on_animation_timeout(gpointer ) {
+gboolean ExultStudio::on_animation_timeout(gpointer) {
+	// Palette cycling
+	unsigned ranges[][2] = {
+			{0xfc, 3},
+            {0xf8, 4},
+            {0xf4, 4},
+            {0xf0, 4},
+            {0xe8, 8},
+            {0xe0, 8}
+    };
+	// If ranges changes update these values as needed
+	unsigned min = 0xe0, limit = 0xff;
 
-	// call animate on all shapedraws
+	for (const auto range : ranges) {
+		auto first = range[0] * 3;
+		auto cnt   = range[1] * 3;
 
-	for (auto draw : Shape_draw::iteratable)
-	{
+		unsigned char* start  = self->palbuf.get() + first;
+		unsigned char* finish = start + cnt;
+		// Shift upward.
+		std::rotate(start, finish - 3, finish);
+	}
+
+	// call animate and update palette on all shapedraws
+
+	for (auto draw : Shape_draw::iteratable) {
+		if (auto b = dynamic_cast<Object_browser*>(draw)) {
+			// If its a browser and not current do nothing
+			if (b != self->browser) {
+				continue;
+			}
+		}
+
+		if (min < limit) {
+			draw->update_palette(self->palbuf.get(), min, limit - min);
+		}
+
 		draw->animate();
 	}
 
 	return G_SOURCE_CONTINUE;
-	
 }
 
 C_EXPORT void on_tile_grid_button_toggled(GtkToggleButton* button, gpointer user_data) {
@@ -915,7 +945,7 @@ ExultStudio::ExultStudio(int argc, char** argv)
 	}
 	// start antimation timer
 	animation_timeout_id = g_timeout_add(ANIMATION_TIMEOUT_MS, on_animation_timeout, nullptr);
-	
+
 	// Set initial state for menus and toolbar - disconnected
 	update_menu_items(false);
 	int w;
