@@ -240,6 +240,22 @@ void Shape_draw::set_background_color(guint32 c) {
 	render();
 }
 
+void Shape_draw::update_palette(const unsigned char* palbuf, unsigned start, unsigned count) {
+	auto end = start + count;
+	if (end > 256 || !palbuf) {
+		return;
+	}
+	bool changed = false;
+	for (unsigned i = start; i < end; i++) {
+		guint32 c = (palbuf[3 * i] << 16) * 4 + (palbuf[3 * i + 1] << 8) * 4 + palbuf[3 * i + 2] * 4;
+		changed |= palette->colors[i] != c;
+		palette->colors[i] = c;
+	}
+	if (changed) {
+		render();
+	}
+}
+
 void Shape_draw::animate() {
 	if (animating_paused > 0) {
 		if (animating_paused != INT_MAX) {

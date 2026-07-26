@@ -160,6 +160,7 @@ public:
 	void         draw_shape_centered(int shapenum, int framenum, int& x, int& y, bool trans = false);
 	virtual void render();    // Update what gets shown.
 	void         set_background_color(guint32 c);
+	void         update_palette(const unsigned char* palbuf, unsigned start, unsigned count);
 	virtual void animate();
 	void         configure();    // Configure when created/resized.
 	// Handler for drop.
