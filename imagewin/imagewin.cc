@@ -768,9 +768,7 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 		cout << "Couldn't create display surface: " << SDL_GetError() << std::endl;
 	}
 	if (screen_texture == nullptr) {
-		screen_texture = SDL_CreateTexture(
-				screen_renderer, desktop_displaymode.format, SDL_TEXTUREACCESS_STREAMING,
-				(fill_scaler == SDLScaler ? inter_width : w), (fill_scaler == SDLScaler ? inter_height : h));
+		screen_texture = SDL_CreateTexture(screen_renderer, desktop_displaymode.format, SDL_TEXTUREACCESS_STREAMING, w, h);
 	}
 	if (screen_texture == nullptr) {
 		cout << "Couldn't create texture: " << SDL_GetError() << std::endl;
