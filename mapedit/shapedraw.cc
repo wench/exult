@@ -240,6 +240,25 @@ void Shape_draw::set_background_color(guint32 c) {
 	render();
 }
 
+void Shape_draw::animate() {
+	if (animating_paused > 0) {
+		if (animating_paused != INT_MAX) {
+			animating_paused--;
+		}
+	} else {
+		if (animation_frame == INT_MAX) {
+			// No integer wrap around to INT_MIN allowed
+			// Not likely to happen as it would take 6 years of continuous running but best to do things right
+			// resetting back to 0 may cause a discontinuity but that is better than who knows what happens if it goes negative
+			animation_frame = 0;
+		} else {
+			animation_frame++;
+		}
+		// animating_frame has changed so queue a draw by calling rander
+		render();
+	}
+}
+
 /*
  *  Configure the viewing window.
  */
@@ -404,9 +423,10 @@ static inline int extract_value(GtkWidget* widget) {
 
 Shape_single::Shape_single(
 		GtkWidget* shp, GtkWidget* shpnm, bool (*shvalid)(int), GtkWidget* frm, int vgnum, Vga_file* vg,
-		const unsigned char* palbuf, GtkWidget* drw, bool hdd, Shape_single::Trans_type translucent)
+		const unsigned char* palbuf, GtkWidget* drw, bool hdd, Shape_single::TA_type translucent, TA_type animating)
 		: Shape_draw(vg, palbuf, drw), shape(shp), shapename(shpnm), shapevalid(shvalid), frame(frm), vganum(vgnum), hide(hdd),
-		  translucent(translucent), shape_connect(0), frame_connect(0), draw_connect(0), drop_connect(0), hide_connect(0) {
+		  translucent(translucent), animating(animating), shape_connect(0), frame_connect(0), draw_connect(0), drop_connect(0),
+		  hide_connect(0) {
 	if (shape && (GTK_IS_SPIN_BUTTON(shape) || GTK_IS_ENTRY(shape))) {
 		shape_connect = g_signal_connect(G_OBJECT(shape), "changed", G_CALLBACK(Shape_single::on_shape_changed), this);
 	}
@@ -473,6 +493,10 @@ void Shape_single::on_shape_changed(GtkWidget* widget, gpointer user_data) {
 			gtk_widget_set_visible(single->draw, false);
 		}
 	}
+	// pause animating on a change
+	if (!single->IsAnimatingStopped()) {
+		single->PauseAnimating(CHANGE_ANIM_PAUSE_FRAMES);
+	}
 	single->render();
 }
 
@@ -486,6 +510,12 @@ void Shape_single::on_frame_changed(GtkWidget* widget, gpointer user_data) {
 			gtk_widget_set_visible(single->draw, false);
 		}
 	}
+
+	// pause animating on a change
+	if (!single->IsAnimatingStopped()) {
+		single->PauseAnimating(CHANGE_ANIM_PAUSE_FRAMES);
+	}
+
 	single->render();
 }
 
@@ -520,18 +550,19 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 	if ((shnum == 0) && !(single->shapevalid(0))) {
 		shnum = -1;
 	}
-	bool trans = false;
+	bool  trans     = false;
+	auto  shapesvga = dynamic_cast<Shapes_vga_file*>(single->ifile);
+	auto* shinfo    = shapesvga ? &(shapesvga->get_info(shnum)) : nullptr;
 	switch (single->translucent) {
-	case Trans_type::Enabled:
+	case TA_type::Enabled:
 		trans = true;
 		break;
 
-	case Trans_type::shapeinfo: {
+	case TA_type::shapeinfo: {
 		// Get it frm Shapeinfo
-		if (auto shapesvga = dynamic_cast<Shapes_vga_file*>(single->ifile)) {
-			// set translucent if the shape info wants it
-			const auto shinfo = shapesvga->get_info(shnum);
-			trans             = shinfo.has_translucency();
+		// set translucent if the shape info wants it
+		if (shinfo) {
+			trans = shinfo->has_translucency();
 		}
 		break;
 	}
@@ -539,6 +570,40 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 	default:
 		trans = false;
 		break;
+	}
+	bool anim = false;
+	switch (single->animating) {
+	case TA_type::Enabled:
+		anim = true;
+		break;
+
+	case TA_type::shapeinfo: {
+		// Get it from Shapeinfo
+		// set animating if the shape info wants it
+		if (shinfo) {
+			anim = shinfo->is_animated();
+		}
+		break;
+	}
+
+	default:
+		anim = false;
+		break;
+	}
+	if (anim) {
+		// makesure animation is emabled if needed
+		if (single->IsAnimatingStopped()) {
+			single->PauseAnimating(0);
+		} else {
+			// want animation and animating is enabled so update the frame number
+			int num = single->ifile->get_num_frames(shnum);
+			int af  = single->animation_frame;
+			// avoid overflow if af is near to INT_MAX
+			if (af > num) {
+				af -= num;
+			}
+			frnum = (frnum + af) % num;
+		}
 	}
 
 	// make sure there is enough space for bbox if needed
@@ -589,7 +654,7 @@ void Shape_single::on_shape_dropped(int filenum, int shapenum, int framenum, gpo
 
 Shape_gump_single::Shape_gump_single(
 		GtkWidget* shp, GtkWidget* shpnm, bool (*shvalid)(int), GtkWidget* frm, int vgnum, Vga_file* vg,
-		const unsigned char* palbuf, GtkWidget* drw, bool hdd, Trans_type translucent)
+		const unsigned char* palbuf, GtkWidget* drw, bool hdd, TA_type translucent)
 		: Shape_single(shp, shpnm, shvalid, frm, vgnum, vg, palbuf, drw, hdd, translucent), container_x_widget(nullptr),
 		  container_x_connect(0), container_y_widget(nullptr), container_y_connect(0), container_w_widget(nullptr),
 		  container_w_connect(0), container_h_widget(nullptr), container_h_connect(0), show_container_widget(nullptr),
@@ -633,6 +698,22 @@ Shape_gump_single::Shape_gump_single(
 			= g_signal_connect(G_OBJECT(show_checkmark_widget), "toggled", G_CALLBACK(Shape_gump_single::on_widget_changed), this);
 	show_checkmark_altered = g_signal_connect(
 			G_OBJECT(show_checkmark_widget), "state-flags-changed", G_CALLBACK(Shape_gump_single::on_widget_state), this);
+}
+
+Shape_single::WidgetChangedConnect::WidgetChangedConnect(
+		const char* name, const char* signal, void (*on_widget_changed)(GtkWidget* widget, gpointer user_data),
+		gpointer user_data) {
+	widget = ExultStudio::get_instance()->get_widget(name);
+	if (widget) {
+		connect = g_signal_connect(G_OBJECT(widget), signal, G_CALLBACK(on_widget_changed), user_data);
+	}
+}
+
+Shape_single::WidgetChangedConnect::~WidgetChangedConnect() {
+	if (connect) {
+		g_signal_handler_disconnect(G_OBJECT(widget), connect);
+		connect = 0;
+	}
 }
 
 Shape_gump_single::~Shape_gump_single() {
@@ -685,6 +766,7 @@ Shape_gump_single::~Shape_gump_single() {
 void Shape_gump_single::on_widget_changed(GtkWidget* widget, gpointer user_data) {
 	ignore_unused_variable_warning(widget);
 	auto* single = static_cast<Shape_gump_single*>(user_data);
+
 	gtk_widget_queue_draw(single->draw);
 }
 
@@ -728,7 +810,7 @@ gboolean Shape_gump_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cai
 		shnum = -1;
 	}
 	int x, y;
-	single->draw_shape_centered(shnum, frnum, x, y, single->translucent == Shape_single::Trans_type::Enabled);
+	single->draw_shape_centered(shnum, frnum, x, y, single->translucent == Shape_single::TA_type::Enabled);
 	if (shnum >= 0 && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(single->show_checkmark_widget))
 		&& gtk_widget_is_sensitive(GTK_WIDGET(single->show_checkmark_widget))) {
 		const int checkmark_shnum = extract_value(single->checkmark_shape_widget);
@@ -741,7 +823,7 @@ gboolean Shape_gump_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cai
 					   extract_value(single->checkmark_y_widget) + shape->get_height() - 1 - shape->get_ybelow()
 							   - check->get_height() + 1 + check->get_ybelow(),
 					   check->get_width(), check->get_height()};
-			single->draw_shape(check, x + overlay.x, y + overlay, single->translucent == Shape_single::Trans_type::Enabled);
+			single->draw_shape(check, x + overlay.x, y + overlay, single->translucent == Shape_single::TA_type::Enabled);
 		}
 	}
 	single->show(ZoomDown(area.x), ZoomDown(area.y), ZoomDown(area.width), ZoomDown(area.height));
@@ -783,65 +865,36 @@ gboolean Shape_gump_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cai
 Shape_shape_single::Shape_shape_single(
 		GtkWidget* shp, GtkWidget* shpnm, bool (*shvalid)(int), GtkWidget* frm, int vgnum, Vga_file* vg,
 		const unsigned char* palbuf, GtkWidget* drw, bool hdd)
-		: Shape_single(shp, shpnm, shvalid, frm, vgnum, vg, palbuf, drw, hdd, Shape_single::Trans_type::Disabled),
-		  shape_3d_x_widget(nullptr), shape_3d_x_connect(0), shape_3d_y_widget(nullptr), shape_3d_y_connect(0),
-		  shape_3d_z_widget(nullptr), shape_3d_z_connect(0), show_shape_3d_widget(nullptr), show_shape_3d_connect(0),
-		  shape_trans_connect(0) {
-	auto* studio         = ExultStudio::get_instance();
-	shape_3d_x_widget    = studio->get_widget("shinfo_xtiles");
-	shape_3d_y_widget    = studio->get_widget("shinfo_ytiles");
-	shape_3d_z_widget    = studio->get_widget("shinfo_ztiles");
-	show_shape_3d_widget = studio->get_widget("shinfo_tiles_preview");
-	shape_trans_widget   = studio->get_widget("shinfo_transl_check");
-	shape_3d_x_connect
-			= g_signal_connect(G_OBJECT(shape_3d_x_widget), "changed", G_CALLBACK(Shape_shape_single::on_widget_changed), this);
-	shape_3d_y_connect
-			= g_signal_connect(G_OBJECT(shape_3d_y_widget), "changed", G_CALLBACK(Shape_shape_single::on_widget_changed), this);
-	shape_3d_z_connect
-			= g_signal_connect(G_OBJECT(shape_3d_z_widget), "changed", G_CALLBACK(Shape_shape_single::on_widget_changed), this);
-	show_shape_3d_connect
-			= g_signal_connect(G_OBJECT(show_shape_3d_widget), "toggled", G_CALLBACK(Shape_shape_single::on_widget_changed), this);
-	if (shape_trans_widget) {
-		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(shape_trans_widget))) {
-			translucent = Shape_single::Trans_type::Enabled;
-		}
-		shape_trans_connect = g_signal_connect(
-				G_OBJECT(shape_trans_widget), "toggled", G_CALLBACK(Shape_shape_single::on_widget_changed), this);
-	}
-}
+		: Shape_single(
+				  shp, shpnm, shvalid, frm, vgnum, vg, palbuf, drw, hdd, Shape_single::TA_type::Disabled,
+				  Shape_single::TA_type::Disabled) {}
 
-Shape_shape_single::~Shape_shape_single() {
-	if (shape_3d_x_connect && g_signal_handler_is_connected(G_OBJECT(shape_3d_x_widget), shape_3d_x_connect)) {
-		g_signal_handler_disconnect(G_OBJECT(shape_3d_x_widget), shape_3d_x_connect);
-		shape_3d_x_connect = 0;
-	}
-	if (shape_3d_y_connect && g_signal_handler_is_connected(G_OBJECT(shape_3d_y_widget), shape_3d_y_connect)) {
-		g_signal_handler_disconnect(G_OBJECT(shape_3d_y_widget), shape_3d_y_connect);
-		shape_3d_y_connect = 0;
-	}
-	if (shape_3d_z_connect && g_signal_handler_is_connected(G_OBJECT(shape_3d_z_widget), shape_3d_z_connect)) {
-		g_signal_handler_disconnect(G_OBJECT(shape_3d_z_widget), shape_3d_z_connect);
-		shape_3d_z_connect = 0;
-	}
-	if (show_shape_3d_connect && g_signal_handler_is_connected(G_OBJECT(show_shape_3d_widget), show_shape_3d_connect)) {
-		g_signal_handler_disconnect(G_OBJECT(show_shape_3d_widget), show_shape_3d_connect);
-		show_shape_3d_connect = 0;
-	}
-	if (shape_trans_connect && g_signal_handler_is_connected(G_OBJECT(shape_trans_widget), shape_trans_connect)) {
-		g_signal_handler_disconnect(G_OBJECT(shape_trans_widget), shape_trans_connect);
-		shape_trans_connect = 0;
-	}
-}
+Shape_shape_single::~Shape_shape_single() {}
 
 void Shape_shape_single::on_widget_changed(GtkWidget* widget, gpointer user_data) {
 	ignore_unused_variable_warning(widget);
 	auto* single = static_cast<Shape_shape_single*>(user_data);
 
-	if (widget && widget == single->shape_trans_widget) {
-		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(single->shape_trans_widget))) {
-			single->translucent = Shape_single::Trans_type::Enabled;
+	if (widget && widget == single->shape_animated.widget) {
+		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(single->shape_animated.widget))) {
+			single->animating = Shape_single::TA_type::Enabled;
+			single->PauseAnimating(0);
 		} else {
-			single->translucent = Shape_single::Trans_type::Disabled;
+			single->animating = Shape_single::TA_type::Disabled;
+			single->PauseAnimating();
+		}
+	} else {
+		// if any other widget changed pause animating
+		if (!single->IsAnimatingStopped()) {
+			single->PauseAnimating(CHANGE_ANIM_PAUSE_FRAMES);
+		}
+	}
+
+	if (widget && widget == single->shape_trans.widget) {
+		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(single->shape_trans.widget))) {
+			single->translucent = Shape_single::TA_type::Enabled;
+		} else {
+			single->translucent = Shape_single::TA_type::Disabled;
 		}
 	}
 	gtk_widget_queue_draw(single->draw);
@@ -854,15 +907,15 @@ void Shape_shape_single::on_widget_state(GtkWidget* widget, GtkStateFlags flags,
 }
 
 void Shape_shape_single::draw_shape(Shape_frame* shape, int x, int y, bool trans) {
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_shape_3d_widget))) {
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_shape_3d.widget))) {
 		// draw shape
 		Shape_draw::draw_shape(shape, x, y, trans);
 		return;
 	}
 
-	int bbox_x = extract_value(shape_3d_x_widget);
-	int bbox_y = extract_value(shape_3d_y_widget);
-	int bbox_z = extract_value(shape_3d_z_widget);
+	int bbox_x = extract_value(shape_3d_x.widget);
+	int bbox_y = extract_value(shape_3d_y.widget);
+	int bbox_z = extract_value(shape_3d_z.widget);
 	int minx   = bbox_x * c_tilesize + bbox_z * c_tilesize / 2 + 1 - shape->get_xleft();
 	int miny   = bbox_y * c_tilesize + bbox_z * c_tilesize / 2 + 1 - shape->get_yabove();
 

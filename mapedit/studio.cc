@@ -440,6 +440,19 @@ void ExultStudio::on_play_button_toggled(GtkToggleButton* button, gpointer user_
 	studio->update_play_button(playing);
 }
 
+gboolean ExultStudio::on_animation_timeout(gpointer ) {
+
+	// call animate on all shapedraws
+
+	for (auto draw : Shape_draw::iteratable)
+	{
+		draw->animate();
+	}
+
+	return G_SOURCE_CONTINUE;
+	
+}
+
 C_EXPORT void on_tile_grid_button_toggled(GtkToggleButton* button, gpointer user_data) {
 	ignore_unused_variable_warning(user_data);
 	ExultStudio::get_instance()->set_tile_grid(gtk_toggle_button_get_active(button));
@@ -900,6 +913,9 @@ ExultStudio::ExultStudio(int argc, char** argv)
 				= g_signal_connect(G_OBJECT(play_button), "toggled", G_CALLBACK(ExultStudio::on_play_button_toggled), this);
 		play_button_signal_id = g_signal_lookup("toggled", GTK_TYPE_TOGGLE_BUTTON);
 	}
+	// start antimation timer
+	animation_timeout_id = g_timeout_add(ANIMATION_TIMEOUT_MS, on_animation_timeout, nullptr);
+	
 	// Set initial state for menus and toolbar - disconnected
 	update_menu_items(false);
 	int w;

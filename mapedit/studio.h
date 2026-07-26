@@ -247,6 +247,10 @@ private:
 	gulong      play_button_handler_id;
 	gulong      play_button_signal_id;
 	static void on_play_button_toggled(GtkToggleButton* button, gpointer user_data);
+	static gboolean on_animation_timeout(gpointer user_data);
+	gulong      animation_timeout_id;
+
+	constexpr static int ANIMATION_TIMEOUT_MS = 100;
 
 public:
 	Shape_info* temp_shape_info;    // Backup for preset undo
