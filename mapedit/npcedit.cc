@@ -279,7 +279,7 @@ void ExultStudio::open_npc_window(
 						return (shnum >= c_first_obj_shape) && (shnum < c_max_shapes);
 					},
 					get_widget("npc_frame"), U7_SHAPE_SHAPES, vgafile->get_ifile(), palbuf.get(), get_widget("npc_draw"), false,
-					Shape_single::Trans_type::Enabled);    // Exult always draws NPCs translucent so doing the same here
+					Shape_single::TA_type::Enabled);    // Exult always draws NPCs translucent so doing the same here
 		}
 		if (facefile && palbuf) {
 			npc_face_single = new Shape_single(

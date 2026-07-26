@@ -3973,7 +3973,7 @@ void ExultStudio::open_shape_window(
 					return shnum >= 0;
 				},
 				nullptr, U7_SHAPE_SPRITES, spritefile->get_ifile(), palbuf.get(), get_widget("shinfo_explosion_draw"), false,
-				Shape_single::Trans_type::Enabled);
+				Shape_single::TA_type::Enabled);
 	}
 	delete weapon_family_single;
 	weapon_family_single = nullptr;

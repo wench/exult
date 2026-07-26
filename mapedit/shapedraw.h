@@ -49,6 +49,11 @@ protected:
 	void*          drop_user_data;
 	bool           dragging;    // Dragging from here.
 
+	int animation_frame = 0;    // Current animation frame
+
+	int animating_paused = INT_MAX;    // Number of frames to pause animating for, While this is >0 animating_frame wont increment.
+									   // If this is INT_MAX animating is disabled
+
 private:
 	// Linked List Pointers
 
@@ -100,6 +105,28 @@ public:
 		}
 	} iteratable;
 
+	// Call with timeout <= 0 to unpause animating
+	// Call with timeout = INT_MAX to stop animating until explicitly unpaused
+	// Call with other timeout values to temporarily to pause for the specified number of frames with the animation automatically
+	// unpausing
+	void PauseAnimating(int timeout = INT_MAX, bool reset_frame = true) {
+		if (timeout < 0) {
+			timeout = 0;
+		}
+		animating_paused = timeout;
+		if (reset_frame) {
+			animation_frame = 0;
+		}
+	}
+
+	bool IsAnimatingPaused() {
+		return animating_paused > 0;
+	}
+
+	bool IsAnimatingStopped() {
+		return animating_paused == INT_MAX;
+	}
+
 	static const int outline_color = 249;    // Palette index of outline color
 
 	Shape_draw(Vga_file* i, const unsigned char* palbuf, GtkWidget* drw);
@@ -133,8 +160,8 @@ public:
 	void         draw_shape_centered(int shapenum, int framenum, int& x, int& y, bool trans = false);
 	virtual void render();    // Update what gets shown.
 	void         set_background_color(guint32 c);
-
-	void configure();    // Configure when created/resized.
+	virtual void animate();
+	void         configure();    // Configure when created/resized.
 	// Handler for drop.
 	static void drag_data_received(
 			GtkWidget* widget, GdkDragContext* context, gint x, gint y, GtkSelectionData* seldata, guint info, guint time,
@@ -160,10 +187,19 @@ class Shape_gump_single;
 
 class Shape_single : public Shape_draw {
 public:
-	enum class Trans_type {
+	enum class TA_type {
 		Disabled  = 0,
 		Enabled   = 1,
 		shapeinfo = 2,    // For a shape from Shapes.vgs, use shapeinfo to determine things
+	};
+
+	struct WidgetChangedConnect {
+		GtkWidget* widget  = nullptr;
+		gulong     connect = 0;
+		WidgetChangedConnect(
+				const char* name, const char* signal, void (*on_widget_changed)(GtkWidget* widget, gpointer user_data),
+				gpointer user_data);
+		~WidgetChangedConnect();
 	};
 
 protected:
@@ -173,7 +209,8 @@ protected:
 	GtkWidget* frame;             // The FrameID   holding GtkWidget: GtkSpinButton / GtkEntry.
 	int        vganum;            // For a Drag and Drop enabled Shape_single :
 	bool       hide;              // Whether the Shape should be hidden.
-	Trans_type translucent;       // How translucent drawing should be handled
+	TA_type    translucent;       // How translucent drawing should be handled
+	TA_type    animating;         // How shape animation should be handled
 	gulong     shape_connect;     // The Shape Widget g_signal_connect changed ID
 	gulong     frame_connect;     // The Frame Widget g_signal_connect changed ID
 	gulong     draw_connect;      // The Draw  Widget g_signal_connect draw ID
@@ -182,18 +219,21 @@ protected:
 
 public:
 	Shape_single(
-			GtkWidget* shp,                                     // The ShapeID   holding GtkWidget.
-			GtkWidget* shpnm,                                   // The ShapeName holding GtkWidget.
-			bool (*shvld)(int),                                 // The ShapeUD   validating lambda.
-			GtkWidget*           frm,                           // The FrameID   holding GtkWidget.
-			int                  vgnum,                         // The D&D U7_SHAPE_xxx VGA file category.
-			Vga_file*            vg,                            // The VGA File for the Shape_draw ctor.
-			const unsigned char* palbuf,                        // The Palette for the Shape_draw ctor.
-			GtkWidget*           drw,                           // The GtkDrawingArea for the Shape_draw ctor.
-			bool                 hdd = false,                   // Whether the Shape should be hidden.
-			Trans_type translucent   = Trans_type::shapeinfo    // How translucent drawing should be handled, defaults to shapeinfo
+			GtkWidget* shp,                                   // The ShapeID   holding GtkWidget.
+			GtkWidget* shpnm,                                 // The ShapeName holding GtkWidget.
+			bool (*shvld)(int),                               // The ShapeUD   validating lambda.
+			GtkWidget*           frm,                         // The FrameID   holding GtkWidget.
+			int                  vgnum,                       // The D&D U7_SHAPE_xxx VGA file category.
+			Vga_file*            vg,                          // The VGA File for the Shape_draw ctor.
+			const unsigned char* palbuf,                      // The Palette for the Shape_draw ctor.
+			GtkWidget*           drw,                         // The GtkDrawingArea for the Shape_draw ctor.
+			bool                 hdd = false,                 // Whether the Shape should be hidden.
+			TA_type translucent      = TA_type::shapeinfo,    // How translucent drawing should be handled, defaults to shapeinfo
+			TA_type animating        = TA_type::shapeinfo     // How shape animation should be handled, defaults to shapeinfo
 
 	);
+	constexpr static int CHANGE_ANIM_PAUSE_FRAMES = 20;
+
 	~Shape_single() override;
 	static void     on_shape_changed(GtkWidget* widget, gpointer user_data);
 	static void     on_frame_changed(GtkWidget* widget, gpointer user_data);
@@ -251,7 +291,7 @@ public:
 			const unsigned char* palbuf,    // The Palette for the Shape_draw ctor.
 			GtkWidget*           drw,       // The GtkDrawingArea for the Shape_draw ctor.
 			bool                 hdd         = false,
-			Trans_type           translucent = Trans_type::Disabled);    // Whether the Shape should be hidden.
+			TA_type              translucent = TA_type::Disabled);    // Whether the Shape should be hidden.
 	~Shape_gump_single() override;
 	static gboolean on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, gpointer user_data);
 
@@ -272,16 +312,12 @@ public:
 
 class Shape_shape_single : public Shape_single {
 protected:
-	GtkWidget* shape_3d_x_widget;
-	gulong     shape_3d_x_connect;
-	GtkWidget* shape_3d_y_widget;
-	gulong     shape_3d_y_connect;
-	GtkWidget* shape_3d_z_widget;
-	gulong     shape_3d_z_connect;
-	GtkWidget* show_shape_3d_widget;
-	gulong     show_shape_3d_connect;
-	GtkWidget* shape_trans_widget;
-	gulong     shape_trans_connect;
+	WidgetChangedConnect shape_3d_x     = {"shinfo_xtiles", "changed", on_widget_changed, this};
+	WidgetChangedConnect shape_3d_y     = {"shinfo_ytiles", "changed", on_widget_changed, this};
+	WidgetChangedConnect shape_3d_z     = {"shinfo_ztiles", "changed", on_widget_changed, this};
+	WidgetChangedConnect show_shape_3d  = {"shinfo_tiles_preview", "toggled", on_widget_changed, this};
+	WidgetChangedConnect shape_trans    = {"shinfo_transl_check", "toggled", on_widget_changed, this};
+	WidgetChangedConnect shape_animated = {"shinfo_animated_check", "toggled", on_widget_changed, this};
 
 public:
 	Shape_shape_single(
