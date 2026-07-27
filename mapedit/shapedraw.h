@@ -127,7 +127,7 @@ public:
 		return animating_paused == INT_MAX;
 	}
 
-	static const int outline_color = 249;    // Palette index of outline color
+	static const int outline_color = 50;    // Palette index of outline color
 
 	Shape_draw(Vga_file* i, const unsigned char* palbuf, GtkWidget* drw);
 	virtual ~Shape_draw();
