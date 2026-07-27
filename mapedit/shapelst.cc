@@ -153,7 +153,6 @@ void Shape_chooser::render() {
 	iwin->fill8(255);    // Set to background_color.
 	int         curr_y     = -row0_voffset;
 	const auto& xforms     = ExultStudio::get_instance()->GetXform();
-	bool        is_sprites = this->ifile == ExultStudio::get_instance()->get_spritefile()->get_ifile();
 	for (unsigned rownum = row0; curr_y < winh && rownum < rows.size(); ++rownum) {
 		const Shape_row& row  = rows[rownum];
 		unsigned         cols = get_num_cols(rownum);
@@ -166,8 +165,8 @@ void Shape_chooser::render() {
 				const int sx = info[index].box.x - hoffset;
 				const int sy = info[index].box.y - voffset;
 				// Get the shapeinfo for translucency flag
-				// for sprites, transparency is always true
-				if (((shapes_file && shapes_file->get_info(shapenum).has_translucency()) || is_sprites) && xforms.size()) {
+				// for choosers other than shapes.vga translucency is always used
+				if (((!shapes_file || shapes_file->get_info(shapenum).has_translucency())) && xforms.size()) {
 					shape->paint_rle_translucent(
 							iwin, sx + shape->get_xleft(), sy + shape->get_yabove(), xforms.data(), xforms.size());
 				} else {

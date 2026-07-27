@@ -252,7 +252,7 @@ void Shape_draw::update_palette(const unsigned char* palbuf, unsigned start, uns
 		palette->colors[i] = c;
 	}
 	if (changed) {
-		render();
+		gtk_widget_queue_draw(draw);
 	}
 }
 

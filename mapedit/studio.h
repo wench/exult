@@ -336,10 +336,6 @@ public:
 		return vgafile;
 	}
 
-	auto get_spritefile() {
-		return spritefile;
-	}
-
 	Combo_editor* get_combowin() {
 		return combowin;
 	}
