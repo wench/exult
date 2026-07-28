@@ -658,6 +658,7 @@ void Shape_single::on_state_changed(GtkWidget* widget, GtkStateFlags flags, gpoi
 
 gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, gpointer user_data) {
 	ignore_unused_variable_warning(widget);
+	auto         studio = ExultStudio::get_instance();
 	auto*        single = static_cast<Shape_single*>(user_data);
 	GdkRectangle area   = {0, 0, 0, 0};
 	gdk_cairo_get_clip_rectangle(cairo, &area);
@@ -680,9 +681,10 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 	auto  shapesvga = dynamic_cast<Shapes_vga_file*>(single->ifile);
 	auto* shinfo    = shapesvga ? &(shapesvga->get_info(shnum)) : nullptr;
 	switch (single->translucent) {
-	case TA_type::Enabled:
+	case TA_type::Enabled: {
 		trans = true;
 		break;
+	}
 
 	case TA_type::shapeinfo: {
 		// Get it frm Shapeinfo
@@ -693,14 +695,21 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 		break;
 	}
 
+	case TA_type::widget: {
+		trans = studio->get_toggle("shinfo_transl_check");
+		break;
+	}
+
 	default:
 		trans = false;
 		break;
 	}
+
 	Animation_info simpleai;
 	int            num_frames = shnum > 0 ? single->ifile->get_num_frames(shnum) : 0;
 	simpleai.set(Animation_info::AniType::FA_LOOPING);
 	auto animinfo = single->aniinf;
+
 	switch (single->animating) {
 	case TA_type::Enabled:
 		if (!animinfo) {
@@ -719,7 +728,12 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 				}
 			}
 		}
-		break;
+	case TA_type::widget: {
+		if (!studio->get_toggle("shinfo_animated_check")) {
+			animinfo = nullptr;
+		}
+
+	} break;
 	}
 
 	default:
@@ -727,6 +741,7 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 		;
 		break;
 	}
+
 	if (animinfo) {
 		// makesure animation is emabled if needed
 		if (single->IsAnimatingStopped()) {
