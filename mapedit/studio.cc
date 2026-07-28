@@ -467,8 +467,8 @@ gboolean ExultStudio::on_animation_timeout(gpointer) {
 
 	for (auto draw : Shape_draw::iteratable) {
 		if (auto b = dynamic_cast<Object_browser*>(draw)) {
-			// If its a browser and not current do nothing
-			if (b != self->browser) {
+			// If its a browser and doesn't have a parent do nothing
+			if (!gtk_widget_get_parent(b->get_widget())) {
 				continue;
 			}
 		}
