@@ -99,7 +99,7 @@ void Shape_draw::show(
  */
 
 void Shape_draw::draw_shape(Shape_frame* shape, int x, int y, bool trans) {
-	if (trans) {
+	if (trans && shape->is_rle()) {
 		const auto& xform = ExultStudio::get_instance()->GetXform();
 		shape->paint_rle_translucent(iwin, x + shape->get_xleft(), y + shape->get_yabove(), xform.data(), xform.size());
 	} else {
@@ -1191,7 +1191,7 @@ GdkPixbuf* ExultStudio::shape_image(Vga_file* shpfile, int shnum, int frnum, boo
 	Image_buffer8 tbuf(w, h);    // Create buffer to render to.
 	tbuf.fill8(0xff);            // Fill with 'transparent' pixel.
 	unsigned char* tbits = tbuf.get_bits();
-	if (!translucent) {
+	if (!translucent || !shape->is_rle()) {
 		shape->paint(&tbuf, w - 1 - xright, h - 1 - ybelow);
 	} else {
 		shape->paint_rle_translucent(&tbuf, w - 1 - xright, h - 1 - ybelow, xforms.data(), xforms.size());
