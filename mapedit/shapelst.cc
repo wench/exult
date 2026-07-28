@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "shapelst.h"
 
+#include "aniinf.h"
 #include "databuf.h"
 #include "fontgen.h"
 #include "frnameinf.h"
@@ -151,15 +152,35 @@ void Shape_chooser::render() {
 	const gint winh = ZoomDown(alloc.height);
 	// Clear window first.
 	iwin->fill8(255);    // Set to background_color.
-	int         curr_y     = -row0_voffset;
-	const auto& xforms     = ExultStudio::get_instance()->GetXform();
+	int         curr_y = -row0_voffset;
+	const auto& xforms = ExultStudio::get_instance()->GetXform();
 	for (unsigned rownum = row0; curr_y < winh && rownum < rows.size(); ++rownum) {
 		const Shape_row& row  = rows[rownum];
 		unsigned         cols = get_num_cols(rownum);
 		for (unsigned index = row.index0; cols; --cols, ++index) {
-			const int    shapenum = info[index].shapenum;
-			const int    framenum = info[index].framenum;
-			Shape_frame* shape    = ifile->get_shape(shapenum, framenum);
+			const int shapenum = info[index].shapenum;
+			int       framenum = info[index].framenum;
+			if (shapes_file) {
+				auto& shinfo = shapes_file->get_info(shapenum);
+				// do not do animation in all frames ,ode
+				if (!frames_mode && shinfo.is_animated()) {
+					// makesure animation is emabled if needed
+					if (IsAnimatingStopped()) {
+						PauseAnimating(0);
+					} else {
+						auto nframes = shapes_file->get_num_frames(shapenum);
+
+						if (auto animinfo = shinfo.get_animation_info()) {
+							framenum = GetAnimInfoFrame(animinfo, framenum, nframes);
+						} else {
+							Animation_info simpleai;
+							simpleai.set(Animation_info::AniType::FA_LOOPING, nframes);
+							framenum = GetAnimInfoFrame(&simpleai, framenum, nframes);
+						}
+					}
+				}
+			}
+			Shape_frame* shape = ifile->get_shape(shapenum, framenum);
 
 			if (shape) {
 				const int sx = info[index].box.x - hoffset;
@@ -278,11 +299,22 @@ void Shape_chooser::setup_shapes_info() {
 		const int    shapenum = group ? (*group)[index] : index;
 		const int    framenum = shapenum == selshape ? selframe : framenum0;
 		Shape_frame* shape    = ifile->get_shape(shapenum, framenum);
-		if (!shape) {
+
+		int sh = shape ? shape->get_height() : 0;
+		int sw = shape ? shape->get_width() : 0;
+		// if animated shape in shapes.vga set width and height to max of all frames
+		if (shapes_file && shapes_file->get_info(shapenum).is_animated()) {
+			int num_frames = shapes_file->get_num_frames(shapenum);
+			for (int f = 0; f < num_frames; f++) {
+				if (auto sf = ifile->get_shape(shapenum, f)) {
+					sh = std::max(sh, sf->get_height());
+					sw = std::max(sw, sf->get_width());
+				}
+			}
+		}
+		if (sh == 0 && sw == 0) {
 			continue;
 		}
-		const int sh = shape->get_height();
-		const int sw = shape->get_width();
 		// Check if we've exceeded max width
 		if (x + sw > winw && x) {    // But don't leave row empty.
 			// Next line.
@@ -2009,6 +2041,8 @@ void Shape_chooser::frame_changed(
 		if (chooser->frames_mode) {    // Get sel. frame in view.
 			chooser->scroll_to_frame();
 		}
+		chooser->PauseAnimating(CHANGE_ANIM_PAUSE_FRAMES);
+
 		chooser->render();
 		chooser->update_statusbar();
 	}
@@ -2024,8 +2058,10 @@ void Shape_chooser::all_frames_toggled(GtkToggleButton* btn, gpointer data) {
 	chooser->frames_mode = on;
 	if (on) {    // Frame => show horiz. scrollbar.
 		gtk_widget_set_visible(chooser->hscroll, true);
+		chooser->PauseAnimating();
 	} else {
 		gtk_widget_set_visible(chooser->hscroll, false);
+		chooser->PauseAnimating(0);
 	}
 	int indx  = -1;
 	int shnum = -1;
