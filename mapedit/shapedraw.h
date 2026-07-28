@@ -196,6 +196,7 @@ public:
 		Disabled  = 0,
 		Enabled   = 1,
 		shapeinfo = 2,    // For a shape from Shapes.vgs, use shapeinfo to determine things
+		widget    = 3,    // use the checkbox from the shapeinfo widget
 	};
 
 	struct WidgetChangedConnect {
