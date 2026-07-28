@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 class Vga_file;
 class Shape_frame;
 class Image_buffer8;
+class Animation_info;
 
 using Drop_callback = void (*)(int filenum, int shapenum, int framenum, void* udata);
 
@@ -119,6 +120,8 @@ public:
 		}
 	}
 
+	constexpr static int CHANGE_ANIM_PAUSE_FRAMES = 20;
+
 	bool IsAnimatingPaused() {
 		return animating_paused > 0;
 	}
@@ -129,6 +132,7 @@ public:
 
 	static const int outline_color = 50;    // Palette index of outline color
 
+	int GetAnimInfoFrame(const Animation_info* aniinfm, unsigned short first_frame, unsigned short nframes);
 	Shape_draw(Vga_file* i, const unsigned char* palbuf, GtkWidget* drw);
 	virtual ~Shape_draw();
 
@@ -207,16 +211,17 @@ protected:
 	GtkWidget* shape;             // The ShapeID   holding GtkWidget: GtkSpinButton / GtkEntry, or GtkFrame ( NPCEditor NPC Face ).
 	GtkWidget* shapename;         // The ShapeName holding GtkLabel.
 	bool (*shapevalid)(int s);    // The ShapeID   validating lambda.
-	GtkWidget* frame;             // The FrameID   holding GtkWidget: GtkSpinButton / GtkEntry.
-	int        vganum;            // For a Drag and Drop enabled Shape_single :
-	bool       hide;              // Whether the Shape should be hidden.
-	TA_type    translucent;       // How translucent drawing should be handled
-	TA_type    animating;         // How shape animation should be handled
-	gulong     shape_connect;     // The Shape Widget g_signal_connect changed ID
-	gulong     frame_connect;     // The Frame Widget g_signal_connect changed ID
-	gulong     draw_connect;      // The Draw  Widget g_signal_connect draw ID
-	gulong     drop_connect;      // The Draw  Widget g_signal_connect drop ID
-	gulong     hide_connect;      // The Hide  Widget g_signal_connect changed ID
+	GtkWidget*            frame;               // The FrameID   holding GtkWidget: GtkSpinButton / GtkEntry.
+	int                   vganum;              // For a Drag and Drop enabled Shape_single :
+	bool                  hide;                // Whether the Shape should be hidden.
+	TA_type               translucent;         // How translucent drawing should be handled
+	TA_type               animating;           // How shape animation should be handled
+	const Animation_info* aniinf = nullptr;    // Ifset use this for animation if animating is not Disabled
+	gulong                shape_connect;       // The Shape Widget g_signal_connect changed ID
+	gulong                frame_connect;       // The Frame Widget g_signal_connect changed ID
+	gulong                draw_connect;        // The Draw  Widget g_signal_connect draw ID
+	gulong                drop_connect;        // The Draw  Widget g_signal_connect drop ID
+	gulong                hide_connect;        // The Hide  Widget g_signal_connect changed ID
 
 public:
 	Shape_single(
@@ -233,7 +238,6 @@ public:
 			TA_type animating        = TA_type::shapeinfo     // How shape animation should be handled, defaults to shapeinfo
 
 	);
-	constexpr static int CHANGE_ANIM_PAUSE_FRAMES = 20;
 
 	~Shape_single() override;
 	static void     on_shape_changed(GtkWidget* widget, gpointer user_data);
@@ -313,12 +317,24 @@ public:
 
 class Shape_shape_single : public Shape_single {
 protected:
-	WidgetChangedConnect shape_3d_x     = {"shinfo_xtiles", "changed", on_widget_changed, this};
-	WidgetChangedConnect shape_3d_y     = {"shinfo_ytiles", "changed", on_widget_changed, this};
-	WidgetChangedConnect shape_3d_z     = {"shinfo_ztiles", "changed", on_widget_changed, this};
-	WidgetChangedConnect show_shape_3d  = {"shinfo_tiles_preview", "toggled", on_widget_changed, this};
-	WidgetChangedConnect shape_trans    = {"shinfo_transl_check", "toggled", on_widget_changed, this};
-	WidgetChangedConnect shape_animated = {"shinfo_animated_check", "toggled", on_widget_changed, this};
+	WidgetChangedConnect shape_3d_x    = {"shinfo_xtiles", "changed", on_widget_changed, this};
+	WidgetChangedConnect shape_3d_y    = {"shinfo_ytiles", "changed", on_widget_changed, this};
+	WidgetChangedConnect shape_3d_z    = {"shinfo_ztiles", "changed", on_widget_changed, this};
+	WidgetChangedConnect show_shape_3d = {"shinfo_tiles_preview", "toggled", on_widget_changed, this};
+	WidgetChangedConnect shape_trans   = {"shinfo_transl_check", "toggled", on_widget_changed, this};
+
+	WidgetChangedConnect shape_animated                = {"shinfo_animated_check", "toggled", on_widget_changed, this};
+	WidgetChangedConnect shinfo_animation_check        = {"shinfo_animation_check", "toggled", on_widget_changed, this};
+	WidgetChangedConnect shinfo_animation_frcount      = {"shinfo_animation_frcount", "changed", on_widget_changed, this};
+	WidgetChangedConnect shinfo_animation_frtype       = {"shinfo_animation_frtype", "toggled", on_widget_changed, this};
+	WidgetChangedConnect shinfo_animation_type         = {"shinfo_animation_type", "changed", on_widget_changed, this};
+	WidgetChangedConnect shinfo_animation_ticks        = {"shinfo_animation_ticks", "changed", on_widget_changed, this};
+	WidgetChangedConnect shinfo_animation_freezefirst  = {"shinfo_animation_freezefirst", "changed", on_widget_changed, this};
+	WidgetChangedConnect shinfo_animation_rectype      = {"shinfo_animation_rectype", "toggled", on_widget_changed, this};
+	WidgetChangedConnect shinfo_animation_recycle      = {"shinfo_animation_recycle", "changed", on_widget_changed, this};
+	WidgetChangedConnect shinfo_animation_freezechance = {"shinfo_animation_freezechance", "changed", on_widget_changed, this};
+
+	std::unique_ptr<Animation_info> up_aniinf;
 
 public:
 	Shape_shape_single(
@@ -340,6 +356,7 @@ public:
 
 	static void on_widget_changed(GtkWidget* widget, gpointer user_data);
 	static void on_widget_state(GtkWidget* widget, GtkStateFlags flags, gpointer user_data);
+	void        setup_aniinf();
 };
 
 #endif
