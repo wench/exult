@@ -861,7 +861,7 @@ Shape_single::WidgetChangedConnect::WidgetChangedConnect(
 }
 
 Shape_single::WidgetChangedConnect::~WidgetChangedConnect() {
-	if (connect) {
+	if (connect && g_signal_handler_is_connected(G_OBJECT(widget), connect)) {
 		g_signal_handler_disconnect(G_OBJECT(widget), connect);
 		connect = 0;
 	}
