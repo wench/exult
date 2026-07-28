@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "shapedraw.h"
 
+#include "aniinf.h"
 #include "ibuf8.h"
 #include "shapefile.h"
 #include "shapeinf.h"
@@ -221,6 +222,115 @@ Shape_draw::~Shape_draw() {
 			break;
 		}
 	}
+}
+
+// Get animated frame using an Animation_info object
+
+int Shape_draw::GetAnimInfoFrame(const Animation_info* aniinf, unsigned short first_frame, unsigned short shape_frames) {
+	//
+	// Variables that represent the fields in the Frame_animator class
+	//
+	unsigned short currpos;          // Current position in the animation.
+	unsigned short nframes;          // Number of frames in cycle.
+	unsigned short frame_counter;    // When to increase frame.
+	unsigned short last_frame;       // To check if we need to re init
+
+	//
+	// Code from Frame_animator::Initialize
+	//
+	unsigned short initial = first_frame;
+	last_frame             = first_frame & ~(1 << 5);
+
+	const int cnt = aniinf->get_frame_count();
+	if (cnt < 0) {
+		nframes = shape_frames;
+	} else {
+		nframes = cnt;
+	}
+	if (nframes == shape_frames) {
+		first_frame = 0;
+	} else {
+		first_frame = last_frame - (last_frame % nframes);
+	}
+	// Ensure proper bounds.
+	if (first_frame + nframes >= shape_frames) {
+		nframes = shape_frames - first_frame;
+	}
+	assert(nframes > 0);
+
+	frame_counter = aniinf->get_frame_delay();
+
+	//
+	// Code from Frame_animator::get_next_frame
+	//
+	if (nframes == 1 || IsAnimatingPaused()) {    // No reason to do anything else.
+		return initial;
+	}
+
+	int framenum;
+	switch (aniinf->get_type()) {
+	case Animation_info::FA_HOURLY:
+		// Use 10 real seconds to represent an hour here
+		// An hour in game is 150 secomnds or 2 and a half minutes
+		// That is way too long to reasonably replicate here
+		framenum = ((animation_frame / 100) + initial) % nframes;
+		break;
+
+	case Animation_info::FA_NON_LOOPING:
+		currpos = animation_frame + initial;
+		if (currpos >= nframes) {
+			currpos = nframes - 1;
+		}
+		framenum = first_frame + currpos;
+		break;
+
+	case Animation_info::FA_TIMESYNCHED: {
+		currpos = animation_frame / aniinf->get_frame_delay() + initial;
+		currpos %= nframes;
+		framenum = first_frame + currpos;
+		break;
+	}
+
+	case Animation_info::FA_LOOPING:
+	default: {
+		// No random freeze first here
+		if (aniinf->get_freeze_first_chance() != 0 || initial != 0) {
+			currpos              = animation_frame + initial;
+			const int rec        = aniinf->get_recycle();
+			auto      first_rec  = nframes - rec;
+			int       loop_start = 0;
+			bool      looped     = false;
+			if (rec && currpos > first_rec) {
+				currpos -= first_rec;
+				loop_start = first_rec;
+				looped     = currpos >= rec;
+				currpos %= rec;
+				currpos += first_rec;
+			} else {
+				looped = currpos >= nframes;
+				currpos %= nframes;
+			}
+			// if it has looped and the loop start is zero and it should pause on zero indefinitely
+			// set frame to 0
+			if (looped && loop_start == 0 && aniinf->get_freeze_first_chance() == 0) {
+				framenum = 0;
+
+			} else {
+				framenum = first_frame + currpos;
+			}
+		} else {
+			framenum = initial;
+		}
+		break;
+	}
+
+	case Animation_info::FA_RANDOM_FRAMES:
+		currpos  = rand() % nframes;
+		framenum = first_frame + currpos;
+		break;
+	}
+
+	return framenum;
 }
 
 /*
@@ -587,38 +697,42 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 		trans = false;
 		break;
 	}
-	bool anim = false;
+	Animation_info simpleai;
+	int            num_frames = shnum > 0 ? single->ifile->get_num_frames(shnum) : 0;
+	simpleai.set(Animation_info::AniType::FA_LOOPING);
+	auto animinfo = single->aniinf;
 	switch (single->animating) {
 	case TA_type::Enabled:
-		anim = true;
+		if (!animinfo) {
+			animinfo = &simpleai;
+		}
 		break;
 
 	case TA_type::shapeinfo: {
 		// Get it from Shapeinfo
 		// set animating if the shape info wants it
 		if (shinfo) {
-			anim = shinfo->is_animated();
+			if (!animinfo && shinfo->is_animated()) {
+				animinfo = shinfo->get_animation_info();
+				if (!animinfo) {
+					animinfo = &simpleai;
+				}
+			}
 		}
 		break;
 	}
 
 	default:
-		anim = false;
+		animinfo = nullptr;
+		;
 		break;
 	}
-	if (anim) {
+	if (animinfo) {
 		// makesure animation is emabled if needed
 		if (single->IsAnimatingStopped()) {
 			single->PauseAnimating(0);
 		} else {
-			// want animation and animating is enabled so update the frame number
-			int num = single->ifile->get_num_frames(shnum);
-			int af  = single->animation_frame;
-			// avoid overflow if af is near to INT_MAX
-			if (af > num) {
-				af -= num;
-			}
-			frnum = (frnum + af) % num;
+			frnum = single->GetAnimInfoFrame(animinfo, frnum, num_frames);
 		}
 	}
 
@@ -883,7 +997,9 @@ Shape_shape_single::Shape_shape_single(
 		const unsigned char* palbuf, GtkWidget* drw, bool hdd)
 		: Shape_single(
 				  shp, shpnm, shvalid, frm, vgnum, vg, palbuf, drw, hdd, Shape_single::TA_type::Disabled,
-				  Shape_single::TA_type::Disabled) {}
+				  Shape_single::TA_type::Disabled) {
+	setup_aniinf();
+}
 
 Shape_shape_single::~Shape_shape_single() {}
 
@@ -913,6 +1029,8 @@ void Shape_shape_single::on_widget_changed(GtkWidget* widget, gpointer user_data
 			single->translucent = Shape_single::TA_type::Disabled;
 		}
 	}
+	single->setup_aniinf();
+
 	gtk_widget_queue_draw(single->draw);
 }
 
@@ -920,6 +1038,56 @@ void Shape_shape_single::on_widget_state(GtkWidget* widget, GtkStateFlags flags,
 	ignore_unused_variable_warning(widget, flags);
 	auto* single = static_cast<Shape_shape_single*>(user_data);
 	gtk_widget_queue_draw(single->draw);
+}
+
+void Shape_shape_single::setup_aniinf() {
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(shape_animated.widget))) {
+		animating = Shape_single::TA_type::Disabled;
+		PauseAnimating();
+		aniinf = nullptr;
+	} else {
+		animating = Shape_single::TA_type::Enabled;
+		PauseAnimating(CHANGE_ANIM_PAUSE_FRAMES);
+		if (!up_aniinf) {
+			up_aniinf = std::make_unique<Animation_info>();
+		}
+		aniinf = up_aniinf.get();
+		if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(shinfo_animation_check.widget))) {
+			// shinfo_animation_check isn't checked, the widget values are in an unspecified state
+			// and should not be used. use a generic looping aniinf
+			up_aniinf->set(Animation_info::FA_LOOPING);
+			return;
+		}
+
+		auto type = static_cast<Animation_info::AniType>(gtk_combo_box_get_active(GTK_COMBO_BOX(shinfo_animation_type.widget)));
+		up_aniinf->set_type(type);
+		const int count   = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(shinfo_animation_frcount.widget));
+		int       shnum   = extract_value(shape);
+		const int nframes = ifile->get_num_frames(shnum);
+		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(shinfo_animation_frtype.widget)) || count == nframes) {
+			up_aniinf->set_frame_count(-1);
+		} else {
+			up_aniinf->set_frame_count(count);
+		}
+		if (type != Animation_info::FA_NON_LOOPING) {
+			up_aniinf->set_frame_delay(gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(shinfo_animation_ticks.widget)));
+			if (type == Animation_info::FA_LOOPING) {
+				const int menu   = gtk_combo_box_get_active(GTK_COMBO_BOX(shinfo_animation_freezefirst.widget));
+				const int chance = menu == 0 ? 100
+											 : (menu == 1 ? 0
+														  : gtk_spin_button_get_value_as_int(
+																	GTK_SPIN_BUTTON(shinfo_animation_freezechance.widget)));
+				up_aniinf->set_freeze_first_chance(chance);
+				int rec;
+				if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(shinfo_animation_rectype.widget))) {
+					rec = nframes;
+				} else {
+					rec = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(shinfo_animation_recycle.widget));
+				}
+				up_aniinf->set_recycle(rec == nframes ? 0 : rec);
+			}
+		}
+	}
 }
 
 void Shape_shape_single::draw_shape(Shape_frame* shape, int x, int y, bool trans) {
