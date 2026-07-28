@@ -163,7 +163,7 @@ void Shape_chooser::render() {
 			if (shapes_file) {
 				auto& shinfo = shapes_file->get_info(shapenum);
 				// do not do animation in all frames ,ode
-				if (!frames_mode && shinfo.is_animated()) {
+				if (!frames_mode && shinfo.is_animated() && ExultStudio::IsShapeAnimationEnabled()) {
 					// makesure animation is emabled if needed
 					if (IsAnimatingStopped()) {
 						PauseAnimating(0);
@@ -304,7 +304,7 @@ void Shape_chooser::setup_shapes_info() {
 		// }
 		int sh = shape ? shape->get_height() : 0;
 		int sw = shape ? shape->get_width() : 0;
-		// if animated shape in shapes.vga set width and height to max of all frames
+		// if animated shape in shapes.vga set width and height to max of all frames even if animation is disabled
 		if (shapes_file && shapes_file->get_info(shapenum).is_animated()) {
 			int num_frames = shapes_file->get_num_frames(shapenum);
 			for (int f = 0; f < num_frames; f++) {
