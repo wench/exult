@@ -252,6 +252,10 @@ private:
 
 	constexpr static int ANIMATION_TIMEOUT_MS = 100;
 
+	bool animating_shapes    = true;
+	bool palette_cycling     = true;
+	bool translucent_drawing = true;
+
 public:
 	Shape_info* temp_shape_info;    // Backup for preset undo
 
@@ -670,6 +674,10 @@ public:
 	}
 
 	BaseGameInfo* get_game() const;
+
+	static bool IsShapeAnimationEnabled() {
+		return self->animating_shapes;
+	}
 };
 
 // Utilities:

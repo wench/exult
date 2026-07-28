@@ -441,43 +441,50 @@ void ExultStudio::on_play_button_toggled(GtkToggleButton* button, gpointer user_
 }
 
 gboolean ExultStudio::on_animation_timeout(gpointer) {
-	// Palette cycling
-	unsigned ranges[][2] = {
-			{0xfc, 3},
-            {0xf8, 4},
-            {0xf4, 4},
-            {0xf0, 4},
-            {0xe8, 8},
-            {0xe0, 8}
-    };
-	// If ranges changes update these values as needed
-	unsigned min = 0xe0, limit = 0xff;
+	unsigned min = UINT_MAX, limit = 0;
 
-	for (const auto range : ranges) {
-		auto first = range[0] * 3;
-		auto cnt   = range[1] * 3;
+	if (self->palette_cycling) {
+		const unsigned ranges[][2] = {
+				{0xfc, 3},
+                {0xf8, 4},
+                {0xf4, 4},
+                {0xf0, 4},
+                {0xe8, 8},
+                {0xe0, 8}
+        };
 
-		unsigned char* start  = self->palbuf.get() + first;
-		unsigned char* finish = start + cnt;
-		// Shift upward.
-		std::rotate(start, finish - 3, finish);
+		for (const auto range : ranges) {
+			auto first = range[0] * 3;
+			auto cnt   = range[1] * 3;
+
+			min   = std::min(min, range[0]);
+			limit = std::max(limit, range[0] + range[1]);
+
+			unsigned char* start  = self->palbuf.get() + first;
+			unsigned char* finish = start + cnt;
+			// Shift upward.
+			std::rotate(start, finish - 3, finish);
+		}
 	}
-
 	// call animate and update palette on all shapedraws
 
-	for (auto draw : Shape_draw::iteratable) {
-		if (auto b = dynamic_cast<Object_browser*>(draw)) {
-			// If its a browser and doesn't have a parent do nothing
-			if (!gtk_widget_get_parent(b->get_widget())) {
-				continue;
+	if (self->animating_shapes || self->palette_cycling) {
+		for (auto draw : Shape_draw::iteratable) {
+			if (auto b = dynamic_cast<Object_browser*>(draw)) {
+				// If its a browser and doesn't have a parent do nothing
+				if (!gtk_widget_get_parent(b->get_widget())) {
+					continue;
+				}
+			}
+
+			if (min < limit) {
+				draw->update_palette(self->palbuf.get(), min, limit - min);
+			}
+
+			if (self->animating_shapes) {
+				draw->animate();
 			}
 		}
-
-		if (min < limit) {
-			draw->update_palette(self->palbuf.get(), min, limit - min);
-		}
-
-		draw->animate();
 	}
 
 	return G_SOURCE_CONTINUE;
@@ -840,6 +847,11 @@ ExultStudio::ExultStudio(int argc, char** argv)
 	config->value("config/disk/data_path", data_path, EXULT_DATADIR);
 	setup_data_dir(data_path, argv[0]);
 	string datastr;
+
+	config->value("config/estudio/animating_shapes", animating_shapes, animating_shapes);
+	config->value("config/estudio/palette_cycling", palette_cycling, palette_cycling);
+	config->value("config/estudio/translucent_drawing", translucent_drawing, translucent_drawing);
+
 #ifdef MACOSX
 	if (is_system_path_defined("<BUNDLE>")) {
 		datastr = get_system_path("<BUNDLE>");
@@ -2527,7 +2539,10 @@ void ExultStudio::show_unused_shapes(
 
 void ExultStudio::load_xforms() {
 	xforms.clear();
-
+	// If Translucemcy is disabled, do nothing other than clearing the vector
+	if (!translucent_drawing) {
+		return;
+	}
 	// Find the colour nearest to the background that is index 0xFF
 	uint_fast8_t nearest_bg = 0xff;
 
@@ -3191,7 +3206,14 @@ void ExultStudio::open_preferences() {
 	g_object_set_data(G_OBJECT(backgrnd), "user_data", reinterpret_cast<gpointer>(uintptr(background_color)));
 	GtkWidget* win = get_widget("prefs_window");
 	g_signal_connect(G_OBJECT(get_widget("prefs_background")), "draw", G_CALLBACK(on_prefs_background_expose_event), this);
+
+	set_toggle("prefs_transl", translucent_drawing);
+	set_toggle("prefs_palcyc", palette_cycling);
+	set_toggle("prefs_animsh", animating_shapes);
+
 	gtk_widget_set_visible(win, true);
+
+	//	ExultStudio::IsShapeAnimationEnabled()
 }
 
 /*
@@ -3202,25 +3224,34 @@ void ExultStudio::save_preferences() {
 	const char* text = get_text_entry("prefs_image_editor");
 	g_free(image_editor);
 	image_editor = g_strdup(text);
-	config->set("config/estudio/image_editor", image_editor, true);
+	config->set("config/estudio/image_editor", image_editor, false);
 	// Save image type from combobox: 0 = .PNG, 1 = .SHP
 	int         ftype_index = get_optmenu("prefs_image_type");
 	const char* ftype_str   = (ftype_index == 1) ? ".SHP" : ".PNG";
 	g_free(edit_filetype);
 	edit_filetype = g_strdup(ftype_str);
-	config->set("config/estudio/edit_filetype", edit_filetype, true);
+	config->set("config/estudio/edit_filetype", edit_filetype, false);
 	text = get_text_entry("prefs_default_game");
 	g_free(default_game);
 	default_game = g_strdup(text);
-	config->set("config/estudio/default_game", default_game, true);
+	config->set("config/estudio/default_game", default_game, false);
 	GtkWidget* backgrnd = get_widget("prefs_background");
 	set_background_color(reinterpret_cast<uintptr>(g_object_get_data(G_OBJECT(backgrnd), "user_data")));
-	config->set("config/estudio/background_color", background_color, true);
+	config->set("config/estudio/background_color", background_color, false);
 	// Set background color.
-	palbuf[3 * 255]     = (background_color >> 18) & 0x3f;
-	palbuf[3 * 255 + 1] = (background_color >> 10) & 0x3f;
-	palbuf[3 * 255 + 2] = (background_color >> 2) & 0x3f;
-	// Xform loading uses background colour so reload them
+	palbuf[3 * 255]                 = (background_color >> 18) & 0x3f;
+	palbuf[3 * 255 + 1]             = (background_color >> 10) & 0x3f;
+	palbuf[3 * 255 + 2]             = (background_color >> 2) & 0x3f;
+	translucent_drawing             = get_toggle("prefs_transl");
+	palette_cycling                 = get_toggle("prefs_palcyc");
+	const bool was_animating_shapes = animating_shapes;
+	animating_shapes                = get_toggle("prefs_animsh");
+	config->set("config/estudio/translucent_drawing", translucent_drawing ? "yes" : "no", false);
+	config->set("config/estudio/palette_cycling", palette_cycling ? "yes" : "no", false);
+	config->set("config/estudio/animating_shapes", animating_shapes ? "yes" : "no", false);
+	config->write_back();
+
+	// Xform loading uses background colour and translucent rendering options so reload them
 	load_xforms();
 	if (browser) {    // Repaint browser.
 		browser->set_background_color(background_color);
@@ -3228,6 +3259,11 @@ void ExultStudio::save_preferences() {
 	// Update background colour of all Shape_draws
 	for (auto draw : Shape_draw::iteratable) {
 		draw->set_background_color(background_color);
+		auto* chooser = dynamic_cast<Shape_chooser*>(draw);
+		// animating_shapes setting changed so call setup_info on Shape_chooser to resize animated shapes to match the setting change
+		if (was_animating_shapes != animating_shapes && chooser) {
+			chooser->setup_info();
+		}
 	}
 }
 

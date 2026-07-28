@@ -227,6 +227,9 @@ Shape_draw::~Shape_draw() {
 // Get animated frame using an Animation_info object
 
 int Shape_draw::GetAnimInfoFrame(const Animation_info* aniinf, unsigned short first_frame, unsigned short shape_frames) {
+	if (!ExultStudio::IsShapeAnimationEnabled()) {
+		return first_frame;
+	}
 	//
 	// Variables that represent the fields in the Frame_animator class
 	//
@@ -710,43 +713,47 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 	simpleai.set(Animation_info::AniType::FA_LOOPING);
 	auto animinfo = single->aniinf;
 
-	switch (single->animating) {
-	case TA_type::Enabled:
-		if (!animinfo) {
-			animinfo = &simpleai;
-		}
-		break;
+	if (ExultStudio::IsShapeAnimationEnabled()) {
+		switch (single->animating) {
+		case TA_type::Enabled:
+			if (!animinfo) {
+				animinfo = &simpleai;
+			}
+			break;
 
-	case TA_type::shapeinfo: {
-		// Get it from Shapeinfo
-		// set animating if the shape info wants it
-		if (shinfo) {
-			if (!animinfo && shinfo->is_animated()) {
-				animinfo = shinfo->get_animation_info();
-				if (!animinfo) {
-					animinfo = &simpleai;
+		case TA_type::shapeinfo: {
+			// Get it from Shapeinfo
+			// set animating if the shape info wants it
+			if (shinfo) {
+				if (!animinfo && shinfo->is_animated()) {
+					animinfo = shinfo->get_animation_info();
+					if (!animinfo) {
+						animinfo = &simpleai;
+					}
 				}
 			}
+			break;
+
+		case TA_type::widget: {
+			if (!studio->get_toggle("shinfo_animated_check")) {
+				animinfo = nullptr;
+			}
+		} break;
 		}
-	case TA_type::widget: {
-		if (!studio->get_toggle("shinfo_animated_check")) {
+
+		default:
 			animinfo = nullptr;
+			;
+			break;
 		}
-	} break;
-	}
 
-	default:
-		animinfo = nullptr;
-		;
-		break;
-	}
-
-	if (animinfo) {
-		// makesure animation is emabled if needed
-		if (single->IsAnimatingStopped()) {
-			single->PauseAnimating(0);
-		} else {
-			frnum = single->GetAnimInfoFrame(animinfo, frnum, num_frames);
+		if (animinfo) {
+			// makesure animation is emabled if needed
+			if (single->IsAnimatingStopped()) {
+				single->PauseAnimating(0);
+			} else {
+				frnum = single->GetAnimInfoFrame(animinfo, frnum, num_frames);
+			}
 		}
 	}
 
@@ -1055,7 +1062,7 @@ void Shape_shape_single::on_widget_state(GtkWidget* widget, GtkStateFlags flags,
 }
 
 void Shape_shape_single::setup_aniinf() {
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(shape_animated.widget))) {
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(shape_animated.widget)) || !ExultStudio::IsShapeAnimationEnabled()) {
 		animating = Shape_single::TA_type::Disabled;
 		PauseAnimating();
 		aniinf = nullptr;
