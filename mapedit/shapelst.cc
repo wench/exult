@@ -187,7 +187,7 @@ void Shape_chooser::render() {
 				const int sy = info[index].box.y - voffset;
 				// Get the shapeinfo for translucency flag
 				// for choosers other than shapes.vga translucency is always used
-				if (((!shapes_file || shapes_file->get_info(shapenum).has_translucency())) && xforms.size()) {
+				if (((!shapes_file || shapes_file->get_info(shapenum).has_translucency())) && xforms.size() && shape->is_rle()) {
 					shape->paint_rle_translucent(
 							iwin, sx + shape->get_xleft(), sy + shape->get_yabove(), xforms.data(), xforms.size());
 				} else {
