@@ -1101,7 +1101,7 @@ C_EXPORT void on_shinfo_effhps_update_clicked(GtkButton* btn, gpointer user_data
 		GdkPixbuf*  nshape = studio->shape_image(
                 static_cast<Shape_file_info*>(g_object_get_data(G_OBJECT(studio->get_widget("shape_window")), "file_info"))
                         ->get_ifile(),
-                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true);
+                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true, studio->get_toggle("shinfo_transl_check"));
 		if (cmp > 0) {
 			gtk_tree_store_insert_after(store, &newiter, nullptr, iter.get());
 		} else {
@@ -1236,7 +1236,7 @@ C_EXPORT void on_shinfo_brightness_update_clicked(GtkButton* btn, gpointer user_
 		GdkPixbuf*  nshape = studio->shape_image(
                 static_cast<Shape_file_info*>(g_object_get_data(G_OBJECT(studio->get_widget("shape_window")), "file_info"))
                         ->get_ifile(),
-                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true);
+                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true, studio->get_toggle("shinfo_transl_check"));
 		if (cmp > 0) {
 			gtk_tree_store_insert_after(store, &newiter, nullptr, iter.get());
 		} else {
@@ -1335,7 +1335,7 @@ C_EXPORT void on_shinfo_warmth_update_clicked(GtkButton* btn, gpointer user_data
 		GdkPixbuf*  nshape = studio->shape_image(
                 static_cast<Shape_file_info*>(g_object_get_data(G_OBJECT(studio->get_widget("shape_window")), "file_info"))
                         ->get_ifile(),
-                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true);
+                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true, studio->get_toggle("shinfo_transl_check"));
 		if (cmp > 0) {
 			gtk_tree_store_insert_after(store, &newiter, nullptr, iter.get());
 		} else {
@@ -1430,10 +1430,11 @@ C_EXPORT void on_shinfo_cntrules_update_clicked(GtkButton* btn, gpointer user_da
 	const int      cmp = Find_unary_iter(model, iter, newshnum);
 	if (cmp) {
 		GtkTreeIter newiter;
-		GdkPixbuf*  nshape = studio->shape_image(
-                static_cast<Shape_file_info*>(g_object_get_data(G_OBJECT(studio->get_widget("shape_window")), "file_info"))
-                        ->get_ifile(),
-                static_cast<int>(newshnum), 0, true);
+		auto vgafile = static_cast<Shape_file_info*>(g_object_get_data(G_OBJECT(studio->get_widget("shape_window")), "file_info"))
+							   ->get_ifile();
+		auto       shapesvga = dynamic_cast<Shapes_vga_file*>(vgafile);
+		GdkPixbuf* nshape    = studio->shape_image(
+                vgafile, static_cast<int>(newshnum), 0, true, shapesvga ? shapesvga->get_info(newshnum).has_translucency() : false);
 		if (cmp > 0) {
 			gtk_tree_store_insert_after(store, &newiter, nullptr, iter.get());
 		} else {
@@ -1547,7 +1548,7 @@ C_EXPORT void on_shinfo_frameflags_update_clicked(GtkButton* btn, gpointer user_
 		GdkPixbuf*  nshape = studio->shape_image(
                 static_cast<Shape_file_info*>(g_object_get_data(G_OBJECT(studio->get_widget("shape_window")), "file_info"))
                         ->get_ifile(),
-                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true);
+                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true, studio->get_toggle("shinfo_transl_check"));
 		if (cmp > 0) {
 			gtk_tree_store_insert_after(store, &newiter, nullptr, iter.get());
 		} else {
@@ -1655,7 +1656,7 @@ C_EXPORT void on_shinfo_frameusecode_update_clicked(GtkButton* btn, gpointer use
 		GdkPixbuf*  nshape = studio->shape_image(
                 static_cast<Shape_file_info*>(g_object_get_data(G_OBJECT(studio->get_widget("shape_window")), "file_info"))
                         ->get_ifile(),
-                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true);
+                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true, studio->get_toggle("shinfo_transl_check"));
 		if (cmp > 0) {
 			gtk_tree_store_insert_after(store, &newiter, nullptr, iter.get());
 		} else {
@@ -1833,7 +1834,7 @@ C_EXPORT void on_shinfo_framenames_update_clicked(GtkButton* btn, gpointer user_
 		GdkPixbuf*  nshape = studio->shape_image(
                 static_cast<Shape_file_info*>(g_object_get_data(G_OBJECT(studio->get_widget("shape_window")), "file_info"))
                         ->get_ifile(),
-                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true);
+                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true, studio->get_toggle("shinfo_transl_check"));
 		if (cmp > 0) {
 			gtk_tree_store_insert_after(store, &newiter, nullptr, iter.get());
 		} else {
@@ -2092,7 +2093,7 @@ C_EXPORT void on_shinfo_objpaperdoll_update_clicked(GtkButton* btn, gpointer use
 		GdkPixbuf*  nshape = studio->shape_image(
                 static_cast<Shape_file_info*>(g_object_get_data(G_OBJECT(studio->get_widget("shape_window")), "file_info"))
                         ->get_ifile(),
-                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true);
+                studio->get_num_entry("shinfo_shape"), static_cast<int>(newfrnum), true, studio->get_toggle("shinfo_transl_check"));
 		if (cmp > 0) {
 			gtk_tree_store_insert_after(store, &newiter, nullptr, iter.get());
 		} else {
@@ -2918,7 +2919,7 @@ void ExultStudio::init_shape_notebook(
 			if (!first) {
 				first = &hps;
 			}
-			GdkPixbuf* nshape = shape_image(shpfile, shnum, hps.get_frame(), true);
+			GdkPixbuf* nshape = shape_image(shpfile, shnum, hps.get_frame(), true, info.has_translucency());
 			gtk_tree_store_append(store, &iter, nullptr);
 			gtk_tree_store_set(
 					store, &iter, HP_FRAME_COLUMN, hps.get_frame(), HP_QUALITY_COLUMN, hps.get_quality(), HP_HIT_POINTS,
@@ -2958,7 +2959,7 @@ void ExultStudio::init_shape_notebook(
 			if (!first) {
 				first = &light;
 			}
-			GdkPixbuf* nshape = shape_image(shpfile, shnum, light.get_frame(), true);
+			GdkPixbuf* nshape = shape_image(shpfile, shnum, light.get_frame(), true, info.has_translucency());
 			gtk_tree_store_append(store, &iter, nullptr);
 			gtk_tree_store_set(
 					store, &iter, BRIGHTNESS_FRAME_COLUMN, light.get_frame(), BRIGHTNESS_VALUE_COLUMN, light.get_light(),
@@ -2999,7 +3000,7 @@ void ExultStudio::init_shape_notebook(
 			if (!first) {
 				first = &warm;
 			}
-			GdkPixbuf* nshape = shape_image(shpfile, shnum, warm.get_frame(), true);
+			GdkPixbuf* nshape = shape_image(shpfile, shnum, warm.get_frame(), true, info.has_translucency());
 			gtk_tree_store_append(store, &iter, nullptr);
 			gtk_tree_store_set(
 					store, &iter, WARM_FRAME_COLUMN, warm.get_frame(), WARM_VALUE_COLUMN, warm.get_warmth(), WARM_FROM_PATCH,
@@ -3039,7 +3040,7 @@ void ExultStudio::init_shape_notebook(
 			if (!first) {
 				first = &cntr;
 			}
-			GdkPixbuf* nshape = shape_image(shpfile, cntr.get_shape(), 0, true);
+			GdkPixbuf* nshape = shape_image(shpfile, cntr.get_shape(), 0, true, info.has_translucency());
 			gtk_tree_store_append(store, &iter, nullptr);
 			gtk_tree_store_set(
 					store, &iter, CNT_SHAPE_COLUMN, cntr.get_shape(), CNT_ACCEPT_COLUMN, cntr.accepts_shape(), CNT_FROM_PATCH,
@@ -3079,7 +3080,7 @@ void ExultStudio::init_shape_notebook(
 			if (!first) {
 				first = &frflag;
 			}
-			GdkPixbuf* nshape = shape_image(shpfile, shnum, frflag.get_frame(), true);
+			GdkPixbuf* nshape = shape_image(shpfile, shnum, frflag.get_frame(), true, info.has_translucency());
 			gtk_tree_store_append(store, &iter, nullptr);
 			gtk_tree_store_set(
 					store, &iter, FRFLAG_FRAME_COLUMN, frflag.get_frame(), FRFLAG_QUAL_COLUMN, frflag.get_quality(),
@@ -3127,7 +3128,7 @@ void ExultStudio::init_shape_notebook(
 			} else {
 				ucfun << frucfun.get_usecode();
 			}
-			GdkPixbuf* nshape = shape_image(shpfile, shnum, frucfun.get_frame(), true);
+			GdkPixbuf* nshape = shape_image(shpfile, shnum, frucfun.get_frame(), true, info.has_translucency());
 			gtk_tree_store_append(store, &iter, nullptr);
 			gtk_tree_store_set(
 					store, &iter, FRUC_FRAME_COLUMN, frucfun.get_frame(), FRUC_QUAL_COLUMN, frucfun.get_quality(),
@@ -3186,7 +3187,7 @@ void ExultStudio::init_shape_notebook(
 					= otype == -255 ? sname : (otype == -1 || otmsg >= get_num_misc_names() ? nullptr : get_misc_name(otmsg));
 			const string utf8msg(convertToUTF8(msgstr));
 			const string utf8otmsg(convertToUTF8(otmsgstr));
-			GdkPixbuf*   nshape = shape_image(shpfile, shnum, nmit.get_frame(), true);
+			GdkPixbuf*   nshape = shape_image(shpfile, shnum, nmit.get_frame(), true, info.has_translucency());
 			gtk_tree_store_append(store, &iter, nullptr);
 			gtk_tree_store_set(
 					store, &iter, FNAME_FRAME, nmit.get_frame(), FNAME_QUALITY, nmit.get_quality(), FNAME_MSGTYPE, type,
@@ -3236,7 +3237,7 @@ void ExultStudio::init_shape_notebook(
 			if (!first) {
 				first = &doll;
 			}
-			GdkPixbuf* nshape = shape_image(shpfile, shnum, doll.get_world_frame(), true);
+			GdkPixbuf* nshape = shape_image(shpfile, shnum, doll.get_world_frame(), true, doll.is_translucent());
 			gtk_tree_store_append(store, &iter, nullptr);
 			gtk_tree_store_set(
 					store, &iter, DOLL_WORLD_FRAME, doll.get_world_frame(), DOLL_SPOT, doll.get_object_spot(), DOLL_TRANSLUCENT,

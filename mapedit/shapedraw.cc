@@ -980,7 +980,7 @@ void Shape_shape_single::draw_shape(Shape_frame* shape, int x, int y, bool trans
  *  Build an Image out of a Shape
  */
 
-GdkPixbuf* ExultStudio::shape_image(Vga_file* shpfile, int shnum, int frnum, bool transparent) {
+GdkPixbuf* ExultStudio::shape_image(Vga_file* shpfile, int shnum, int frnum, bool transparent, bool translucent) {
 	if (shnum < 0) {
 		return nullptr;
 	}
@@ -1002,7 +1002,11 @@ GdkPixbuf* ExultStudio::shape_image(Vga_file* shpfile, int shnum, int frnum, boo
 	Image_buffer8 tbuf(w, h);    // Create buffer to render to.
 	tbuf.fill8(0xff);            // Fill with 'transparent' pixel.
 	unsigned char* tbits = tbuf.get_bits();
-	shape->paint(&tbuf, w - 1 - xright, h - 1 - ybelow);
+	if (!translucent) {
+		shape->paint(&tbuf, w - 1 - xright, h - 1 - ybelow);
+	} else {
+		shape->paint_rle_translucent(&tbuf, w - 1 - xright, h - 1 - ybelow, xforms.data(), xforms.size());
+	}
 	// Put shape on a pixmap.
 	GdkPixbuf* pixbuf  = gdk_pixbuf_new(GDK_COLORSPACE_RGB, transparent, 8, w, h);
 	guchar*    pixels  = gdk_pixbuf_get_pixels(pixbuf);

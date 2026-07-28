@@ -239,16 +239,16 @@ private:
 	int h_at_close;
 
 	// Widgets, Callbacks, HandlerIDs of the main_window
-	GtkWidget*  connect_button;
-	gulong      connect_button_handler_id;
-	gulong      connect_button_signal_id;
-	static void on_connect_button_toggled(GtkToggleButton* button, gpointer user_data);
-	GtkWidget*  play_button;
-	gulong      play_button_handler_id;
-	gulong      play_button_signal_id;
-	static void on_play_button_toggled(GtkToggleButton* button, gpointer user_data);
+	GtkWidget*      connect_button;
+	gulong          connect_button_handler_id;
+	gulong          connect_button_signal_id;
+	static void     on_connect_button_toggled(GtkToggleButton* button, gpointer user_data);
+	GtkWidget*      play_button;
+	gulong          play_button_handler_id;
+	gulong          play_button_signal_id;
+	static void     on_play_button_toggled(GtkToggleButton* button, gpointer user_data);
 	static gboolean on_animation_timeout(gpointer user_data);
-	gulong      animation_timeout_id;
+	gulong          animation_timeout_id;
 
 	constexpr static int ANIMATION_TIMEOUT_MS = 100;
 
@@ -471,7 +471,7 @@ public:
 	static void schedule_btn_clicked(GtkWidget* btn, gpointer data);
 	// Shapes:
 	GdkPixbuf* shape_image(    // The GdkPixbuf should be g_object_unrefed.
-			Vga_file* shpfile, int shnum, int frnum, bool transparent);
+			Vga_file* shpfile, int shnum, int frnum, bool transparent, bool translucent);
 	void       init_equip_window(int recnum);
 	void       save_equip_window();
 	void       open_equip_window(int recnum);
