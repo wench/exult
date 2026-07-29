@@ -738,7 +738,6 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 			if (!studio->get_toggle("shinfo_animated_check")) {
 				animinfo = nullptr;
 			}
-
 		} break;
 		}
 
