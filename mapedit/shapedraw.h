@@ -132,7 +132,7 @@ public:
 
 	static const int outline_color = 50;    // Palette index of outline color
 
-	int GetAnimInfoFrame(const Animation_info* aniinfm, unsigned short first_frame, unsigned short nframes);
+	int GetAnimInfoFrame(const Animation_info* aniinfm, unsigned short first_frame, unsigned short nframes, bool pausable = false);
 	Shape_draw(Vga_file* i, const unsigned char* palbuf, GtkWidget* drw);
 	virtual ~Shape_draw();
 

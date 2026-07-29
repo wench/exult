@@ -226,7 +226,8 @@ Shape_draw::~Shape_draw() {
 
 // Get animated frame using an Animation_info object
 
-int Shape_draw::GetAnimInfoFrame(const Animation_info* aniinf, unsigned short first_frame, unsigned short shape_frames) {
+int Shape_draw::GetAnimInfoFrame(
+		const Animation_info* aniinf, unsigned short first_frame, unsigned short shape_frames, bool pausable) {
 	if (!ExultStudio::IsShapeAnimationEnabled()) {
 		return first_frame;
 	}
@@ -266,7 +267,7 @@ int Shape_draw::GetAnimInfoFrame(const Animation_info* aniinf, unsigned short fi
 	//
 	// Code from Frame_animator::get_next_frame
 	//
-	if (nframes == 1 || IsAnimatingPaused()) {    // No reason to do anything else.
+	if (nframes == 1) {
 		return initial;
 	}
 
@@ -296,8 +297,8 @@ int Shape_draw::GetAnimInfoFrame(const Animation_info* aniinf, unsigned short fi
 
 	case Animation_info::FA_LOOPING:
 	default: {
-		// No random freeze first here
-		if (aniinf->get_freeze_first_chance() != 0 || initial != 0) {
+		int freeze_chance = aniinf->get_freeze_first_chance();
+		if (freeze_chance != 0 || initial != 0) {
 			currpos              = animation_frame + initial;
 			const int rec        = aniinf->get_recycle();
 			auto      first_rec  = nframes - rec;
@@ -324,8 +325,19 @@ int Shape_draw::GetAnimInfoFrame(const Animation_info* aniinf, unsigned short fi
 		} else {
 			framenum = initial;
 		}
-		break;
-	}
+		// random freeze on first frame
+		if (framenum == first_frame && freeze_chance > 0 && pausable && !IsAnimatingPaused()) {
+			int pause_counter = 0;
+
+			while (rand() % 100 >= freeze_chance) {
+				++pause_counter;
+			}
+
+			if (pause_counter) {
+				PauseAnimating(pause_counter + 1, false);
+			}
+		}
+	} break;
 
 	case Animation_info::FA_RANDOM_FRAMES:
 		currpos  = rand() % nframes;
@@ -374,7 +386,9 @@ void Shape_draw::animate() {
 		if (animating_paused != INT_MAX) {
 			animating_paused--;
 		}
-	} else {
+	}
+	// If animation pausing just ended increment the frame now too
+	if (animating_paused == 0) {
 		if (animation_frame == INT_MAX) {
 			// No integer wrap around to INT_MIN allowed
 			// Not likely to happen as it would take 6 years of continuous running but best to do things right
@@ -383,7 +397,7 @@ void Shape_draw::animate() {
 		} else {
 			animation_frame++;
 		}
-		// animating_frame has changed so queue a draw by calling rander
+		// animating_frame has changed so do a render
 		render();
 	}
 }
@@ -752,7 +766,7 @@ gboolean Shape_single::on_draw_expose_event(GtkWidget* widget, cairo_t* cairo, g
 			if (single->IsAnimatingStopped()) {
 				single->PauseAnimating(0);
 			} else {
-				frnum = single->GetAnimInfoFrame(animinfo, frnum, num_frames);
+				frnum = single->GetAnimInfoFrame(animinfo, frnum, num_frames, true);
 			}
 		}
 	}
