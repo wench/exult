@@ -104,7 +104,6 @@ public:
 		iterator end() const {
 			return nullptr;
 		}
-
 	} iteratable;
 
 	// Call with timeout <= 0 to unpause animating
