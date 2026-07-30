@@ -36,6 +36,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "u7drag.h"
 #include "vgafile.h"
 
+#include <random>
+
 using std::cout;
 using std::endl;
 
@@ -271,6 +273,8 @@ int Shape_draw::GetAnimInfoFrame(
 		return initial;
 	}
 
+	static std::default_random_engine rng;
+
 	int framenum;
 	switch (aniinf->get_type()) {
 	case Animation_info::FA_HOURLY:
@@ -329,7 +333,7 @@ int Shape_draw::GetAnimInfoFrame(
 		if (framenum == first_frame && freeze_chance > 0 && pausable && !IsAnimatingPaused()) {
 			int pause_counter = 0;
 
-			while (rand() % 100 >= freeze_chance) {
+			while (rng() % 100 >= freeze_chance) {
 				++pause_counter;
 			}
 
@@ -340,7 +344,7 @@ int Shape_draw::GetAnimInfoFrame(
 	} break;
 
 	case Animation_info::FA_RANDOM_FRAMES:
-		currpos  = rand() % nframes;
+		currpos  = rng() % nframes;
 		framenum = first_frame + currpos;
 		break;
 	}
