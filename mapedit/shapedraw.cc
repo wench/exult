@@ -333,7 +333,7 @@ int Shape_draw::GetAnimInfoFrame(
 		if (framenum == first_frame && freeze_chance > 0 && pausable && !IsAnimatingPaused()) {
 			int pause_counter = 0;
 
-			while (rng() % 100 >= freeze_chance) {
+			while (rng() % 100 >= unsigned(freeze_chance)) {
 				++pause_counter;
 			}
 
