@@ -72,7 +72,6 @@ using std::exit;
 
 #define SCALE_BIT(factor) (1 << ((factor) - 1))
 
-const Image_window::ScalerType  Image_window::NoScaler(-1);
 const Image_window::ScalerConst Image_window::point("Point");
 const Image_window::ScalerConst Image_window::interlaced("Interlaced");
 const Image_window::ScalerConst Image_window::bilinear("Bilinear");
