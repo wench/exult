@@ -249,7 +249,7 @@ void Chunk_chooser::render_chunk(
 				//  Default origin -1, -1 to be reset,
 				//  Not clickable nor Hack-Movable.
 				if (s && pass == 1 && !s->is_rle()) {
-					if (shinfo && !shinfo->has_translucency() || xforms.empty()) {
+					if ((shinfo && !shinfo->has_translucency()) || xforms.empty()) {
 						s->paint(rwin, xoff + x, yoff + y);
 					} else {
 						s->paint_rle_translucent(rwin, xoff + x, yoff + y, xforms.data(), xforms.size());
@@ -260,7 +260,7 @@ void Chunk_chooser::render_chunk(
 				//  Valid origin,
 				//  Clikable show Name and Outline, Hack-Movable.
 				if (s && pass == 2 && s->is_rle()) {
-					if (shinfo && !shinfo->has_translucency() || xforms.empty()) {
+					if ((shinfo && !shinfo->has_translucency()) || xforms.empty()) {
 						s->paint(rwin, xoff + x - 1, yoff + y - 1);
 					} else {
 						s->paint_rle_translucent(rwin, xoff + x - 1, yoff + y - 1, xforms.data(), xforms.size());

@@ -238,7 +238,6 @@ int Shape_draw::GetAnimInfoFrame(
 	//
 	unsigned short currpos;          // Current position in the animation.
 	unsigned short nframes;          // Number of frames in cycle.
-	unsigned short frame_counter;    // When to increase frame.
 	unsigned short last_frame;       // To check if we need to re init
 
 	//
@@ -264,7 +263,6 @@ int Shape_draw::GetAnimInfoFrame(
 	}
 	assert(nframes > 0);
 
-	frame_counter = aniinf->get_frame_delay();
 
 	//
 	// Code from Frame_animator::get_next_frame
