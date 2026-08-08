@@ -236,9 +236,9 @@ int Shape_draw::GetAnimInfoFrame(
 	//
 	// Variables that represent the fields in the Frame_animator class
 	//
-	unsigned short currpos;          // Current position in the animation.
-	unsigned short nframes;          // Number of frames in cycle.
-	unsigned short last_frame;       // To check if we need to re init
+	unsigned short currpos;       // Current position in the animation.
+	unsigned short nframes;       // Number of frames in cycle.
+	unsigned short last_frame;    // To check if we need to re init
 
 	//
 	// Code from Frame_animator::Initialize
@@ -262,7 +262,6 @@ int Shape_draw::GetAnimInfoFrame(
 		nframes = shape_frames - first_frame;
 	}
 	assert(nframes > 0);
-
 
 	//
 	// Code from Frame_animator::get_next_frame
@@ -1100,7 +1099,7 @@ void Shape_shape_single::setup_aniinf() {
 		up_aniinf->set_type(type);
 		const int count   = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(shinfo_animation_frcount.widget));
 		int       shnum   = extract_value(shape);
-		const int nframes = ifile->get_num_frames(shnum);
+		const int nframes = (shnum > 0 && (!shapevalid || shapevalid(shnum))) ? ifile->get_num_frames(shnum) : 1;
 		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(shinfo_animation_frtype.widget)) || count == nframes) {
 			up_aniinf->set_frame_count(-1);
 		} else {
