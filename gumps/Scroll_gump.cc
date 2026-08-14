@@ -48,7 +48,7 @@ namespace {
 				gwin->destroy_layer(g->render_layer);
 				g->render_layer = -1;
 			}
-			g->render_layer = gwin->create_layer(w, h, 255, 0, text_gump_layer_z);
+			g->render_layer = gwin->create_layer(typeid(*g).name(), w, h, 255, 0, text_gump_layer_z);
 			if (g->render_layer < 0) {
 				return false;
 			}
