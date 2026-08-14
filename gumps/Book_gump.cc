@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "game.h"
 #include "gamewin.h"
 
+#include <typeinfo>
+
 namespace {
 	// Above normal/hud gumps, below modal gumps.
 	constexpr int text_gump_layer_z = (1 << 18) + (1 << 16) + 1;
@@ -48,7 +50,8 @@ namespace {
 				gwin->destroy_layer(g->render_layer);
 				g->render_layer = -1;
 			}
-			g->render_layer = gwin->create_layer(w, h, 255, 0, text_gump_layer_z);
+
+			g->render_layer = gwin->create_layer(typeid(*g).name(), w, h, 255, 0, text_gump_layer_z);
 			if (g->render_layer < 0) {
 				return false;
 			}

@@ -190,9 +190,11 @@ public:
 		// palette colour, letting a layer draw translucent pixels.
 		std::vector<uint32> index_argb;
 
+		std::string name;
+
 	public:
-		Layer(std::unique_ptr<Image_buffer> b, int w, int h, unsigned char transp, int fscale, int zorder)
-				: buf(std::move(b)), logw(w), logh(h), fixed_scale(fscale), transparent(transp), z(zorder) {}
+		Layer(std::unique_ptr<Image_buffer> b, int w, int h, unsigned char transp, int fscale, int zorder, std::string&& name)
+				: buf(std::move(b)), logw(w), logh(h), fixed_scale(fscale), transparent(transp), z(zorder), name(std::move(name)) {}
 
 		Image_buffer* get_ibuf() const {
 			return buf.get();
@@ -228,6 +230,10 @@ public:
 
 		bool is_visible() const {
 			return visible;
+		}
+
+		const std::string& get_name() {
+			return name;
 		}
 	};
 
@@ -663,7 +669,7 @@ public:
 	// constant on-screen size independent of the world scaling), otherwise it
 	// is drawn at the given integer scale.  'z' orders layers: higher values
 	// are composited on top.
-	int           create_layer(int w, int h, unsigned char transparent = 255, int fixed_scale = 0, int z = 0);
+	int           create_layer(std::string&& name, int w, int h, unsigned char transparent = 255, int fixed_scale = 0, int z = 0);
 	void          destroy_layer(int handle);
 	Image_buffer* get_layer_ibuf(int handle);
 	// Mark a layer's buffer as changed so it is re-uploaded before the next

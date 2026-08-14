@@ -38,6 +38,7 @@ Boston, MA  02111-1307, USA.
 #include "items.h"
 #include "manip.h"
 #include "mouse.h"
+#include "perf.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -941,6 +942,8 @@ void Image_window::resized(
  */
 
 void Image_window::show(int x, int y, int w, int h) {
+	PerformanceTimer::paintPerfMetrics();
+	auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__);
 	if (!ready()) {
 		return;
 	}
@@ -1005,6 +1008,7 @@ void Image_window::show(int x, int y, int w, int h) {
 	if (ibuf->width + 2 * guard_band == draw_surface->w && ibuf->height + 2 * guard_band == draw_surface->h) {
 		// Phase 1 blit from draw_surface to inter_surface
 		if (draw_surface != inter_surface) {
+			auto              perftimer  = PerformanceTimer::GetScopedPerfTimer(__func__, " scaler");
 			const ScalerInfo& sel_scaler = Scalers[scaler];
 
 			const SDL_PixelFormatDetails* inter_surface_format = SDL_GetPixelFormatDetails(inter_surface->format);
@@ -1057,6 +1061,7 @@ void Image_window::show(int x, int y, int w, int h) {
 
 		// Phase 2 blit from inter_surface to display_surface
 		if (inter_surface != display_surface && fill_scaler != SDLScaler) {
+			auto              perftimer  = PerformanceTimer::GetScopedPerfTimer(__func__, " fill scaler");
 			const ScalerInfo& sel_scaler = Scalers[fill_scaler];
 
 			// Just scale entire surfaces
@@ -1089,10 +1094,11 @@ void Image_window::show(int x, int y, int w, int h) {
 	// display size (e.g. AspectCorrectCentre), so uploading it directly may not
 	// match the display texture dimensions. Resolve to display_surface first.
 	if (fill_scaler == SDLScaler && inter_surface != display_surface) {
-		int sx;
-		int sy;
-		int sw;
-		int sh;
+		auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__, " sdl fill scaler");
+		int  sx;
+		int  sy;
+		int  sw;
+		int  sh;
 		if (inter_surface == draw_surface) {
 			sx = guard_band;
 			sy = guard_band;
@@ -1573,7 +1579,7 @@ bool Image_window::fillmode_to_string(FillMode fmode, std::string& str) {
  *  Layers.
  */
 
-int Image_window::create_layer(int w, int h, unsigned char transparent, int fixed_scale, int z) {
+int Image_window::create_layer(std::string&& name, int w, int h, unsigned char transparent, int fixed_scale, int z) {
 	if (w <= 0 || h <= 0) {
 		return -1;
 	}
@@ -1582,7 +1588,7 @@ int Image_window::create_layer(int w, int h, unsigned char transparent, int fixe
 		return -1;
 	}
 	buf->fill8(transparent);    // Start fully transparent.
-	auto layer = std::make_unique<Layer>(std::move(buf), w, h, transparent, fixed_scale, z);
+	auto layer = std::make_unique<Layer>(std::move(buf), w, h, transparent, fixed_scale, z, std::move(name));
 	// Reuse a freed slot if there is one, so handles stay stable.
 	for (size_t i = 0; i < layers.size(); i++) {
 		if (!layers[i]) {
@@ -2049,6 +2055,7 @@ void Image_window::composite_layers() {
 	if (layers.empty() || screen_renderer == nullptr) {
 		return;
 	}
+	auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__);
 	// Gather the visible layers and composite them from lowest to highest z.
 	std::vector<Layer*> ordered;
 	ordered.reserve(layers.size());
@@ -2073,8 +2080,10 @@ void Image_window::composite_layers() {
 		return a->z < b->z;
 	});
 	for (Layer* lptr : ordered) {
-		Layer&               layer = *lptr;
-		const UiLayerConfig& cfg   = get_ui_cfg(layer.ui_kind);
+		Layer& layer     = *lptr;
+		auto   perftimer = PerformanceTimer::GetScopedPerfTimer("Composite_Layer:", layer.get_name(), true);
+
+		const UiLayerConfig& cfg = get_ui_cfg(layer.ui_kind);
 		// Match filtering to this layer's scaler/fill scaler.
 		const bool smooth = (eff_ui_scaler(cfg) == bilinear) || (eff_ui_scaler(cfg) == SDLScaler)
 							|| (eff_ui_fill_scaler(cfg) == bilinear) || (eff_ui_fill_scaler(cfg) == SDLScaler);
@@ -2112,19 +2121,29 @@ void Image_window::composite_layers() {
 }
 
 void Image_window::UpdateRect(SDL_Surface* surf) {
+	auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__);
 	// TODO: Only update the necessary portion of the screen.
 	// Seem to get flicker like crazy or some other ill effect no matter
 	// what I try. -Lanica 08/28/2013
-	const SDL_PixelFormatDetails* surf_format = SDL_GetPixelFormatDetails(surf->format);
-	uint8*                        pixels
-			= (surf == display_surface ? static_cast<uint8*>(surf->pixels)
-									   : static_cast<uint8*>(surf->pixels) + guard_band * scale * surf_format->bytes_per_pixel
-												 + guard_band * scale * surf->pitch);
-	SDL_UpdateTexture(screen_texture, nullptr, pixels, surf->pitch);
-	SDL_RenderTexture(screen_renderer, screen_texture, nullptr, nullptr);
+	{
+		auto                          perftimer   = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_UpdateTexture");
+		const SDL_PixelFormatDetails* surf_format = SDL_GetPixelFormatDetails(surf->format);
+		uint8*                        pixels
+				= (surf == display_surface ? static_cast<uint8*>(surf->pixels)
+										   : static_cast<uint8*>(surf->pixels) + guard_band * scale * surf_format->bytes_per_pixel
+													 + guard_band * scale * surf->pitch);
+		SDL_UpdateTexture(screen_texture, nullptr, pixels, surf->pitch);
+	}
+	{
+		auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderTexture");
+		SDL_RenderTexture(screen_renderer, screen_texture, nullptr, nullptr);
+	}
 	// Draw overlay layers on top of the main image, before presenting.
 	composite_layers();
-	SDL_RenderPresent(screen_renderer);
+	{
+		auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderPresent");
+		SDL_RenderPresent(screen_renderer);
+	}
 }
 
 int Image_window::VideoModeOK(int width, int height, bool fullscreen, int bpp) {
