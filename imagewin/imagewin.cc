@@ -597,7 +597,9 @@ void Image_window::create_surface(unsigned int w, unsigned int h) {
 		if (screen_renderer == nullptr) {
 			cout << "Couldn't create renderer: " << SDL_GetError() << std::endl;
 		}
-		SDL_SetRenderVSync(screen_renderer, 1);
+		int vsync = 1;
+		config->value("config/video/vsync", vsync, vsync);
+		SDL_SetRenderVSync(screen_renderer, vsync);
 		// Do an initial draw/fill
 		SDL_SetRenderDrawColor(screen_renderer, 0, 0, 0, 255);
 		SDL_RenderClear(screen_renderer);
@@ -711,7 +713,9 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 	if (screen_renderer == nullptr) {
 		cout << "Couldn't create renderer: " << SDL_GetError() << std::endl;
 	}
-	SDL_SetRenderVSync(screen_renderer, 1);
+	int vsync = 1;
+	config->value("config/video/vsync", vsync, vsync);
+	SDL_SetRenderVSync(screen_renderer, vsync);
 
 	SDL_DisplayID original_displayID = SDL_GetDisplayForWindow(screen_window);
 
