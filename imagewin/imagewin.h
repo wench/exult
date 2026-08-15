@@ -375,14 +375,14 @@ protected:
 	static SDL_DisplayMode desktop_displaymode;
 	struct SDL_Window*     screen_window;
 	struct SDL_Renderer*   screen_renderer;
-	struct SDL_Texture*    screen_texture;
-	void                   UpdateRect(SDL_Surface* surf);
+	struct SDL_Texture*    screen_texture; // What gets drawn to the screen by SDL. 
+
+	void                   UpdateRect(SDL_FRect *srcRect); // Draw screen_texture with Screen_renderer
 
 	SDL_Surface* paletted_surface;    // Surface that palette is set on (Example
-									  // res)
-	SDL_Surface* display_surface;     // Final surface that is displayed  (1024x1024)
-	SDL_Surface* inter_surface;       // Post scaled/pre stretch surface  (960x600)
-	SDL_Surface* draw_surface;        // Pre scaled surface               (320x200)
+									  // res) - Never null
+	SDL_Surface* inter_surface;       // Post scaled/pre stretch surface  (960x600) - can be null
+	SDL_Surface* draw_surface;        // Pre scaled surface               (320x200) - Never null
 
 	// Layers composited on top of the main image (see class Layer).
 	std::vector<std::unique_ptr<Layer>> layers;
@@ -547,7 +547,7 @@ public:
 			FillMode fmode = AspectCorrectCentre, int fillsclr = point)
 			: ibuf(ib), scale(scl), scaler(sclr), uses_palette(true), fullscreen(fs), game_width(gamew), game_height(gameh),
 			  saved_game_width(gamew), saved_game_height(gameh), fill_mode(fmode), fill_scaler(fillsclr), screen_window(nullptr),
-			  screen_renderer(nullptr), screen_texture(nullptr), paletted_surface(nullptr), display_surface(nullptr),
+			  screen_renderer(nullptr), screen_texture(nullptr), paletted_surface(nullptr),
 			  inter_surface(nullptr), draw_surface(nullptr) {
 		static_init();
 		create_surface(w, h);
@@ -776,7 +776,7 @@ public:
 			return false;
 		}
 		// Only if actually scaling
-		if (draw_surface == display_surface) {
+		if (draw_surface->w == screen_texture->w && draw_surface->h == screen_texture->h) {
 			return false;
 		}
 
@@ -786,9 +786,9 @@ public:
 			return false;
 		}
 
-		// if inter is the same as display the scaling is only being done by
+		// if no inter surface the scaling is only being done by
 		// scaler and if is point we don't need to do this
-		if (display_surface == inter_surface && point == scaler) {
+		if (!inter_surface && point == scaler) {
 			return false;
 		}
 
