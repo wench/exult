@@ -705,7 +705,11 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 	}
 
 	// Scale using 'fill_scaler' only
-	if (scaler == fill_scaler || scale == 1 || (fill_scaler == SDLScaler && scaler == bilinear)) {
+	if (scaler == fill_scaler || scale == 1 || (fill_scaler == SDLScaler && (scaler == point || scaler == bilinear))) {
+		// Use nearest scale mode if the scaler is point
+		if (fill_scaler == SDLScaler && scaler == point) {
+			SDL_SetTextureScaleMode(screen_texture, SDL_SCALEMODE_NEAREST);
+		}
 		inter_surface = draw_surface;
 	} else if (inter_width != w || inter_height != h) {
 		int i_width  = inter_width + 2 * scale * guard_band;
