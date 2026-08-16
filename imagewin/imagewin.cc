@@ -673,7 +673,6 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 	SDL_SetRenderDrawColor(screen_renderer, 0, 0, 0, 255);
 	SDL_RenderClear(screen_renderer);
 	SDL_RenderPresent(screen_renderer);
-
 	int    sbpp;
 	Uint32 sRmask;
 	Uint32 sGmask;
@@ -894,7 +893,7 @@ void Image_window::show(int x, int y, int w, int h) {
 	// Create temporary display_surface from screen_texture;
 	SDL_Surface* display_surface;
 	{
-		auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_LockTextureToSurface");
+		auto perftimer_sltts = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_LockTextureToSurface");
 		SDL_LockTextureToSurface(screen_texture, nullptr, &display_surface);
 	}
 
@@ -905,8 +904,8 @@ void Image_window::show(int x, int y, int w, int h) {
 	if (ibuf->width + 2 * guard_band == draw_surface->w && ibuf->height + 2 * guard_band == draw_surface->h) {
 		// Phase 1 blit from draw_surface to inter_surface
 		if (draw_surface != inter_surface) {
-			auto              perftimer  = PerformanceTimer::GetScopedPerfTimer(__func__, " scaler");
-			const ScalerInfo& sel_scaler = Scalers[scaler];
+			auto              perftimer_s = PerformanceTimer::GetScopedPerfTimer(__func__, " scaler");
+			const ScalerInfo& sel_scaler  = Scalers[scaler];
 
 			const SDL_PixelFormatDetails* inter_surface_format = SDL_GetPixelFormatDetails(inter_surface->format);
 
@@ -947,8 +946,8 @@ void Image_window::show(int x, int y, int w, int h) {
 
 		// Phase 2 blit from inter_surface to display_surface
 		if (inter_surface != display_surface && fill_scaler != SDLScaler) {
-			auto              perftimer  = PerformanceTimer::GetScopedPerfTimer(__func__, " fill scaler");
-			const ScalerInfo& sel_scaler = Scalers[fill_scaler];
+			auto              perftimer_fs = PerformanceTimer::GetScopedPerfTimer(__func__, " fill scaler");
+			const ScalerInfo& sel_scaler   = Scalers[fill_scaler];
 
 			// Just scale entire surfaces
 			if (inter_surface == draw_surface) {
@@ -978,7 +977,7 @@ void Image_window::show(int x, int y, int w, int h) {
 
 		// Just blit the inter surface including guardband to the display surface with no scaling here.
 		else if (fill_scaler == SDLScaler && inter_surface != display_surface) {
-			auto perfcounter = PerformanceTimer::GetScopedPerfTimer(__func__, " sdl fill scaler");
+			auto perfcounter_sfs = PerformanceTimer::GetScopedPerfTimer(__func__, " sdl fill scaler");
 			// display_surface is always as big as or bigger than inter_surface so we copy the entire inter_surface to
 			// display_surface So the scaling can be done when rendering the texture in UpdateRect
 
@@ -2014,13 +2013,13 @@ void Image_window::UpdateRect(SDL_FRect* srcRect) {
 	// Seem to get flicker like crazy or some other ill effect no matter
 	// what I try. -Lanica 08/28/2013
 	{
-		auto perfcounter = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderTexture");
+		auto perfcounter_srt = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderTexture");
 		SDL_RenderTexture(screen_renderer, screen_texture, srcRect, nullptr);
 	}
 	// Draw overlay layers on top of the main image, before presenting.
 	composite_layers();
 	{
-		auto perfcounter = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderPresent");
+		auto perfcounter_srp = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderPresent");
 		SDL_RenderPresent(screen_renderer);
 	}
 }

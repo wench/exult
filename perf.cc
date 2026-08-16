@@ -115,6 +115,10 @@ void PerformanceTimer::paintPerfMetrics() {
 
 	if (font) {
 		ibuf = gwin->get_layer_ibuf(mode == 2 ? layer_handle : layer_handle_mini);
+		if (!ibuf) {
+			// Shouldn't happen but just in case
+			return;
+		}
 		ibuf->fill8(255);
 		Image_buffer8* prev_ibuf = gwin->push_render_target(ibuf);
 		int            y = 0, xlimit = 0;
