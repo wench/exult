@@ -41,6 +41,11 @@ class PerformanceTimer {
 	PerformanceTimer*        next = nullptr;
 	PerformanceTimer*        prev = nullptr;
 
+	// Private default constructor
+	PerformanceTimer() {
+		start_frame();
+	}
+
 	void RemoveFromList(PerformanceTimer*& head) {
 		if (next) {
 			next->prev = prev;
@@ -72,10 +77,6 @@ class PerformanceTimer {
 public:
 	static void IncMode() {
 		mode = (mode + 1) % 3;
-	}
-
-	PerformanceTimer() {
-		start_frame();
 	}
 
 	void start_frame() {
