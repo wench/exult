@@ -622,7 +622,7 @@ void Cheat::toggle_infravision() {
 	} else {
 		eman->center_text(Strings::InfravisionDisabled());
 	}
-	gclock->set_palette();
+	gclock->reset_palette();
 }
 
 void Cheat::toggle_pickpocket() {
