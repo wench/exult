@@ -923,7 +923,7 @@ void Image_window::show(int x, int y, int w, int h) {
 	// The Region of the screen_texture that needs to be rendered to the screen
 	SDL_FRect fullrect = {0, 0, 0, 0};
 	{
-		auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_LockTextureToSurface");
+		auto perftimer_s_ltts = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_LockTextureToSurface");
 
 		// Lock the texture as a surface so we can draw to it. The Lock operation imvalidates anything already in the texture
 		if (!SDL_LockTextureToSurface(screen_texture, nullptr, &display_surface)) {
@@ -2077,7 +2077,7 @@ void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect) {
 	auto perfcounter = PerformanceTimer::GetScopedPerfTimer(__func__);
 
 	{
-		auto perfcounter = PerformanceTimer::GetScopedPerfTimer(__func__, " Rendering Textures");
+		auto perfcounter_rt = PerformanceTimer::GetScopedPerfTimer(__func__, " Rendering Textures");
 		if (!SDL_SetRenderTarget(screen_renderer, screen_texture_a)) {
 			const char* err = SDL_GetError();
 			std::cerr << "SDL_SetRenderTarget(screen_renderer, screen_texture_a) failed: " << (err ? err : "") << std::endl;
