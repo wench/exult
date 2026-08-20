@@ -718,6 +718,9 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 			free_surface();
 			return false;
 		}
+		// inter_surface could have an alpha channel but we don't want blending
+		// so disable it
+		SDL_SetSurfaceBlendMode(inter_surface, SDL_BLENDMODE_NONE);
 	}
 	// Scale using 'scaler' only
 	else {
@@ -902,12 +905,12 @@ void Image_window::show(int x, int y, int w, int h) {
 
 	// No scaling if ibuf and draw_surface are not the same size
 	if (ibuf->width + 2 * guard_band == draw_surface->w && ibuf->height + 2 * guard_band == draw_surface->h) {
-		// Phase 1 blit from draw_surface to inter_surface
+		// Phase 1 blit from draw_surface to inter_surface. This only scales the input rectangle
+		const SDL_PixelFormatDetails* inter_surface_format  = SDL_GetPixelFormatDetails(inter_surface->format);
+		const size_t                  inter_bytes_per_pixel = inter_surface_format->bits_per_pixel / 8;
 		if (draw_surface != inter_surface) {
 			auto              perftimer_s = PerformanceTimer::GetScopedPerfTimer(__func__, " scaler");
 			const ScalerInfo& sel_scaler  = Scalers[scaler];
-
-			const SDL_PixelFormatDetails* inter_surface_format = SDL_GetPixelFormatDetails(inter_surface->format);
 
 			if (sel_scaler.arb) {
 				if (!sel_scaler.arb->Scale(
@@ -992,8 +995,26 @@ void Image_window::show(int x, int y, int w, int h) {
 				w = inter_width;
 				h = inter_height;
 			}
-			// Copy everything
-			SDL_BlitSurface(inter_surface, nullptr, display_surface, nullptr);
+			// Copy everything using memcpy if the surfaces have the same format
+			if (inter_surface->format == display_surface->format) {
+				char* src = reinterpret_cast<char*>(inter_surface->pixels) + x * inter_bytes_per_pixel + y * size_t(inter_surface->pitch);
+				char* end = src + h * inter_surface->pitch;
+				char* dst
+						= reinterpret_cast<char*>(display_surface->pixels) + x * inter_bytes_per_pixel + y * size_t(display_surface->pitch);
+
+				while (src != end) {
+					memcpy(dst, src, w * inter_bytes_per_pixel);
+					src += inter_surface->pitch;
+					dst += display_surface->pitch;
+				}
+			} else {
+				// Fallback to SDL if pixel format conversion is needed
+				if (!SDL_BlitSurface(inter_surface, nullptr, display_surface, nullptr)) {
+					const char* err = SDL_GetError();
+					std::cerr << "SDL_BlitSurface failed: " << (err ? err : "") << std::endl;
+					SDL_ClearError();
+				}
+			}
 		}
 	}
 
