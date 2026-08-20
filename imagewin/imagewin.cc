@@ -668,10 +668,16 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 				SDL_WINDOWPOS_CENTERED_DISPLAY(original_displayID));
 		SDL_SetRenderLogicalPresentation(screen_renderer, w, h, SDL_LOGICAL_PRESENTATION_LETTERBOX);
 	}
+	display_width  = w;
+	display_height = h;
 
 	// Do an initial draw/fill
 	SDL_SetRenderDrawColor(screen_renderer, 0, 0, 0, 255);
 	SDL_RenderClear(screen_renderer);
+	// Clear screen_texture_a too
+	SDL_SetRenderTarget(screen_renderer, screen_texture_a);
+	SDL_RenderClear(screen_renderer);
+	SDL_SetRenderTarget(screen_renderer, nullptr);
 	SDL_RenderPresent(screen_renderer);
 	int    sbpp;
 	Uint32 sRmask;
@@ -686,9 +692,20 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 				std::max(inter_width, w) + 2 * guard_band * scale, std::max(inter_height, h) + 2 * guard_band * scale);
 	}
 	if (screen_texture == nullptr) {
-		cout << "Couldn't create texture: " << SDL_GetError() << std::endl;
+		cout << "Couldn't create screen_texture: " << SDL_GetError() << std::endl;
+	}
+	// This is just to make sure that rects in screen_texture get copied exactly to screen_texture_a
+	SDL_SetTextureScaleMode(screen_texture, SDL_SCALEMODE_NEAREST);
+
+	if (screen_texture_a == nullptr) {
+		screen_texture_a = SDL_CreateTexture(
+				screen_renderer, desktop_displaymode.format, SDL_TEXTUREACCESS_TARGET, screen_texture->w, screen_texture->h);
+	}
+	if (screen_texture_a == nullptr) {
+		cout << "Couldn't create screen_texture_a: " << SDL_GetError() << std::endl;
 	}
 	SDL_SetTextureBlendMode(screen_texture, SDL_BLENDMODE_NONE);
+	SDL_SetTextureBlendMode(screen_texture_a, SDL_BLENDMODE_NONE);
 
 	int draw_width  = inter_width / scale + 2 * guard_band;
 	int draw_height = inter_height / scale + 2 * guard_band;
@@ -705,15 +722,14 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 
 	// Scale using 'fill_scaler' only
 	if (scaler == fill_scaler || scale == 1 || (fill_scaler == SDLScaler && (scaler == point || scaler == bilinear))) {
-		// Use nearest scale mode if the scaler is point
-		if (fill_scaler == SDLScaler && scaler == point) {
-			SDL_SetTextureScaleMode(screen_texture, SDL_SCALEMODE_NEAREST);
-		}
+		// Use nearest scale mode if the scaler is point otherwise use linear
+		SDL_SetTextureScaleMode(
+				screen_texture_a, (fill_scaler == SDLScaler && scaler == point) ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR);
 		inter_surface = draw_surface;
 	} else if (inter_width != w || inter_height != h) {
 		int i_width  = inter_width + 2 * scale * guard_band;
 		int i_height = inter_height + 2 * scale * guard_band;
-		if (!(inter_surface = SDL_CreateSurface(i_width, i_height, desktop_displaymode.format))) {
+		if (!(inter_surface = SDL_CreateSurface(i_width, i_height, SDL_PIXELFORMAT_ARGB8888))) {
 			cerr << "Couldn't create inter surface: " << SDL_GetError() << endl;
 			free_surface();
 			return false;
@@ -781,7 +797,11 @@ void Image_window::free_surface() {
 	if (screen_texture != nullptr) {
 		SDL_DestroyTexture(screen_texture);
 	}
+	if (screen_texture_a != nullptr) {
+		SDL_DestroyTexture(screen_texture_a);
+	}
 	screen_texture   = nullptr;
+	screen_texture_a = nullptr;
 	paletted_surface = nullptr;
 	inter_surface    = nullptr;
 	draw_surface     = nullptr;
@@ -833,6 +853,8 @@ void Image_window::resized(
 
 void Image_window::show(int x, int y, int w, int h) {
 	PerformanceTimer::paintPerfMetrics();
+	SDL_ClearError();
+
 	auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__);
 	if (!ready()) {
 		return;
@@ -895,9 +917,20 @@ void Image_window::show(int x, int y, int w, int h) {
 	}
 	// Create temporary display_surface from screen_texture;
 	SDL_Surface* display_surface;
+
+	// The region of screen_texture that was changed
+	SDL_FRect dirtyrect = {0, 0, 0, 0};
+	// The Region of the screen_texture that needs to be rendered to the screen
+	SDL_FRect fullrect = {0, 0, 0, 0};
 	{
-		auto perftimer_sltts = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_LockTextureToSurface");
-		SDL_LockTextureToSurface(screen_texture, nullptr, &display_surface);
+		auto perftimer = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_LockTextureToSurface");
+
+		// Lock the texture as a surface so we can draw to it. The Lock operation imvalidates anything already in the texture
+		if (!SDL_LockTextureToSurface(screen_texture, nullptr, &display_surface)) {
+			const char* err = SDL_GetError();
+			std::cerr << "SDL_LockTextureToSurface failed: " << (err ? err : "") << std::endl;
+			SDL_ClearError();
+		}
 	}
 
 	// inter_surface is not null use that, otherwise set it to the temporary display_surface
@@ -940,14 +973,20 @@ void Image_window::show(int x, int y, int w, int h) {
 
 				(this->*show_scaled)(x, y, w, h);
 			}
-
+			x += guard_band;
+			y += guard_band;
 			x *= scale;
 			y *= scale;
 			w *= scale;
 			h *= scale;
+
+			fullrect.x = guard_band * scale;
+			fullrect.y = guard_band * scale;
+			fullrect.w = (draw_surface->w - 2 * guard_band) * scale;
+			fullrect.h = (draw_surface->h - 2 * guard_band) * scale;
 		}
 
-		// Phase 2 blit from inter_surface to display_surface
+		// Phase 2 blit from inter_surface to display_surface (this scales the entire surface)
 		if (inter_surface != display_surface && fill_scaler != SDLScaler) {
 			auto              perftimer_fs = PerformanceTimer::GetScopedPerfTimer(__func__, " fill scaler");
 			const ScalerInfo& sel_scaler   = Scalers[fill_scaler];
@@ -964,7 +1003,6 @@ void Image_window::show(int x, int y, int w, int h) {
 				w = inter_width;
 				h = inter_height;
 			}
-
 			int dw = display_surface->w - 2 * guard_band * scale;
 			int dh = display_surface->h - 2 * guard_band * scale;
 
@@ -972,13 +1010,17 @@ void Image_window::show(int x, int y, int w, int h) {
 				Scalers[point].arb->Scale(inter_surface, x, y, w, h, display_surface, 0, 0, dw, dh, false);
 			}
 
-			x = 0;
-			y = 0;
-			w = dw;
-			h = dh;
+			x          = 0;
+			y          = 0;
+			w          = dw;
+			h          = dh;
+			fullrect.x = x;
+			fullrect.y = y;
+			fullrect.w = w;
+			fullrect.h = h;
 		}
 
-		// Just blit the inter surface including guardband to the display surface with no scaling here.
+		// Copy the entire inter surface including guardband to the display surface with no scaling here.
 		else if (fill_scaler == SDLScaler && inter_surface != display_surface) {
 			auto perfcounter_sfs = PerformanceTimer::GetScopedPerfTimer(__func__, " sdl fill scaler");
 			// display_surface is always as big as or bigger than inter_surface so we copy the entire inter_surface to
@@ -997,10 +1039,11 @@ void Image_window::show(int x, int y, int w, int h) {
 			}
 			// Copy everything using memcpy if the surfaces have the same format
 			if (inter_surface->format == display_surface->format) {
-				char* src = reinterpret_cast<char*>(inter_surface->pixels) + x * inter_bytes_per_pixel + y * size_t(inter_surface->pitch);
+				char* src = reinterpret_cast<char*>(inter_surface->pixels) + x * inter_bytes_per_pixel
+							+ y * size_t(inter_surface->pitch);
 				char* end = src + h * inter_surface->pitch;
-				char* dst
-						= reinterpret_cast<char*>(display_surface->pixels) + x * inter_bytes_per_pixel + y * size_t(display_surface->pitch);
+				char* dst = reinterpret_cast<char*>(display_surface->pixels) + x * inter_bytes_per_pixel
+							+ y * size_t(display_surface->pitch);
 
 				while (src != end) {
 					memcpy(dst, src, w * inter_bytes_per_pixel);
@@ -1015,21 +1058,31 @@ void Image_window::show(int x, int y, int w, int h) {
 					SDL_ClearError();
 				}
 			}
+			fullrect.x = x;
+			fullrect.y = y;
+			fullrect.w = w;
+			fullrect.h = h;
 		}
 	}
+	dirtyrect.x = x;
+	dirtyrect.y = y;
+	dirtyrect.w = w;
+	dirtyrect.h = h;
 
 	// Phase 3 call UpdateRect to render screen_texture
-	SDL_FRect toupdate;
-	toupdate.x = x;
-	toupdate.y = y;
-	toupdate.w = w;
-	toupdate.h = h;
+
 	// reset inter_surface back to nullptr if it was set to the temporary display_surface that is about to be destroyed
 	if (inter_surface == display_surface) {
 		inter_surface = nullptr;
 	}
+	// Unlocking the texture destroys display_surface
 	SDL_UnlockTexture(screen_texture);
-	UpdateRect(&toupdate);
+	UpdateRect(&dirtyrect, &fullrect);
+
+	const char* err = SDL_GetError();
+	if (err && *err) {
+		std::cerr << "A SDL error occurred: " << err << std::endl;
+	}
 }
 
 /*
@@ -1039,8 +1092,8 @@ void Image_window::toggle_fullscreen() {
 	int w;
 	int h;
 
-	w = screen_texture->w;
-	h = screen_texture->h;
+	w = display_height;
+	h = display_height;
 
 	if (fullscreen) {
 		cout << "Switching to windowed mode." << endl;
@@ -1179,14 +1232,6 @@ bool Image_window::screenshot(SDL_IOStream* dst) {
 
 void Image_window::set_title(const char* title) {
 	SDL_SetWindowTitle(screen_window, title);
-}
-
-int Image_window::get_display_width() {
-	return screen_texture->w - 2 * guard_band * scale;
-}
-
-int Image_window::get_display_height() {
-	return screen_texture->h - 2 * guard_band * scale;
 }
 
 void Image_window::screen_to_game(int sx, int sy, bool fast, int& gx, int& gy) {
@@ -1816,8 +1861,8 @@ int Image_window::get_ui_height(UiLayerKind kind) const {
 }
 
 void Image_window::compute_fill_dest(int logw, int logh, FillMode fmode, int escl, SDL_FRect& dst) const {
-	const int dw = screen_texture ? screen_texture->w : logw;
-	const int dh = screen_texture ? screen_texture->h : logh;
+	const int dw = display_width;
+	const int dh = display_height;
 	double    cw;
 	double    ch;
 	if (logw <= 0 || logh <= 0) {
@@ -2028,20 +2073,47 @@ void Image_window::composite_layers() {
 	}
 }
 
-void Image_window::UpdateRect(SDL_FRect* srcRect) {
+void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect) {
 	auto perfcounter = PerformanceTimer::GetScopedPerfTimer(__func__);
-	// TODO: Only update the necessary portion of the screen.
-	// Seem to get flicker like crazy or some other ill effect no matter
-	// what I try. -Lanica 08/28/2013
+
 	{
-		auto perfcounter_srt = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderTexture");
-		SDL_RenderTexture(screen_renderer, screen_texture, srcRect, nullptr);
+		auto perfcounter = PerformanceTimer::GetScopedPerfTimer(__func__, " Rendering Textures");
+		if (!SDL_SetRenderTarget(screen_renderer, screen_texture_a)) {
+			const char* err = SDL_GetError();
+			std::cerr << "SDL_SetRenderTarget(screen_renderer, screen_texture_a) failed: " << (err ? err : "") << std::endl;
+			SDL_ClearError();
+		}
+
+		if (!SDL_RenderTexture(screen_renderer, screen_texture, dirtyRect, dirtyRect)) {
+			const char* err = SDL_GetError();
+			std::cerr << "SDL_RenderTexture(screen_renderer, screen_texture, srcRect, srcRect) failed: " << (err ? err : "")
+					  << std::endl;
+			SDL_ClearError();
+		}
+
+		if (!SDL_SetRenderTarget(screen_renderer, nullptr)) {
+			const char* err = SDL_GetError();
+			std::cerr << "SDL_SetRenderTarget(screen_renderer, screen_texture_a) failed: " << (err ? err : "") << std::endl;
+			SDL_ClearError();
+		}
+		SDL_RenderClear(screen_renderer);
+		if (!SDL_RenderTexture(screen_renderer, screen_texture_a, fullRect, nullptr)) {
+			const char* err = SDL_GetError();
+			std::cerr << "SDL_RenderTexture(screen_renderer, screen_texture_a, srcRect, nullptr) failed: " << (err ? err : "")
+					  << std::endl;
+			SDL_ClearError();
+		}
 	}
+
 	// Draw overlay layers on top of the main image, before presenting.
 	composite_layers();
 	{
 		auto perfcounter_srp = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderPresent");
-		SDL_RenderPresent(screen_renderer);
+		if (!SDL_RenderPresent(screen_renderer)) {
+			const char* err = SDL_GetError();
+			std::cerr << "SDL_RenderPresent failed: " << (err ? err : "") << std::endl;
+			SDL_ClearError();
+		}
 	}
 }
 

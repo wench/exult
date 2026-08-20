@@ -335,6 +335,8 @@ protected:
 	int active_scene_layer = -1;
 	int inter_width;
 	int inter_height;
+	int display_width;
+	int display_height;
 	// Guardband around the edge of the draw surface to allow scalers to run
 	// without per pixel bounds checking and to allow rounding up to
 	// multiples of 4. It should  not be less than 4 and there is no reason for
@@ -375,14 +377,18 @@ protected:
 	static SDL_DisplayMode desktop_displaymode;
 	struct SDL_Window*     screen_window;
 	struct SDL_Renderer*   screen_renderer;
-	struct SDL_Texture*    screen_texture; // What gets drawn to the screen by SDL. 
+	struct SDL_Texture*
+			screen_texture;    // Output of scalers gets drawn here. This may contain partial frames if there is no inter_surface
+	struct SDL_Texture* screen_texture_a;    // What gets drawn to the screen by SDL. The is the accumulation of all updates to
+											 // screen_texture and contains the current full frame being displayed
 
-	void                   UpdateRect(SDL_FRect *srcRect); // Draw screen_texture with Screen_renderer
+	// Update screen_texture_a with the dirtyRect changes made to screen_texture and render fullRect of screen_texture_a
+	void UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect);
 
 	SDL_Surface* paletted_surface;    // Surface that palette is set on (Example
 									  // res) - Never null
-	SDL_Surface* inter_surface;       // Post scaled/pre stretch surface  (960x600) - can be null
-	SDL_Surface* draw_surface;        // Pre scaled surface               (320x200) - Never null
+	SDL_Surface* inter_surface;    // Post scaled/pre stretch surface  (960x600) - can be null if there is no stretching being dome
+	SDL_Surface* draw_surface;     // Pre scaled surface               (320x200) - Never null
 
 	// Layers composited on top of the main image (see class Layer).
 	std::vector<std::unique_ptr<Layer>> layers;
@@ -547,7 +553,7 @@ public:
 			FillMode fmode = AspectCorrectCentre, int fillsclr = point)
 			: ibuf(ib), scale(scl), scaler(sclr), uses_palette(true), fullscreen(fs), game_width(gamew), game_height(gameh),
 			  saved_game_width(gamew), saved_game_height(gameh), fill_mode(fmode), fill_scaler(fillsclr), screen_window(nullptr),
-			  screen_renderer(nullptr), screen_texture(nullptr), paletted_surface(nullptr),
+			  screen_renderer(nullptr), screen_texture(nullptr), screen_texture_a(nullptr), paletted_surface(nullptr),
 			  inter_surface(nullptr), draw_surface(nullptr) {
 		static_init();
 		create_surface(w, h);
@@ -561,8 +567,13 @@ public:
 		return scale;
 	}
 
-	int get_display_width();
-	int get_display_height();
+	int get_display_width() {
+		return display_width;
+	}
+
+	int get_display_height() {
+		return display_height;
+	}
 
 	void screen_to_game(int sx, int sy, bool fast, int& gx, int& gy);
 
