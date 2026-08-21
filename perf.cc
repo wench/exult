@@ -81,31 +81,35 @@ void PerformanceTimer::paintPerfMetrics() {
 		textbg.colors[i] = i;
 	}
 	textbg.colors[255] = 254;
-	float scale_factor = 1.5f * 960.0f / gwin->get_win()->get_display_width();
+	float scale_factor = std::max(.75f, gwin->get_win()->get_display_width() / 1440.f);
 
-	if (mode == 2 && layer_handle == -1) {
-		layer_handle = gwin->create_layer("Perf text", 960, 720, 255, 0, INT_MAX);
+	if (mode == 2) {
 		if (layer_handle == -1) {
-			// Failed, do nothing
-			return;
+			layer_handle = gwin->create_layer("Perf text", 960, 720, 255, 0, INT_MAX);
+			if (layer_handle == -1) {
+				// Failed, do nothing
+				return;
+			}
+			// layer_set_ui_kind(layer_handle,)
+			gwin->layer_set_opaque(layer_handle, false);
+			std::memset(rgba, 255, sizeof(rgba));
+			rgba[254] = 0xAf000000;
+			gwin->layer_set_index_argb(layer_handle, rgba);
 		}
-		// layer_set_ui_kind(layer_handle,)
-		gwin->layer_set_opaque(layer_handle, false);
-		std::memset(rgba, 255, sizeof(rgba));
-		rgba[254] = 0xAf000000;
-		gwin->layer_set_index_argb(layer_handle, rgba);
 		gwin->layer_set_dest(layer_handle, 0, 0, int(960 * scale_factor), int(720 * scale_factor));
 	}
-	if (mode == 1 && layer_handle_mini == -1) {
-		layer_handle_mini = gwin->create_layer("Perf text mini", 256, 20, 255, 0, INT_MAX);
+	if (mode == 1) {
 		if (layer_handle_mini == -1) {
-			// Failed, do nothing
-			return;
+			layer_handle_mini = gwin->create_layer("Perf text mini", 256, 20, 255, 0, INT_MAX);
+			if (layer_handle_mini == -1) {
+				// Failed, do nothing
+				return;
+			}
+			gwin->layer_set_opaque(layer_handle_mini, false);
+			std::memset(rgba, 255, sizeof(rgba));
+			rgba[254] = 0xAf000000;
+			gwin->layer_set_index_argb(layer_handle_mini, rgba);
 		}
-		gwin->layer_set_opaque(layer_handle_mini, false);
-		std::memset(rgba, 255, sizeof(rgba));
-		rgba[254] = 0xAf000000;
-		gwin->layer_set_index_argb(layer_handle_mini, rgba);
 		gwin->layer_set_dest(layer_handle_mini, 0, 0, int(256 * scale_factor), int(20 * scale_factor));
 	}
 
