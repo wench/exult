@@ -266,11 +266,19 @@ void Image_window8::refresh_layer(Layer& layer) {
 	const unsigned char* src    = b->get_bits();
 	const int            pitch  = static_cast<int>(b->get_line_width());
 	auto                 pixels = make_unique<uint32[]>(static_cast<size_t>(w) * h);
+	uint32               palette[256];
+
+	for (int i = 0; i < 256; i++) {
+		palette[i] = layer_argb_pixel(layer, i);
+	}
+
 	for (int y = 0; y < h; y++) {
 		const unsigned char* srow = src + static_cast<size_t>(y) * pitch;
 		uint32*              drow = pixels.get() + static_cast<size_t>(y) * w;
-		for (int x = 0; x < w; x++) {
-			drow[x] = layer_argb_pixel(layer, srow[x]);
+		uint32*              end  = drow + w;
+
+		while (drow != end) {
+			*drow++ = palette[*srow++];
 		}
 	}
 	SDL_UpdateTexture(layer.texture, nullptr, pixels.get(), w * static_cast<int>(sizeof(uint32)));

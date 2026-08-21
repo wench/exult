@@ -78,6 +78,8 @@ public:
 		UiLayerDisplayMap,
 		UiLayerTextEffects,
 		UiLayerFullScreenScene,
+		UiLayerFullScreenNoScaler,
+
 		NumUiLayerKinds
 	};
 
@@ -189,6 +191,10 @@ public:
 		// entry is used verbatim (with its own alpha) instead of the opaque
 		// palette colour, letting a layer draw translucent pixels.
 		std::vector<uint32> index_argb;
+		std::vector<uint32> gamma_argb;
+		double              gamma_r = 0;
+		double              gamma_g = 0;
+		double              gamma_b = 0;
 
 		std::string name;
 
@@ -232,7 +238,7 @@ public:
 			return visible;
 		}
 
-		const std::string& get_name() {
+		const std::string& get_name() const {
 			return name;
 		}
 	};
