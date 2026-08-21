@@ -97,6 +97,7 @@ void PerformanceTimer::paintPerfMetrics() {
 			gwin->layer_set_index_argb(layer_handle, rgba);
 		}
 		gwin->layer_set_dest(layer_handle, 0, 0, int(960 * scale_factor), int(720 * scale_factor));
+		gwin->layer_set_ui_kind(layer_handle, Image_window::UiLayerFullScreenNoScaler);
 	}
 	if (mode == 1) {
 		if (layer_handle_mini == -1) {
@@ -109,6 +110,7 @@ void PerformanceTimer::paintPerfMetrics() {
 			std::memset(rgba, 255, sizeof(rgba));
 			rgba[254] = 0xAf000000;
 			gwin->layer_set_index_argb(layer_handle_mini, rgba);
+			gwin->layer_set_ui_kind(layer_handle_mini, Image_window::UiLayerFullScreenNoScaler);
 		}
 		gwin->layer_set_dest(layer_handle_mini, 0, 0, int(256 * scale_factor), int(20 * scale_factor));
 	}

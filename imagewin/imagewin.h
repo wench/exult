@@ -78,6 +78,8 @@ public:
 		UiLayerDisplayMap,
 		UiLayerTextEffects,
 		UiLayerFullScreenScene,
+		UiLayerFullScreenNoScaler,
+
 		NumUiLayerKinds
 	};
 
@@ -142,6 +144,7 @@ public:
 		int      scaler      = 0;
 		FillMode fill_mode   = Fit;
 		int      fill_scaler = 0;
+		bool     protect = false; // Protect flag is used to prevent this config from being changed by set_ui_config and set_ui_layer_config
 		// Optional fixed palette for the layer (see UiPaletteMode).
 		int                        ui_palette = UiPaletteDisabled;
 		std::vector<unsigned char> ui_palette_colors;    // 768 gamma RGB, empty = none.
@@ -189,6 +192,10 @@ public:
 		// entry is used verbatim (with its own alpha) instead of the opaque
 		// palette colour, letting a layer draw translucent pixels.
 		std::vector<uint32> index_argb;
+		std::vector<uint32> gamma_argb;
+		double              gamma_r = 0;
+		double              gamma_g = 0;
+		double              gamma_b = 0;
 
 		std::string name;
 
@@ -232,7 +239,7 @@ public:
 			return visible;
 		}
 
-		const std::string& get_name() {
+		const std::string& get_name() const {
 			return name;
 		}
 	};
@@ -709,7 +716,7 @@ public:
 	// placed. width/height set a fixed UI layout size in game pixels. A value
 	// of 0,0 means Auto (use game area size).
 	void set_ui_config(int width, int height, int scaler, FillMode fmode, int fill_scaler);
-	void set_ui_layer_config(UiLayerKind kind, int width, int height, int scaler, FillMode fmode, int fill_scaler);
+	void set_ui_layer_config(UiLayerKind kind, int width, int height, int scaler, FillMode fmode, int fill_scaler, bool protect=false);
 	// -------- Layer fixed palette --------
 	// Which fixed palette (if any) a layer uses when the game's live
 	// palette is not the day palette. Values are UiPaletteMode; the mapping to

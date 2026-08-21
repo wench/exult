@@ -485,8 +485,8 @@ public:
 	}
 
 	void set_ui_layer_config(
-			Image_window::UiLayerKind kind, int width, int height, int scaler, Image_window::FillMode fmode, int fill_scaler) {
-		win->set_ui_layer_config(kind, width, height, scaler, fmode, fill_scaler);
+			Image_window::UiLayerKind kind, int width, int height, int scaler, Image_window::FillMode fmode, int fill_scaler,bool protect=false) {
+		win->set_ui_layer_config(kind, width, height, scaler, fmode, fill_scaler,protect);
 	}
 
 	void set_ui_layer_palette(Image_window::UiLayerKind kind, int mode) {

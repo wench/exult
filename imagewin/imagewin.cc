@@ -1751,22 +1751,30 @@ void Image_window::set_ui_config(int width, int height, int scaler_, FillMode fm
 	cfg.fill_mode   = fmode;
 	cfg.fill_scaler = fill_scaler_;
 	for (int i = 0; i < NumUiLayerKinds; ++i) {
-		ui_cfgs[i] = cfg;
+		if (!ui_cfgs[i].protect) {
+			ui_cfgs[i] = cfg;
+		}
 	}
 	// Sizes/scale may have changed; force layer textures to rebuild.
 	mark_all_layers_dirty();
 }
 
-void Image_window::set_ui_layer_config(UiLayerKind kind, int width, int height, int scaler_, FillMode fmode, int fill_scaler_) {
+void Image_window::set_ui_layer_config(UiLayerKind kind, int width, int height, int scaler_, FillMode fmode, int fill_scaler_, bool protect) {
 	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
 		return;
 	}
 	UiLayerConfig& cfg = ui_cfgs[static_cast<int>(kind)];
+	// configs with protectflagset can't be chaged unless protect argument is also set
+	// This is just to prevent ui settings gump from changing this config
+	if (cfg.protect && !protect) {
+		return;
+	}
 	cfg.width          = width;
 	cfg.height         = height;
 	cfg.scaler         = scaler_;
 	cfg.fill_mode      = fmode;
 	cfg.fill_scaler    = fill_scaler_;
+	cfg.protect        = protect;
 	mark_all_layers_dirty();
 }
 
