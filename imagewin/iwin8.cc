@@ -326,8 +326,20 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 		const int    ossw  = ((logw + 3) & ~3) + 2 * gb;
 		const int    ossh  = logh + 2 * gb;
 		SDL_Surface* osrc8 = SDL_CreateSurface(ossw, ossh, SDL_PIXELFORMAT_INDEX8);
-		SDL_Surface* odst  = SDL_CreateSurface(ossw * factor, ossh * factor, SDL_PIXELFORMAT_ARGB8888);
-		bool         done  = false;
+		SDL_Surface* odst;
+		if (!SDL_LockTextureToSurface(layer.texture, nullptr, &odst)) {
+			const char* err = SDL_GetError();
+			std::cerr << "SDL_LockTextureToSurface failed trying to lock texture for layer " << layer.get_name() << ":"
+					  << (err ? err : "") << std::endl;
+
+			return false;
+		}
+		if (odst->w < ossw * factor || odst->h < ossh * factor) {
+			std::cerr << " odst surface size too small after locking texture for layer '" << layer.get_name() << "' expected "
+					  << (ossw * factor) << "x" << (ossh * factor) << " got " << odst->w << "x" << odst->h << std::endl;
+			return false;
+		}
+		bool done = false;
 		if (osrc8 && odst) {
 			SDL_Palette* sdl_pal = SDL_CreateSurfacePalette(osrc8);
 			if (sdl_pal) {
@@ -368,14 +380,12 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 							trow[x] = 0xff000000u | (row[x] & 0x00ffffffu);
 						}
 					}
-					SDL_UpdateTexture(layer.texture, nullptr, texpix.get(), tex_w * static_cast<int>(sizeof(uint32)));
+					SDL_UnlockTexture(layer.texture);
 					done = true;
 				}
 			}
 		}
-		if (odst) {
-			SDL_DestroySurface(odst);
-		}
+
 		if (osrc8) {
 			SDL_DestroySurface(osrc8);
 		}
