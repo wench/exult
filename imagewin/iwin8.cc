@@ -48,6 +48,7 @@ Boston, MA  02111-1307, USA.
 #include <algorithm>
 #include <climits>
 #include <cstring>
+#include <iostream>
 
 using std::make_unique;
 using std::rotate;
@@ -260,28 +261,37 @@ void Image_window8::refresh_layer(Layer& layer) {
 	if (layer.render_scale > 1 && refresh_layer_scaled(layer, layer.render_scale)) {
 		return;
 	}
-	const int            w      = layer.get_width();
-	const int            h      = layer.get_height();
-	Image_buffer*        b      = layer.get_ibuf();
-	const unsigned char* src    = b->get_bits();
-	const int            pitch  = static_cast<int>(b->get_line_width());
-	auto                 pixels = make_unique<uint32[]>(static_cast<size_t>(w) * h);
-	uint32               palette[256];
+	const int            w     = layer.get_width();
+	const int            h     = layer.get_height();
+	Image_buffer*        b     = layer.get_ibuf();
+	const unsigned char* src   = b->get_bits();
+	const int            pitch = static_cast<int>(b->get_line_width());
 
+	char* pixels       = nullptr;
+	int   pixels_pitch = 0;
+
+	if (!SDL_LockTexture(layer.texture, nullptr, reinterpret_cast<void**>(&pixels), &pixels_pitch)) {
+		const char* err = SDL_GetError();
+		std::cerr << "SDL_LockTexture failed trying to lock texture for layer " << layer.get_name() << ":" << (err ? err : "")
+				  << std::endl;
+		return;
+	}
+
+	uint32 palette[256];
 	for (int i = 0; i < 256; i++) {
 		palette[i] = layer_argb_pixel(layer, i);
 	}
 
 	for (int y = 0; y < h; y++) {
 		const unsigned char* srow = src + static_cast<size_t>(y) * pitch;
-		uint32*              drow = pixels.get() + static_cast<size_t>(y) * w;
+		uint32*              drow = reinterpret_cast<uint32*>(pixels + static_cast<size_t>(y) * pixels_pitch);
 		uint32*              end  = drow + w;
 
 		while (drow != end) {
 			*drow++ = palette[*srow++];
 		}
 	}
-	SDL_UpdateTexture(layer.texture, nullptr, pixels.get(), w * static_cast<int>(sizeof(uint32)));
+	SDL_UnlockTexture(layer.texture);
 }
 
 /*
