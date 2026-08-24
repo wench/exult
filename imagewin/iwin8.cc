@@ -492,7 +492,16 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 		}
 	}
 
-	auto texpix = make_unique<uint32[]>(static_cast<size_t>(tex_w) * tex_h);
+	int     texpix_pitch;
+	char *texpix=nullptr;
+	if (!SDL_LockTexture(layer.texture, nullptr, reinterpret_cast<void**>(&texpix), &texpix_pitch)) {
+		const char* err = SDL_GetError();
+		std::cerr << "SDL_LockTexture failed trying to lock texture for layer " << layer.get_name() << ":"
+					<< (err ? err : "") << std::endl;
+
+		return false;
+	}
+
 	if (ok) {
 		const uint32* pix1             = static_cast<const uint32*>(dst32->pixels);
 		const uint32* pix2             = static_cast<const uint32*>(dst32b->pixels);
@@ -506,7 +515,7 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 			const uint32*        row2 = pix2 + roff;
 			const uint32*        row3 = have3 ? pix3 + roff : nullptr;
 			const unsigned char* srow = src + static_cast<size_t>(sy) * spitch;
-			uint32*              trow = texpix.get() + static_cast<size_t>(y) * tex_w;
+			uint32*              trow = reinterpret_cast<uint32*>(texpix + static_cast<size_t>(y) * texpix_pitch);
 			for (int x = 0; x < tex_w; x++) {
 				const unsigned char idx = srow[x / factor];
 				const uint32        p1  = row1[x];
@@ -595,13 +604,13 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 		// Fallback: nearest-neighbour upscale of the 1:1 conversion.
 		for (int y = 0; y < tex_h; y++) {
 			const unsigned char* srow = src + static_cast<size_t>(y / factor) * spitch;
-			uint32*              trow = texpix.get() + static_cast<size_t>(y) * tex_w;
+			uint32*              trow = reinterpret_cast<uint32*>(texpix + static_cast<size_t>(y) * texpix_pitch);
 			for (int x = 0; x < tex_w; x++) {
 				trow[x] = layer_argb_pixel(layer, srow[x / factor]);
 			}
 		}
 	}
-	SDL_UpdateTexture(layer.texture, nullptr, texpix.get(), tex_w * static_cast<int>(sizeof(uint32)));
+	SDL_UnlockTexture(layer.texture);
 	if (dst32c) {
 		SDL_DestroySurface(dst32c);
 	}
