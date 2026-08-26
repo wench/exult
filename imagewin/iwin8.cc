@@ -399,8 +399,8 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 	const int    ssw    = ((logw + 3) & ~3) + 2 * gb;
 	const int    ssh    = logh + 2 * gb;
 	SDL_Surface* src8   = SDL_CreateSurface(ssw, ssh, SDL_PIXELFORMAT_INDEX8);
-	SDL_Surface* dst32  = SDL_CreateSurface(ssw * factor, ssh * factor, SDL_PIXELFORMAT_ARGB8888);
-	SDL_Surface* dst32b = SDL_CreateSurface(ssw * factor, ssh * factor, SDL_PIXELFORMAT_ARGB8888);
+	SDL_Surface* dst32  = get_layer_dst32_surface(0, ssw * factor, ssh * factor);
+	SDL_Surface* dst32b = get_layer_dst32_surface(1, ssw * factor, ssh * factor);
 	SDL_Surface* dst32c = nullptr;
 	bool         ok     = false;
 	bool         have3  = false;
@@ -479,7 +479,7 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 					}
 				}
 				if (needs3) {
-					dst32c = SDL_CreateSurface(ssw * factor, ssh * factor, SDL_PIXELFORMAT_ARGB8888);
+					dst32c = get_layer_dst32_surface(2, ssw * factor, ssh * factor);
 					if (dst32c) {
 						fill.r = 0;
 						fill.g = 0;
@@ -611,15 +611,6 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 		}
 	}
 	SDL_UnlockTexture(layer.texture);
-	if (dst32c) {
-		SDL_DestroySurface(dst32c);
-	}
-	if (dst32b) {
-		SDL_DestroySurface(dst32b);
-	}
-	if (dst32) {
-		SDL_DestroySurface(dst32);
-	}
 	if (src8) {
 		SDL_DestroySurface(src8);
 	}

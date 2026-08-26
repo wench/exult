@@ -399,6 +399,11 @@ protected:
 
 	// Layers composited on top of the main image (see class Layer).
 	std::vector<std::unique_ptr<Layer>> layers;
+	// Scaling layers can need upto 3 dst32 surfaces. Layer dst32 Surfaces aren't persistent and shared between all layers as needed
+	SDL_Surface* layer_dst32_surfaces[3] = {nullptr, nullptr, nullptr};
+
+	// Get one of the 3 layer dst32 surfaces making sure it's size is at least w x h
+	SDL_Surface* get_layer_dst32_surface(unsigned index, int w, int h);
 
 	// Compute a layer's on-screen destination rect (in display coords, which
 	// match the renderer's logical presentation).

@@ -811,6 +811,13 @@ void Image_window::free_surface() {
 		SDL_DestroyRenderer(screen_renderer);
 	}
 	screen_renderer = nullptr;
+
+	for (auto& surf : layer_dst32_surfaces) {
+		if (surf) {
+			SDL_DestroySurface(surf);
+			surf = nullptr;
+		}
+	}
 }
 
 /*
@@ -1733,6 +1740,31 @@ bool Image_window::scale_layer_color(const Layer& layer, SDL_Surface* src8, int 
 	ibuf->height     = save_height;
 	scale            = save_scale;
 	return true;
+}
+
+SDL_Surface* Image_window::get_layer_dst32_surface(unsigned index, int w, int h) {
+	if (index >= std::size(layer_dst32_surfaces)) {
+		return nullptr;
+	}
+
+	SDL_Surface*& surface = layer_dst32_surfaces[index];
+
+	if (surface && (surface->w < w || surface->h < h)) {
+		SDL_DestroySurface(surface);
+		surface = nullptr;
+	}
+
+	// Create a new surface
+	if (!surface) {
+		surface = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
+	}
+
+	if (surface) {
+		// zero fill the surface
+		SDL_FillSurfaceRect(surface, nullptr, 0);
+	}
+
+	return surface;
 }
 
 void Image_window::get_layer_dest(const Layer& layer, SDL_FRect& dst) {
