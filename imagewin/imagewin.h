@@ -144,7 +144,8 @@ public:
 		int      scaler      = 0;
 		FillMode fill_mode   = Fit;
 		int      fill_scaler = 0;
-		bool     protect = false; // Protect flag is used to prevent this config from being changed by set_ui_config and set_ui_layer_config
+		bool     protect     = false;    // Protect flag is used to prevent this config from being changed by set_ui_config and
+										 // set_ui_layer_config
 		// Optional fixed palette for the layer (see UiPaletteMode).
 		int                        ui_palette = UiPaletteDisabled;
 		std::vector<unsigned char> ui_palette_colors;    // 768 gamma RGB, empty = none.
@@ -170,6 +171,7 @@ public:
 	class Layer {
 		friend class Image_window;
 		friend class Image_window8;
+		SDL_Surface*                  surface = nullptr;    // SDL Surface for buf
 		std::unique_ptr<Image_buffer> buf;                  // 8-bit drawing buffer.
 		struct SDL_Texture*           texture = nullptr;    // GPU cache (rebuilt on resize).
 		int                           logw;                 // Logical (game-pixel) width.
@@ -200,8 +202,8 @@ public:
 		std::string name;
 
 	public:
-		Layer(std::unique_ptr<Image_buffer> b, int w, int h, unsigned char transp, int fscale, int zorder, std::string&& name)
-				: buf(std::move(b)), logw(w), logh(h), fixed_scale(fscale), transparent(transp), z(zorder), name(std::move(name)) {}
+		~Layer();
+		Layer(SDL_Surface* surface, int w, int h, unsigned char transp, int fscale, int zorder, std::string&& name);
 
 		Image_buffer* get_ibuf() const {
 			return buf.get();
@@ -348,7 +350,7 @@ protected:
 	// without per pixel bounds checking and to allow rounding up to
 	// multiples of 4. It should  not be less than 4 and there is no reason for
 	// it to be bigger.
-	const int guard_band = 4;
+	constexpr static int guard_band = 4;
 
 	FillMode fill_mode;
 	int      fill_scaler;
@@ -721,7 +723,8 @@ public:
 	// placed. width/height set a fixed UI layout size in game pixels. A value
 	// of 0,0 means Auto (use game area size).
 	void set_ui_config(int width, int height, int scaler, FillMode fmode, int fill_scaler);
-	void set_ui_layer_config(UiLayerKind kind, int width, int height, int scaler, FillMode fmode, int fill_scaler, bool protect=false);
+	void set_ui_layer_config(
+			UiLayerKind kind, int width, int height, int scaler, FillMode fmode, int fill_scaler, bool protect = false);
 	// -------- Layer fixed palette --------
 	// Which fixed palette (if any) a layer uses when the game's live
 	// palette is not the day palette. Values are UiPaletteMode; the mapping to

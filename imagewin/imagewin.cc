@@ -36,6 +36,7 @@ Boston, MA  02111-1307, USA.
 #include "common_types.h"
 #include "exceptions.h"
 #include "gamewin.h"
+#include "ibuf8.h"
 #include "istring.h"
 #include "items.h"
 #include "manip.h"
@@ -1543,12 +1544,17 @@ int Image_window::create_layer(std::string&& name, int w, int h, unsigned char t
 	if (w <= 0 || h <= 0) {
 		return -1;
 	}
-	std::unique_ptr<Image_buffer> buf = create_buffer(w, h);
-	if (!buf) {
+	auto surface = SDL_CreateSurface(w + 2 * guard_band, h + 2 * guard_band, SDL_PIXELFORMAT_INDEX8);
+	if (!surface) {
 		return -1;
 	}
-	buf->fill8(transparent);    // Start fully transparent.
-	auto layer = std::make_unique<Layer>(std::move(buf), w, h, transparent, fixed_scale, z, std::move(name));
+	// Make sure the surface has a palette
+	if (!SDL_CreateSurfacePalette(surface)) {
+		return -1;
+	}
+
+	auto layer = std::make_unique<Layer>(surface, w, h, transparent, fixed_scale, z, std::move(name));
+	layer->get_ibuf()->fill8(transparent);    // Start fully transparent.
 	// Reuse a freed slot if there is one, so handles stay stable.
 	for (size_t i = 0; i < layers.size(); i++) {
 		if (!layers[i]) {
@@ -1563,9 +1569,6 @@ int Image_window::create_layer(std::string&& name, int w, int h, unsigned char t
 void Image_window::destroy_layer(int handle) {
 	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
 		return;
-	}
-	if (layers[handle]->texture) {
-		SDL_DestroyTexture(layers[handle]->texture);
 	}
 	layers[handle].reset();
 }
@@ -1782,6 +1785,7 @@ void Image_window::set_ui_config(int width, int height, int scaler_, FillMode fm
 	cfg.scaler      = scaler_;
 	cfg.fill_mode   = fmode;
 	cfg.fill_scaler = fill_scaler_;
+	cfg.protect     = false;
 	for (int i = 0; i < NumUiLayerKinds; ++i) {
 		if (!ui_cfgs[i].protect) {
 			ui_cfgs[i] = cfg;
@@ -1791,7 +1795,8 @@ void Image_window::set_ui_config(int width, int height, int scaler_, FillMode fm
 	mark_all_layers_dirty();
 }
 
-void Image_window::set_ui_layer_config(UiLayerKind kind, int width, int height, int scaler_, FillMode fmode, int fill_scaler_, bool protect) {
+void Image_window::set_ui_layer_config(
+		UiLayerKind kind, int width, int height, int scaler_, FillMode fmode, int fill_scaler_, bool protect) {
 	if (kind < UiLayerDefault || kind >= NumUiLayerKinds) {
 		return;
 	}
@@ -1801,12 +1806,12 @@ void Image_window::set_ui_layer_config(UiLayerKind kind, int width, int height, 
 	if (cfg.protect && !protect) {
 		return;
 	}
-	cfg.width          = width;
-	cfg.height         = height;
-	cfg.scaler         = scaler_;
-	cfg.fill_mode      = fmode;
-	cfg.fill_scaler    = fill_scaler_;
-	cfg.protect        = protect;
+	cfg.width       = width;
+	cfg.height      = height;
+	cfg.scaler      = scaler_;
+	cfg.fill_mode   = fmode;
+	cfg.fill_scaler = fill_scaler_;
+	cfg.protect     = protect;
 	mark_all_layers_dirty();
 }
 
@@ -2093,12 +2098,13 @@ void Image_window::composite_layers() {
 		layer.render_scale = render_scale;
 		if (layer.texture == nullptr) {    // Lazily (re)create the GPU texture.
 			layer.texture = SDL_CreateTexture(
-					screen_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, layer.logw * render_scale,
-					layer.logh * render_scale);
+					screen_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+					(layer.logw + 2 * guard_band + 2) * render_scale, (layer.logh + 2 * guard_band) * render_scale);
 			if (layer.texture == nullptr) {
 				continue;
 			}
-			SDL_SetTextureBlendMode(layer.texture, SDL_BLENDMODE_BLEND);
+
+			SDL_SetTextureBlendMode(layer.texture, layer.is_opaque() ? SDL_BLENDMODE_NONE : SDL_BLENDMODE_BLEND);
 			layer.dirty = true;
 		}
 		SDL_SetTextureScaleMode(layer.texture, smode);
@@ -2107,9 +2113,12 @@ void Image_window::composite_layers() {
 			layer.dirty = false;
 		}
 		SDL_SetTextureAlphaMod(layer.texture, layer.alpha);
-		SDL_FRect dst;
+		SDL_FRect dst, src = {float(guard_band * render_scale), float(guard_band * render_scale), float(layer.logw * render_scale),
+							  float(layer.logh * render_scale)};
 		get_layer_dest(layer, dst);
-		SDL_RenderTexture(screen_renderer, layer.texture, nullptr, &dst);
+
+		// SDL_RenderTexture(screen_renderer, layer.texture, nullptr, &dst);
+		SDL_RenderTexture(screen_renderer, layer.texture, &src, &dst);
 	}
 }
 
@@ -2198,3 +2207,18 @@ int Image_window::VideoModeOK(int width, int height, bool fullscreen, int bpp) {
 }
 
 SDL_DisplayMode Image_window::desktop_displaymode;
+
+Image_window::Layer::~Layer() {
+	if (texture) {
+		SDL_DestroyTexture(texture);
+	}
+	if (surface) {
+		SDL_DestroySurface(surface);
+	}
+}
+
+Image_window::Layer::Layer(SDL_Surface* surface, int w, int h, unsigned char transp, int fscale, int zorder, std::string&& name)
+		: surface(surface),
+		  buf(std::make_unique<Image_buffer8>(
+				  surface->w, surface->h, surface->pitch, reinterpret_cast<unsigned char*>(surface->pixels), guard_band)),
+		  logw(w), logh(h), fixed_scale(fscale), transparent(transp), z(zorder), name(std::move(name)) {}
