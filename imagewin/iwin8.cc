@@ -249,6 +249,30 @@ uint32 Image_window8::layer_argb_pixel(const Layer& layer, unsigned char p) cons
 		   | static_cast<uint32>(pal[3 * p + 2]);
 }
 
+static void fill_guardband(void* buffer, int width, int height, int pitch, int gbsize, uint32 val) {
+	uint8* buffer8 = reinterpret_cast<uint8*>(buffer);
+	if (gbsize < 0) {
+		buffer8 += gbsize + pitch * gbsize;
+		gbsize = -gbsize;
+	}
+
+	// left and right guardbands
+	for (int y = 0; y < height; y++) {
+		uint32* row = reinterpret_cast<uint32*>(buffer8 + y * pitch);
+		std::fill_n(row, gbsize, val);
+		std::fill_n(row + width + gbsize, gbsize, val);
+	}
+	// top and bottom guardbands
+	for (int y = 0; y < gbsize; y++) {
+		// Top guardband
+		uint32* row = reinterpret_cast<uint32*>(buffer8 + y * pitch);
+		std::fill_n(row, width + gbsize * 2, val);
+		// Bottom guardband
+		row = reinterpret_cast<uint32*>(buffer8 + (gbsize + height + y) * pitch);
+		std::fill_n(row, width + gbsize * 2, val);
+	}
+}
+
 /*
  *  Convert a layer's 8-bit paletted pixels into its ARGB texture,
  *  using the current palette.  The layer's transparent index is written as
@@ -261,14 +285,13 @@ void Image_window8::refresh_layer(Layer& layer) {
 	if (layer.render_scale > 1 && refresh_layer_scaled(layer, layer.render_scale)) {
 		return;
 	}
-	const int            w     = layer.get_width();
-	const int            h     = layer.get_height();
-	SDL_Surface*         s     = layer.surface;
-	const unsigned char* src   = reinterpret_cast<unsigned char*>(s->pixels);
-	const int            pitch = s->pitch;
-
-	char* pixels       = nullptr;
-	int   pixels_pitch = 0;
+	const int            w            = layer.get_width();
+	const int            h            = layer.get_height();
+	SDL_Surface*         s            = layer.surface;
+	const unsigned char* src          = reinterpret_cast<unsigned char*>(s->pixels);
+	const int            pitch        = s->pitch;
+	char*                pixels       = nullptr;
+	int                  pixels_pitch = 0;
 
 	if (!SDL_LockTexture(layer.texture, nullptr, reinterpret_cast<void**>(&pixels), &pixels_pitch)) {
 		const char* err = SDL_GetError();
@@ -276,6 +299,7 @@ void Image_window8::refresh_layer(Layer& layer) {
 				  << (err ? err : "") << std::endl;
 		return;
 	}
+	fill_guardband(pixels, w, h, pixels_pitch, guard_band, 0);
 
 	uint32 palette[256];
 	for (int i = 0; i < 256; i++) {
@@ -379,6 +403,7 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 			SDL_UnlockTexture(layer.texture);
 			return false;
 		}
+		fill_guardband(odst->pixels, tex_w, tex_h, odst->pitch, guard_band * factor, 0);
 		bool done = false;
 		if (odst) {
 			if (scale_layer_color(layer, lsurf, logw, logh, odst)) {
@@ -470,6 +495,7 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 
 		return false;
 	}
+	fill_guardband(texpix, tex_w, tex_h, texpix_pitch, guard_band * factor, 0);
 
 	if (ok) {
 		const uint32* pix1    = static_cast<const uint32*>(dst32->pixels);
@@ -584,7 +610,6 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 			}
 		}
 	}
-
 	SDL_UnlockTexture(layer.texture);
 
 	return true;
