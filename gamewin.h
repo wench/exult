@@ -459,8 +459,8 @@ public:
 		win->layer_set_z(handle, z);
 	}
 
-	void layer_set_dest(int handle, int x, int y, int w, int h) {
-		win->layer_set_dest(handle, x, y, w, h);
+	void layer_set_dest(int handle, int x, int y, int w, int h, bool add = false) {
+		win->layer_set_dest(handle, x, y, w, h, add);
 	}
 
 	void layer_clear_dest(int handle) {
@@ -485,8 +485,9 @@ public:
 	}
 
 	void set_ui_layer_config(
-			Image_window::UiLayerKind kind, int width, int height, int scaler, Image_window::FillMode fmode, int fill_scaler,bool protect=false) {
-		win->set_ui_layer_config(kind, width, height, scaler, fmode, fill_scaler,protect);
+			Image_window::UiLayerKind kind, int width, int height, int scaler, Image_window::FillMode fmode, int fill_scaler,
+			bool protect = false) {
+		win->set_ui_layer_config(kind, width, height, scaler, fmode, fill_scaler, protect);
 	}
 
 	void set_ui_layer_palette(Image_window::UiLayerKind kind, int mode) {

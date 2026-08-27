@@ -181,11 +181,11 @@ public:
 		bool                          opaque = false;       // If set, NO index is transparent (a
 															// full-screen opaque scene: every pixel
 															// is drawn, even the 'transparent' index).
-		bool        visible  = true;
-		bool        dirty    = true;     // Buffer changed => re-upload.
-		int         z        = 0;        // Composite order (higher = on top).
-		bool        has_dest = false;    // Explicit destination override?
-		SDL_FRect   dest{};              // Destination rect (display coords).
+		bool                   visible = true;
+		bool                   dirty   = true;    // Buffer changed => re-upload.
+		int                    z       = 0;       // Composite order (higher = on top).
+		std::vector<SDL_FRect> dest    = {};      // Destination rects to paint layer. If more than 1 the layer is painted multiple
+												  // tines, if 0 default foe UIConfog is used
 		UiLayerKind ui_kind      = UiLayerDefault;
 		int         render_scale = 1;    // 1 = 1:1 upload; >1 = pre-scaled by
 										 // the game's scaler at this factor.
@@ -409,7 +409,7 @@ protected:
 
 	// Compute a layer's on-screen destination rect (in display coords, which
 	// match the renderer's logical presentation).
-	void get_layer_dest(const Layer& layer, struct SDL_FRect& dst);
+	bool get_layer_dest(const Layer& layer, struct SDL_FRect& dst, int num = 0);
 	// Place a logw x logh layer on the display using the UI fill mode / scale.
 	void compute_layer_fill_dest(int logw, int logh, struct SDL_FRect& dst) const;
 	void compute_layer_fill_dest(int logw, int logh, struct SDL_FRect& dst, UiLayerKind kind) const;
@@ -707,7 +707,7 @@ public:
 	// Give a layer an explicit destination rectangle (in display coords),
 	// overriding the centred auto-fit placement.  Used to position a layer
 	// (e.g. the mouse cursor) freely. layer_clear_dest() restores auto-fit.
-	void layer_set_dest(int handle, int x, int y, int w, int h);
+	void layer_set_dest(int handle, int x, int y, int w, int h, bool add = false);
 	void layer_clear_dest(int handle);
 	void layer_set_ui_kind(int handle, UiLayerKind kind);
 	// Set (or clear, with nullptr) a layer's 256-entry ARGB override table.
