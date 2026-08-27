@@ -2117,7 +2117,6 @@ void Image_window::composite_layers() {
 							  float(layer.logh * render_scale)};
 		get_layer_dest(layer, dst);
 
-		// SDL_RenderTexture(screen_renderer, layer.texture, nullptr, &dst);
 		SDL_RenderTexture(screen_renderer, layer.texture, &src, &dst);
 	}
 }
