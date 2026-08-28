@@ -169,8 +169,9 @@ class Game_window {
 	long check_time_stopped();
 
 	// Red plasma animation during game load
-	uint32 load_palette_timer;
-	int    plasma_start_color, plasma_cycle_range;
+	uint32                             load_palette_timer;
+	std::unique_ptr<class Scene_layer> load_screen_layer;
+	int                                plasma_start_color, plasma_cycle_range;
 
 public:
 	friend class Game_render;
