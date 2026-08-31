@@ -288,8 +288,8 @@ void Image_window8::refresh_layer(Layer& layer) {
 	const int            w            = layer.get_width();
 	const int            h            = layer.get_height();
 	SDL_Surface*         s            = layer.surface;
-	const unsigned char* src          = reinterpret_cast<unsigned char*>(s->pixels);
-	const int            pitch        = s->pitch;
+	const size_t         spitch       = s->pitch;
+	const unsigned char* src          = reinterpret_cast<unsigned char*>(s->pixels) + spitch * guard_band + guard_band;
 	char*                pixels       = nullptr;
 	int                  pixels_pitch = 0;
 
@@ -299,6 +299,7 @@ void Image_window8::refresh_layer(Layer& layer) {
 				  << (err ? err : "") << std::endl;
 		return;
 	}
+
 	fill_guardband(pixels, w, h, pixels_pitch, guard_band, 0);
 
 	uint32 palette[256];
@@ -306,9 +307,11 @@ void Image_window8::refresh_layer(Layer& layer) {
 		palette[i] = layer_argb_pixel(layer, i);
 	}
 
+	const size_t ppitch = pixels_pitch;
+	pixels += ppitch * guard_band + guard_band * sizeof(uint32);
 	for (int y = 0; y < h; y++) {
-		const unsigned char* srow = src + static_cast<size_t>(y) * pitch;
-		uint32*              drow = reinterpret_cast<uint32*>(pixels + static_cast<size_t>(y) * pixels_pitch);
+		const unsigned char* srow = src + y * spitch;
+		uint32*              drow = reinterpret_cast<uint32*>(pixels + y * ppitch);
 		uint32*              end  = drow + w;
 
 		while (drow != end) {
