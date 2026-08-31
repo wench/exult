@@ -1617,7 +1617,7 @@ bool Image_window::layer_is_visible(int handle) {
 	return layers[handle]->is_visible();
 }
 
-void Image_window::layer_set_index_argb(int handle, const uint32* argb256) {
+void Image_window::layer_set_index_argb(int handle, const uint32* argb256, bool nogc) {
 	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
 		return;
 	}
@@ -1626,6 +1626,7 @@ void Image_window::layer_set_index_argb(int handle, const uint32* argb256) {
 		layer.index_argb.clear();
 	} else {
 		layer.index_argb.assign(argb256, argb256 + 256);
+		layer.no_gammacorrection = nogc;
 	}
 	layer.set_dirty();
 }
@@ -1642,6 +1643,13 @@ void Image_window::layer_set_alpha(int handle, unsigned char a) {
 		return;
 	}
 	layers[handle]->alpha = a;
+}
+
+void Image_window::layer_set_blendmode(int handle, SDL_BlendMode blendmode) {
+	if (handle < 0 || handle >= static_cast<int>(layers.size()) || !layers[handle]) {
+		return;
+	}
+	layers[handle]->blend_mode = blendmode;
 }
 
 void Image_window::layer_set_dest(int handle, int x, int y, int w, int h, bool add) {
@@ -2117,9 +2125,9 @@ void Image_window::composite_layers() {
 				continue;
 			}
 
-			SDL_SetTextureBlendMode(layer.texture, layer.is_opaque() ? SDL_BLENDMODE_NONE : SDL_BLENDMODE_BLEND);
 			layer.dirty = true;
 		}
+		SDL_SetTextureBlendMode(layer.texture, layer.blend_mode);
 		SDL_SetTextureScaleMode(layer.texture, smode);
 		if (layer.dirty) {
 			refresh_layer(layer);
