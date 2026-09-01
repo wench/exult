@@ -78,7 +78,11 @@ public:
 		UiLayerDisplayMap,
 		UiLayerTextEffects,
 		UiLayerFullScreenScene,
-		UiLayerFullScreenNoScaler,
+
+		// Layer is drawn fullscreen with bilinear fill scaling.
+		UiLayerFullScreenBilinear,
+		// Layer is drawn fullscreen with point fill scaling
+		UiLayerFullScreenPoint,
 
 		NumUiLayerKinds
 	};

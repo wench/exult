@@ -746,6 +746,11 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 
 	paletted_surface = draw_surface;
 
+	// Set UI config for UiLayerGameWorldCoords
+
+	set_ui_layer_config(UiLayerFullScreenBilinear, w, h, NoScaler, Fill, bilinear, true);
+	set_ui_layer_config(UiLayerFullScreenPoint, w, h, NoScaler, Fill, point, true);
+
 	return true;
 }
 
