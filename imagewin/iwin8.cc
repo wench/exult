@@ -392,8 +392,8 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 	// scene's legitimate use of the 'transparent' index (e.g. index 255 in an
 	// FLI frame) would be matted away to see-through.
 	if (layer.is_opaque()) {
-		SDL_Surface* odst;
-		if (!SDL_LockTextureToSurface(layer.texture, nullptr, &odst)) {
+		SDL_Surface* odst = nullptr;
+		if (!SDL_LockTextureToSurface(layer.texture, nullptr, &odst) || !odst) {
 			const char* err = SDL_GetError();
 			std::cerr << "SDL_LockTextureToSurface failed trying to lock texture for layer " << layer.get_name() << ":"
 					  << (err ? err : "") << std::endl;
@@ -408,12 +408,10 @@ bool Image_window8::refresh_layer_scaled(Layer& layer, int factor) {
 		}
 		fill_guardband(odst->pixels, tex_w, tex_h, odst->pitch, guard_band * factor, 0);
 		bool done = false;
-		if (odst) {
-			if (scale_layer_color(layer, lsurf, logw, logh, odst)) {
-				auto texpix = make_unique<uint32[]>(static_cast<size_t>(tex_w) * tex_h);
+		if (scale_layer_color(layer, lsurf, logw, logh, odst)) {
+			auto texpix = make_unique<uint32[]>(static_cast<size_t>(tex_w) * tex_h);
 
-				done = true;
-			}
+			done = true;
 		}
 
 		SDL_UnlockTexture(layer.texture);

@@ -694,6 +694,7 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 	}
 	if (screen_texture == nullptr) {
 		cout << "Couldn't create screen_texture: " << SDL_GetError() << std::endl;
+		return false;
 	}
 	// This is just to make sure that rects in screen_texture get copied exactly to screen_texture_a
 	SDL_SetTextureScaleMode(screen_texture, SDL_SCALEMODE_NEAREST);
