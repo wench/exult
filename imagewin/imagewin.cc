@@ -1105,7 +1105,7 @@ void Image_window::show(int x, int y, int w, int h) {
 	}
 	// Unlocking the texture destroys display_surface
 	SDL_UnlockTexture(screen_texture);
-	UpdateRect(&dirtyrect, &fullrect);
+	UpdateRect(&dirtyrect, &fullrect, false);
 
 	const char* err = SDL_GetError();
 	if (err && *err) {
@@ -1251,11 +1251,22 @@ void Image_window::FillGuardband() {
 	}
 }
 
-bool Image_window::screenshot(SDL_IOStream* dst) {
-	if (!paletted_surface) {
-		return false;
+bool Image_window::screenshot(SDL_IOStream* dst, bool paletted) {
+	if (paletted && paletted_surface) {
+		return SaveIMG_RW(draw_surface, dst, true, guard_band);
+	} else if (screen_renderer) {
+		UpdateRect(nullptr, nullptr, true);
+		SDL_Surface* surf = SDL_RenderReadPixels(screen_renderer, nullptr);
+		if (!surf) {
+			const char* err = SDL_GetError();
+			std::cerr << "SDL_RenderReadPixels failed when trying to make screenshot: " << (err ? err : "") << std::endl;
+			SDL_ClearError();
+		}
+		bool res = SaveIMG_RW(surf, dst, true, guard_band);
+		SDL_DestroySurface(surf);
+		return res;
 	}
-	return SaveIMG_RW(draw_surface, dst, true, guard_band);
+	return false;
 }
 
 void Image_window::set_title(const char* title) {
@@ -2155,22 +2166,27 @@ void Image_window::composite_layers() {
 	}
 }
 
-void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect) {
+void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect, bool for_screenshot) {
 	auto perfcounter = PerformanceTimer::GetScopedPerfTimer(__func__);
 
 	{
-		auto perfcounter_rt = PerformanceTimer::GetScopedPerfTimer(__func__, " Rendering Textures");
-		if (!SDL_SetRenderTarget(screen_renderer, screen_texture_a)) {
-			const char* err = SDL_GetError();
-			std::cerr << "SDL_SetRenderTarget(screen_renderer, screen_texture_a) failed: " << (err ? err : "") << std::endl;
-			SDL_ClearError();
-		}
+		static SDL_FRect last_fullrect = {};
+		if (!for_screenshot) {
+			auto perfcounter_rt = PerformanceTimer::GetScopedPerfTimer(__func__, " Rendering Textures");
+			if (!SDL_SetRenderTarget(screen_renderer, screen_texture_a)) {
+				const char* err = SDL_GetError();
+				std::cerr << "SDL_SetRenderTarget(screen_renderer, screen_texture_a) failed: " << (err ? err : "") << std::endl;
+				SDL_ClearError();
+			}
 
-		if (!SDL_RenderTexture(screen_renderer, screen_texture, dirtyRect, dirtyRect)) {
-			const char* err = SDL_GetError();
-			std::cerr << "SDL_RenderTexture(screen_renderer, screen_texture, srcRect, srcRect) failed: " << (err ? err : "")
-					  << std::endl;
-			SDL_ClearError();
+			if (!SDL_RenderTexture(screen_renderer, screen_texture, dirtyRect, dirtyRect)) {
+				const char* err = SDL_GetError();
+				std::cerr << "SDL_RenderTexture(screen_renderer, screen_texture, srcRect, srcRect) failed: " << (err ? err : "")
+						  << std::endl;
+				SDL_ClearError();
+			}
+		} else {
+			fullRect = &last_fullrect;
 		}
 
 		if (!SDL_SetRenderTarget(screen_renderer, nullptr)) {
@@ -2185,11 +2201,14 @@ void Image_window::UpdateRect(SDL_FRect* dirtyRect, SDL_FRect* fullRect) {
 					  << std::endl;
 			SDL_ClearError();
 		}
+		if (!for_screenshot) {
+			last_fullrect = *fullRect;
+		}
 	}
 
 	// Draw overlay layers on top of the main image, before presenting.
 	composite_layers();
-	{
+	if (!for_screenshot) {
 		auto perfcounter_srp = PerformanceTimer::GetScopedPerfTimer(__func__, " SDL_RenderPresent");
 		if (!SDL_RenderPresent(screen_renderer)) {
 			const char* err = SDL_GetError();
