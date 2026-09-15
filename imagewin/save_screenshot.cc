@@ -318,8 +318,6 @@ bool SaveIMG_RW(SDL_Surface* saveme, SDL_IOStream* dst, bool freedst, int guardb
 	cout << "Taking screenshot...";
 
 	surface = nullptr;
-	// Choose correct Pixel Masks for the SDL Surface so it in memory has the byte order libpng expects.
-	// PNG expects bytes in RGB order
 	const SDL_PixelFormatDetails* saveme_format = SDL_GetPixelFormatDetails(saveme->format);
 	if (dst) {
 		if (SDL_GetSurfacePalette(saveme)) {
