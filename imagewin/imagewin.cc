@@ -1261,6 +1261,7 @@ bool Image_window::screenshot(SDL_IOStream* dst, bool paletted) {
 			const char* err = SDL_GetError();
 			std::cerr << "SDL_RenderReadPixels failed when trying to make screenshot: " << (err ? err : "") << std::endl;
 			SDL_ClearError();
+			return false;
 		}
 		bool res = SaveIMG_RW(surf, dst, true, guard_band);
 		SDL_DestroySurface(surf);
